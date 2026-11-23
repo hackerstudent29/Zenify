@@ -12,54 +12,85 @@ import java.io.IOException
 
 @OptIn(UnstableApi::class)
 class RefusedRetryDataSource(
-    private val upstream: DataSource,
+    private val upstreamFactory: DataSource.Factory,
     private val onRefused: (videoId: String, failedUrl: String?) -> Unit
 ) : DataSource {
     companion object {
         private const val TAG = "RefusedRetryDataSource"
     }
 
+    private var currentUpstream: DataSource? = null
+    private val transferListeners = mutableListOf<TransferListener>()
     private var currentDataSpec: DataSpec? = null
     private var retried = false
 
     override fun addTransferListener(transferListener: TransferListener) {
-        upstream.addTransferListener(transferListener)
+        transferListeners.add(transferListener)
+        currentUpstream?.addTransferListener(transferListener)
+    }
+
+    private fun createAndListenUpstream(): DataSource {
+        val s = upstreamFactory.createDataSource()
+        for (l in transferListeners) {
+            s.addTransferListener(l)
+        }
+        return s
     }
 
     @Throws(IOException::class)
     override fun open(dataSpec: DataSpec): Long {
         currentDataSpec = dataSpec
         retried = false
+        val initialSource = createAndListenUpstream()
+        currentUpstream = initialSource
         try {
-            return upstream.open(dataSpec)
-        } catch (e: HttpDataSource.InvalidResponseCodeException) {
-            if (e.responseCode == 403 && !retried) {
+            return initialSource.open(dataSpec)
+        } catch (e: Exception) {
+            val is403 = (e as? HttpDataSource.InvalidResponseCodeException)?.responseCode == 403 ||
+                    e.message?.contains("403") == true
+            if (is403 && !retried) {
                 retried = true
                 val videoId = extractVideoId(dataSpec)
                 Log.w(TAG, "HTTP 403 on open for videoId=$videoId; retrying with fresh client stream...")
                 if (videoId != null) {
-                    val failedUrl = e.dataSpec.uri.toString()
+                    val failedUrl = (e as? HttpDataSource.InvalidResponseCodeException)?.dataSpec?.uri?.toString() ?: dataSpec.uri.toString()
                     onRefused(videoId, failedUrl)
-                    return upstream.open(dataSpec)
+                    try {
+                        initialSource.close()
+                    } catch (_: Exception) {}
+                    val freshSource = createAndListenUpstream()
+                    currentUpstream = freshSource
+                    try {
+                        return freshSource.open(dataSpec)
+                    } catch (e2: Exception) {
+                        if (e2 is IOException) throw e2
+                        throw IOException(e2)
+                    }
                 }
             }
-            throw e
+            if (e is IOException) throw e
+            throw IOException(e)
         }
     }
 
     @Throws(IOException::class)
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
-        return upstream.read(buffer, offset, length)
+        val s = currentUpstream ?: throw IOException("DataSource not open")
+        return s.read(buffer, offset, length)
     }
 
-    override fun getUri(): Uri? = upstream.uri
+    override fun getUri(): Uri? = currentUpstream?.uri
 
-    override fun getResponseHeaders(): Map<String, List<String>> = upstream.responseHeaders
+    override fun getResponseHeaders(): Map<String, List<String>> = currentUpstream?.responseHeaders ?: emptyMap()
 
     @Throws(IOException::class)
     override fun close() {
         currentDataSpec = null
-        upstream.close()
+        try {
+            currentUpstream?.close()
+        } finally {
+            currentUpstream = null
+        }
     }
 
     private fun extractVideoId(dataSpec: DataSpec): String? {
@@ -88,7 +119,7 @@ class RefusedRetryDataSource(
         private val onRefused: (videoId: String, failedUrl: String?) -> Unit
     ) : DataSource.Factory {
         override fun createDataSource(): DataSource {
-            return RefusedRetryDataSource(upstreamFactory.createDataSource(), onRefused)
+            return RefusedRetryDataSource(upstreamFactory, onRefused)
         }
     }
 }

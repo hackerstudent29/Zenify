@@ -58,12 +58,81 @@ class _MiniGeo {
   double get insetTop => (h - art) / 2;
   double get insetLeft => lerpDouble(10.0, 14.0, dp)!;
   double get inset => insetTop;
-  Rect artRect(Size size) => Rect.fromLTWH(
+
+  // landscape: wide thumb (capped); portrait / square: square slot, content is cropped
+  double artW(double ar) => ar > 1.08 ? math.min(art * ar, art * 1.8) : art;
+  Rect artRect(Size size, [double ar = 1.0]) => Rect.fromLTWH(
     side + insetLeft,
     size.height - bottom - h + insetTop,
-    art,
+    artW(ar),
     art,
   );
+}
+
+class _WindowClipper extends CustomClipper<RRect> {
+  _WindowClipper(this.window, this.radius);
+  final Size window; // in the cover's LOCAL (pre-scale) coordinates
+  final double radius;
+  @override
+  RRect getClip(Size box) {
+    final w = math.min(box.width, window.width);
+    final h = math.min(box.height, window.height);
+    final maxR = math.min(w, h) / 2;
+    return RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: box.center(Offset.zero),
+        width: w,
+        height: h,
+      ),
+      Radius.circular(math.min(radius, maxR)),
+    );
+  }
+  @override
+  bool shouldReclip(_WindowClipper o) =>
+      o.window != window || o.radius != radius;
+}
+
+double _clampAr(double ar) => ar.clamp(9 / 22, 22 / 9).toDouble();
+
+/// Big card for a video (portrait). Fits inside the art region, centered.
+Rect _videoBigRect(Size size, EdgeInsets safe, double ar) {
+  final region = Rect.fromLTRB(
+    16,
+    safe.top + 63, // same top as _bigOrFallback
+    size.width - 16,
+    _bleedRect(size, safe).bottom, // same bottom as the full-bleed slot
+  );
+  double w = region.width;
+  double h = w / ar;
+  if (h > region.height) {
+    h = region.height;
+    w = h * ar;
+  }
+  return Rect.fromCenter(center: region.center, width: w, height: h);
+}
+
+/// Landscape video: the cover flies out to fill the whole screen (contain).
+Rect _videoFullRect(Size size, double ar) {
+  double w = size.width;
+  double h = w / ar;
+  if (h > size.height) {
+    h = size.height;
+    w = h * ar;
+  }
+  return Rect.fromCenter(center: size.center(Offset.zero), width: w, height: h);
+}
+
+/// Landscape: square artwork on the left, vertically centered (Apple Music).
+Rect _landscapeArtRect(Size size, EdgeInsets safe) {
+  const pad = 24.0;
+  final availH = size.height - safe.top - safe.bottom - pad * 2;
+  final side = math
+      .min(availH, size.width * 0.44)
+      .clamp(120.0, 520.0)
+      .toDouble();
+  final left = safe.left + pad + 8;
+  final top = safe.top + (size.height - safe.top - safe.bottom - side) / 2;
+  return Rect.fromLTWH(left, top, side, side);
 }
 
 /// Artwork corner radii (visual points, independent of the morph scale).
@@ -72,7 +141,12 @@ const double _kRadiusBig = 12;
 const double _kRadiusDocked = 7;
 
 /// Auto-hide bottom controls after 3 seconds of inactivity in lyrics mode.
+/// The countdown only starts once the lyrics are fully visible.
 const Duration _kIdleHide = Duration(seconds: 3);
+
+/// After the lyrics / queue appear, scroll notifications are ignored for this
+/// long so the initial auto-scroll can never hide the controls.
+const Duration _kPanelScrollGrace = Duration(milliseconds: 900);
 
 /// Cover docking spring (art <-> header). Critically damped: no bounce.
 const SpringDescription _kDockSpring = SpringDescription(
@@ -81,12 +155,13 @@ const SpringDescription _kDockSpring = SpringDescription(
   damping: 44, // ζ≈1
 );
 
-/// Sheet close spring. Critically damped: swift settle, no undershoot, so it
-/// can never sit "stuck" below 0 before completing.
+/// Sheet close spring. CRITICALLY damped (damping = 2·√stiffness). Softer than
+/// before so the glide to the mini player is clearly visible (~0.35s) even
+/// from a light flick, and it never undershoots below 0.
 const SpringDescription _kCloseSpring = SpringDescription(
   mass: 1.0,
-  stiffness: 420,
-  damping: 41, // ζ≈1
+  stiffness: 220,
+  damping: 29.7, // ζ≈1
 );
 
 /// Sheet open spring. Tiny settle, like iOS.
@@ -108,6 +183,25 @@ const SpringDescription _kReleaseSpring = SpringDescription(
   damping: 15,
 );
 
+/// LANDSCAPE: controls <-> lyrics / queue swap. Critically damped (ζ≈1,
+/// damping = 2·√stiffness): a soft, fast ease with zero overshoot.
+const SpringDescription _kPanelSpring = SpringDescription(
+  mass: 1,
+  stiffness: 300,
+  damping: 34.6,
+);
+
+/// LANDSCAPE video: controls show / hide. A hair under critical = a tiny
+/// natural settle on the scale, none on the opacity (it is clamped).
+const SpringDescription _kVideoUiSpring = SpringDescription(
+  mass: 1,
+  stiffness: 360,
+  damping: 30,
+);
+
+/// Height reserved for the title / artist header in the landscape right pane.
+const double _kLandMetaH = 58.0;
+
 /// The mini player pill is fully gone once the sheet is this far open.
 const double _kMiniFadeSpan = 0.14;
 
@@ -120,14 +214,28 @@ const double _kSheetStartY = 0.70;
 
 /// Sheet opacity: exactly 0% until the sheet has travelled _kSheetFadeStart,
 /// then an ease-in (quadratic) ramp, reaching 100% only at _kSheetFadeEnd.
-///   t=0.20 -> 0%   t=0.50 -> 16%   t=0.80 -> 64%   t>=0.95 -> 100%
-/// (t = fraction of the sheet travel; the sheet top is at 30% + 70%·t of the
-/// screen height). Tune these two numbers to taste.
 const double _kSheetFadeStart = 0.20;
 const double _kSheetFadeEnd = 0.95;
 
 /// Tap vs scroll threshold for the controls show / hide logic.
 const double _kTapSlop = 18.0;
+
+/// The parent (tab bar / dock) rebuilds on [PlayerShell.sheetProgress]. Every
+/// publish = one parent rebuild in the middle of the animation, so only
+/// publish in coarse steps (+ the end points).
+const double _kPublishStep = 0.2;
+
+/// Sheet progress below which the dock / tab bar is allowed to come back
+/// DURING a close. 0.0 = only after the cover has fully landed in the mini
+/// player (the dock's blurred glass then can't steal frames from the glide).
+/// Raise it (e.g. 0.08) if you want the dock to return slightly earlier.
+const double _kDockReturnAt = 0.0;
+
+/// Lyrics / queue body: fades in only AFTER the cover has docked, and fades
+/// out quickly. While the cover glides the body is not painted at all, so the
+/// glide is just one image moving = buttery smooth.
+const Duration _kBodyFadeIn = Duration(milliseconds: 240);
+const Duration _kBodyFadeOut = Duration(milliseconds: 110);
 
 double _smooth(double x) {
   final v = x.clamp(0.0, 1.0).toDouble();
@@ -141,6 +249,10 @@ double _sheetAlpha(double t) {
   return x * x;
 }
 
+/// The heavy body (lyrics / queue) is gone by the time the sheet is 70% open,
+/// so a closing swipe never has to paint it while the cover flies down.
+double _bodyAlpha(double t) => _smooth((t - 0.7) / 0.3);
+
 /// Tap open/close have no finger momentum, so they use softer springs and
 /// the cover flight stays visible. Drag releases keep the stiff ones.
 const SpringDescription _kOpenTapSpring = SpringDescription(
@@ -149,13 +261,10 @@ const SpringDescription _kOpenTapSpring = SpringDescription(
   damping: 35,
 );
 
-/// Vertical gap used TWICE in the open sheet, so the rhythm is even:
-///  • between the seekbar and the play / pause row
-///  • between the play / pause row and the last row (Studio FX · Lyrics · Queue)
+/// Vertical gap used TWICE in the open sheet, so the rhythm is even.
 const double _kRowGap = 56.0;
 
-// Fixed heights of the open-sheet blocks (shared by the layout AND by the
-// full-bleed artwork placement, so the cover always sits cleanly above the title).
+// Fixed heights of the open-sheet blocks.
 const double _kSeekH = 52.0;
 const double _kTransportH = 90.0; // height of the play / pause button box
 const double _kMetaH = 50.0; // title + artist row (incl. its bottom padding)
@@ -165,9 +274,7 @@ const double _kMetaGap = 3.0; // gap between the title row and the seekbar
 /// block (= top of the last row + _kRowGap).
 double _blockBottomInset(EdgeInsets safe) => 44.0 + 16 + safe.bottom + _kRowGap;
 
-/// Where the full-bleed cover sits: positioned in the upper portion between
-/// the top safe area / grabber and the title row, fitting the screen's left
-/// and right sides exactly with guaranteed clearance above the song title.
+/// Where the full-bleed cover sits.
 Rect _bleedRect(Size size, EdgeInsets safe) {
   final dockedBlockH = _kSeekH + _kRowGap + _kTransportH;
   final titleTop =
@@ -194,16 +301,21 @@ enum _Panel { art, lyrics, queue }
 ///   Stack(children: [ pages, const Positioned.fill(child: PlayerShell()) ])
 ///
 /// Motion model (all springs):
-///  • `_sheet`  0 = docked mini, 1 = fully open. It drives the cover flight
-///    (ONE card: mini -> big / bleed / header) and fades the backdrop
-///    0% -> 100%. The sheet itself does NOT slide.
+///  • `_sheet`  0 = docked mini, 1 = fully open. Drives the cover flight.
 ///  • `_dock`   0 = big artwork, 1 = artwork docked top-left in the header.
+///    (PORTRAIT only: in landscape the cover never docks, it stays on the left.)
+///  • `_bodyIn` 0 = lyrics / queue hidden, 1 = visible. Portrait: rises only
+///    AFTER the cover has docked. Landscape: a spring cross-fade with the
+///    controls on the right pane.
 ///  • `_chrome` 0 = bottom controls shown, 1 = hidden (lyrics idle / scroll).
-///    Hiding NEVER changes layout (only opacity and offset), except the queue
-///    list which grows to the bottom edge while the controls are hidden.
-///  • ONE artwork widget lives in an overlay, laid out once at the big size and
-///    moved/scaled with a matrix. The mini player hides its own cover while
-///    the sheet is open, so there is never a second card.
+///  • `_videoUiC` landscape video: 1 = controls shown, 0 = hidden.
+///
+/// PERFORMANCE RULES used everywhere below:
+///  1. The widget tree NEVER changes shape while something animates.
+///  2. Heavy bodies are mounted BEFORE the glide starts, invisible and
+///     NOT PAINTED (Opacity 0 skips painting entirely).
+///  3. While the cover glides / the sheet moves, lyrics tickers are muted and
+///     nothing heavy is painted: the GPU only moves one cached image.
 class PlayerShell extends StatefulWidget {
   static final ValueNotifier<bool> isPlayerOpenNotifier = ValueNotifier<bool>(
     false,
@@ -257,17 +369,25 @@ class PlayerShellState extends State<PlayerShell>
   late final AnimationController _sheet;
   late final AnimationController _pause;
   late final AnimationController _dock;
+  late final AnimationController _bodyIn;
   late final AnimationController _chrome;
   late final AnimationController _artX;
   late final AnimationController _miniX;
   late final AnimationController _press;
+  late final AnimationController _videoUiC; // landscape video controls
 
   _Panel _bodyPanel = _Panel.art; // what is actually mounted in the middle
   Timer? _mountTimer;
+  Timer? _closeSafetyTimer;
 
   // bumped on every skip so the prev / next icons can nudge with a spring
   final ValueNotifier<int> _prevPulse = ValueNotifier<int>(0);
   final ValueNotifier<int> _nextPulse = ValueNotifier<int>(0);
+
+  /// true while ANYTHING is moving (sheet, dock glide, body fade, drag,
+  /// close). Used to mute the lyrics / queue tickers so the whole frame
+  /// budget belongs to the motion.
+  final ValueNotifier<bool> _dockGliding = ValueNotifier<bool>(false);
 
   static _Panel _preferredMode = _Panel.art;
   bool _open = false;
@@ -280,6 +400,10 @@ class PlayerShellState extends State<PlayerShell>
   bool _warm = false;
   Timer? _warmTimer;
 
+  bool _landscape = false;
+  bool _videoUiShown = true;
+  Timer? _videoUiTimer;
+
   bool _chromeHidden = false;
   bool _reordering = false;
   double _scrollAcc = 0;
@@ -287,12 +411,20 @@ class PlayerShellState extends State<PlayerShell>
 
   Timer? _idleTimer;
   int _activePointers = 0;
-  bool _userScrolling = false; // finger is dragging a lyrics / queue list
+  bool _userScrolling = false; // finger is dragging (or flinging) a list
   Offset? _downPos;
   bool _pointerMoved = false;
   int _closeToken = 0;
+  int _panelToken = 0;
+  int _bodyToken = 0;
   bool _closing = false;
+  bool _bodyShowing = false; // lyrics / queue body is (becoming) visible
   double _lastPublished = 0;
+  DateTime _panelChangedAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// true when the body swap must be instant (art <-> panel). lyrics <-> queue
+  /// keeps a short cross-fade.
+  bool _instantSwap = true;
 
   // where (as a fraction of the lyrics region) the lyrics finish fading out
   // above the seekbar / transport block
@@ -342,30 +474,95 @@ class PlayerShellState extends State<PlayerShell>
     _sheet = AnimationController.unbounded(vsync: this, value: 0);
     _pause = AnimationController.unbounded(vsync: this, value: 1);
     _dock = AnimationController.unbounded(vsync: this, value: 0);
+    _bodyIn = AnimationController.unbounded(vsync: this, value: 0);
     _chrome = AnimationController.unbounded(vsync: this, value: 0);
     _artX = AnimationController.unbounded(vsync: this, value: 0);
     _miniX = AnimationController.unbounded(vsync: this, value: 0);
     _press = AnimationController.unbounded(vsync: this, value: 1);
+    _videoUiC = AnimationController.unbounded(vsync: this, value: 1);
     PlayerShell.openRequestNotifier.addListener(_onOpenRequested);
     _sheet.addListener(_publishProgress);
     _sheet.addListener(_syncDockVisibility);
+    _sheet.addListener(_syncGlide);
+    _sheet.addStatusListener(_onAnyStatus);
+    _dock.addListener(_onDockTick);
+    _dock.addStatusListener(_onAnyStatus);
+    _bodyIn.addStatusListener(_onAnyStatus);
+  }
+
+  void _onAnyStatus(AnimationStatus _) => _syncGlide();
+
+  /// Mutes lyrics / queue tickers while anything moves. NOTE: it must also
+  /// listen to the STATUS of the controllers: the last tick of a spring
+  /// still reports isAnimating == true, so without the status listener this
+  /// would get stuck on "gliding".
+  void _syncGlide() {
+    final g =
+        _dock.isAnimating ||
+        _bodyIn.isAnimating ||
+        _sheet.isAnimating ||
+        _closing ||
+        _dragging;
+    if (_dockGliding.value != g) _dockGliding.value = g;
+  }
+
+  /// The cover has (almost) docked: only NOW the lyrics / queue fade in.
+  /// (Portrait only: in landscape the cover never docks.)
+  void _onDockTick() {
+    _syncGlide();
+    if (_panel != _Panel.art && !_bodyShowing && _open && _dock.value > 0.9) {
+      _showBody();
+    }
+  }
+
+  /// Fades the lyrics / queue body in and starts the idle countdown only when
+  /// it is fully visible (a laggy glide can no longer eat the 3 seconds).
+  /// Landscape uses a critically damped SPRING (interruptible, carries
+  /// velocity); portrait keeps the short timed fade.
+  void _showBody() {
+    if (_bodyShowing) return;
+    _bodyShowing = true;
+    final token = ++_bodyToken;
+    final Future<void> fut = _landscape
+        ? _bodyIn.springTo(
+            1.0,
+            spring: _kPanelSpring,
+            velocity: _bodyIn.velocity,
+          )
+        : _bodyIn.animateTo(1.0, duration: _kBodyFadeIn, curve: Curves.easeOut);
+    fut.whenComplete(() {
+      if (!mounted || token != _bodyToken || _panel == _Panel.art) return;
+      _panelChangedAt = DateTime.now();
+      if (_panel == _Panel.lyrics) _scheduleIdle();
+    });
+  }
+
+  /// Landscape: let the heavy body build + lay out for two frames while it is
+  /// invisible / unpainted, THEN spring it in. No jank on the first frame.
+  Future<void> _warmThenShowBody(int token) async {
+    for (var i = 0; i < 2; i++) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted || token != _panelToken) return;
+    }
+    if (_panel != _Panel.art) _showBody();
   }
 
   /// The dock / tab bar (blurred glass) must NOT animate back in while the
-  /// sheet is still travelling down: that was a big part of the heavy close.
-  /// It comes back only when the sheet has almost landed.
+  /// sheet is still travelling down. See [_kDockReturnAt].
   void _syncDockVisibility() {
     if (_closing &&
-        _sheet.value < 0.3 &&
+        _sheet.value < _kDockReturnAt &&
         PlayerShell.isPlayerOpenNotifier.value) {
       PlayerShell.isPlayerOpenNotifier.value = false;
     }
   }
 
-  /// Parent rebuilds on this: only publish meaningful steps + the end points.
+  /// Parent rebuilds on this: only publish coarse steps + the end points.
   void _publishProgress() {
     final v = _sheet.value.clamp(0.0, 1.0).toDouble();
-    if ((v - _lastPublished).abs() < 0.03 && v != 0.0 && v != 1.0) return;
+    if ((v - _lastPublished).abs() < _kPublishStep && v != 0.0 && v != 1.0) {
+      return;
+    }
     _lastPublished = v;
     PlayerShell.sheetProgress.value = v;
   }
@@ -384,15 +581,34 @@ class PlayerShellState extends State<PlayerShell>
     PlayerShell.openRequestNotifier.removeListener(_onOpenRequested);
     _sheet.removeListener(_publishProgress);
     _sheet.removeListener(_syncDockVisibility);
+    _sheet.removeListener(_syncGlide);
+    _sheet.removeStatusListener(_onAnyStatus);
+    _dock.removeListener(_onDockTick);
+    _dock.removeStatusListener(_onAnyStatus);
+    _bodyIn.removeStatusListener(_onAnyStatus);
     _warmTimer?.cancel();
     _mountTimer?.cancel();
     _idleTimer?.cancel();
+    _closeSafetyTimer?.cancel();
+    _videoUiTimer?.cancel();
     _lyricsImmersive.dispose();
+    _dockGliding.dispose();
     _prevPulse.dispose();
     _nextPulse.dispose();
-    for (final c in [_sheet, _pause, _dock, _chrome, _artX, _miniX, _press]) {
+    for (final c in [
+      _sheet,
+      _pause,
+      _dock,
+      _bodyIn,
+      _chrome,
+      _artX,
+      _miniX,
+      _press,
+      _videoUiC,
+    ]) {
       c.dispose();
     }
+    SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
     super.dispose();
   }
 
@@ -447,7 +663,9 @@ class PlayerShellState extends State<PlayerShell>
     if (_open && _preferredMode == _Panel.lyrics && _panel != _Panel.lyrics) {
       _panel = _Panel.lyrics;
       _bodyPanel = _Panel.lyrics;
-      _dock.value = 1.0;
+      _dock.value = _landscape ? 0.0 : 1.0; // landscape never docks
+      _bodyIn.value = 1.0;
+      _bodyShowing = true;
     }
 
     if (_panel == _Panel.lyrics) _scheduleIdle();
@@ -597,11 +815,95 @@ class PlayerShellState extends State<PlayerShell>
     context.read<PlayerState>().playFromHistory(e);
   }
 
+  /// Landscape video: seek ±[seconds] (clamped to the track).
+  void _skip(int seconds) {
+    final p = context.read<PlayerState>();
+    final Duration cur = p.positionNotifier.value;
+    final Duration total = (p.duration as Duration?) ?? Duration.zero;
+    var t = cur + Duration(seconds: seconds);
+    if (t < Duration.zero) t = Duration.zero;
+    if (total > Duration.zero && t > total) t = total;
+    (seconds < 0 ? _prevPulse : _nextPulse).value++;
+    p.seek(t);
+    _pokeVideoUi();
+  }
+
+  /* ───────────── landscape video controls (spring show / hide) ───────────── */
+
+  void _setVideoUi(bool show) {
+    _videoUiShown = show;
+    _videoUiTimer?.cancel();
+    _videoUiC.springTo(
+      show ? 1.0 : 0.0,
+      spring: _kVideoUiSpring,
+      velocity: _videoUiC.velocity,
+    );
+  }
+
+  /// Shows the controls and (re)starts the 3s auto-hide. [toggle] = a tap on
+  /// the video: hides them when they are already visible.
+  void _pokeVideoUi({bool toggle = false}) {
+    if (toggle && _videoUiShown) {
+      _setVideoUi(false);
+      return;
+    }
+    if (!_videoUiShown) _setVideoUi(true);
+    _videoUiTimer?.cancel();
+    _videoUiTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      final isScrubbing = context.read<PlayerState>().scrubbingNotifier.value;
+      if (isScrubbing) {
+        _pokeVideoUi();
+        return;
+      }
+      if (_playing) _setVideoUi(false);
+    });
+  }
+
+  void _expandVideoToLandscape() {
+    HapticFeedback.lightImpact();
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) {
+        SystemChrome.setPreferredOrientations(const [
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+      }
+    });
+  }
+
+  void _exitLandscapeToPortrait() {
+    HapticFeedback.lightImpact();
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.portraitUp,
+    ]);
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) {
+        SystemChrome.setPreferredOrientations(const [
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+      }
+    });
+  }
+
   /* ───────────────────────── sheet motion ───────────────────────── */
 
   void _openSheet({double velocity = 0}) {
     HapticFeedback.lightImpact();
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     _closeToken++; // cancels any pending close finalizer
+    _closeSafetyTimer?.cancel();
     _closing = false;
     PlayerShell.isPlayerOpenNotifier.value = true;
     final restoreLyrics = _preferredMode == _Panel.lyrics;
@@ -611,12 +913,14 @@ class PlayerShellState extends State<PlayerShell>
         if (restoreLyrics) {
           _panel = _Panel.lyrics;
           _bodyPanel = _Panel.art;
-          _dock.value = 1.0;
+          _dock.value = _landscape ? 0.0 : 1.0; // landscape never docks
         }
       });
-      if (restoreLyrics) {
-        _scheduleIdle();
-      }
+    }
+    if (_isVideo && _landscape) {
+      _videoUiShown = false; // force a fresh reveal
+      _videoUiC.value = 0;
+      _pokeVideoUi();
     }
     // interruptible: tapping mid-flight carries the current velocity
     final v = velocity != 0 ? velocity : _sheet.velocity;
@@ -627,22 +931,30 @@ class PlayerShellState extends State<PlayerShell>
           velocity: v,
         )
         .then((_) {
-          if (mounted &&
-              _panel == _Panel.lyrics &&
-              _bodyPanel != _Panel.lyrics) {
-            setState(() => _bodyPanel = _Panel.lyrics);
+          if (!mounted || _panel != _Panel.lyrics) return;
+          if (_bodyPanel != _Panel.lyrics) {
+            setState(() {
+              _instantSwap = true;
+              _bodyPanel = _Panel.lyrics;
+            });
           }
+          // sheet has landed: now the lyrics fade in (idle timer starts after)
+          _showBody();
         });
   }
 
   void _close({double velocity = 0}) {
     if (!_open && _sheet.value <= 0.001) {
       PlayerShell.isPlayerOpenNotifier.value = false;
+      SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
       return;
     }
-    _closing = true; // dock returns once the sheet is below 30% (see listener)
+    _closing = true;
     _mountTimer?.cancel();
     _idleTimer?.cancel();
+    _closeSafetyTimer?.cancel();
+    _videoUiTimer?.cancel();
+    _panelToken++; // cancels a pending panel warm-up
     _activePointers = 0;
     _userScrolling = false;
     _scrollAcc = 0;
@@ -651,44 +963,50 @@ class PlayerShellState extends State<PlayerShell>
     _lyricsImmersive.value = false;
     if (_chrome.value != 0) _chrome.springTo(0, spring: kSnappySpring);
     if (_dock.value != 0) _dock.springTo(0, spring: _kCloseSpring);
+    _syncGlide();
 
     final token = ++_closeToken;
     final rawV = velocity != 0 ? velocity : _sheet.velocity;
-    // Fluid downward momentum towards 0 so it never hesitates or creeps
-    final v = rawV < -0.5 ? rawV : -1.2;
+    // Always carry some downward momentum (so a light flick never creeps),
+    // but clamp it so the critically damped spring can't overshoot past 0.
+    final v = math.min(rawV, -0.9).clamp(-14.0, -0.9).toDouble();
 
-    late void Function() closeCutoffListener;
-    closeCutoffListener = () {
+    late void Function() settleListener;
+    settleListener = () {
       if (!_closing || token != _closeToken) {
-        _sheet.removeListener(closeCutoffListener);
+        _sheet.removeListener(settleListener);
         return;
       }
       // Instant cutoff near bottom: prevents creeping/stalling at the asymptote
-      if (_sheet.value <= 0.045) {
-        _sheet.removeListener(closeCutoffListener);
+      if (_sheet.value <= 0.02) {
+        _sheet.removeListener(settleListener);
         _sheet.stop();
         _sheet.value = 0;
         _finishClose(token);
       }
     };
-    _sheet.addListener(closeCutoffListener);
+    _sheet.addListener(settleListener);
 
     _sheet
         .springTo(
           0,
-          spring: const SpringDescription(mass: 0.8, stiffness: 460, damping: 28),
+          spring: const SpringDescription(
+            mass: 0.9,
+            stiffness: 340,
+            damping: 32,
+          ),
           velocity: v,
         )
         .then((_) {
-          _sheet.removeListener(closeCutoffListener);
+          _sheet.removeListener(settleListener);
           _finishClose(token);
         });
 
-    // Safety net: force close after 260ms max so it can NEVER get stuck
-    Timer(const Duration(milliseconds: 260), () {
+    // Safety net: force close after 650ms max so it can NEVER get stuck
+    Timer(const Duration(milliseconds: 650), () {
       if (!mounted || token != _closeToken) return;
       if (_open || _sheet.value.abs() > 0.0005) {
-        _sheet.removeListener(closeCutoffListener);
+        _sheet.removeListener(settleListener);
         _sheet.stop();
         _sheet.value = 0;
         _finishClose(token);
@@ -697,9 +1015,12 @@ class PlayerShellState extends State<PlayerShell>
   }
 
   void _finishClose(int token) {
-    if (!mounted || token != _closeToken) return;
+    if (!mounted || token != _closeToken || !_closing) return;
+    _closeSafetyTimer?.cancel();
     _closing = false;
-    PlayerShell.isPlayerOpenNotifier.value = false;
+    _bodyToken++;
+    _bodyShowing = false;
+    _bodyIn.value = 0;
     _dock.value = 0;
     _chrome.value = 0;
     _chromeHidden = false;
@@ -709,15 +1030,33 @@ class PlayerShellState extends State<PlayerShell>
       _open = false;
       _panel = _Panel.art;
       _bodyPanel = _Panel.art;
+      _instantSwap = true;
+    });
+    _syncGlide();
+    SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
+    // Give the dock / tab bar back one frame AFTER the cover has landed, so
+    // its glass animation never competes with the close glide.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || token != _closeToken) return;
+      PlayerShell.isPlayerOpenNotifier.value = false;
     });
   }
 
   void _dragStart() {
     _sheet.stop();
     _closeToken++; // a drag takes over from any running close
+    _closeSafetyTimer?.cancel();
     _closing = false;
     _dragging = true;
     _startedClosed = !_open;
+    if (_startedClosed) {
+      SystemChrome.setPreferredOrientations(const [
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
+    _syncGlide();
     // dock hides the instant a drag-open begins
     if (_startedClosed) PlayerShell.isPlayerOpenNotifier.value = true;
   }
@@ -735,20 +1074,11 @@ class PlayerShellState extends State<PlayerShell>
     final t = _sheet.value;
     final bool target;
     if (_startedClosed) {
-      if (vy < -40 || vt > 0.06 || t > 0.15 || _miniAcc.dy < -18) {
-        target = true;
-      } else {
-        target = false;
-      }
+      target = vy < -40 || vt > 0.06 || t > 0.15 || _miniAcc.dy < -18;
     } else {
-      // Closing from open sheet:
-      // If the user pulled down at all or has downward momentum, close smoothly!
-      // Only keep open if user clearly swiped/pulled back UP (vy < -120 or vt > 0.12).
-      if (vy < -120 || vt > 0.12) {
-        target = true; // explicitly pulled/flung back up
-      } else {
-        target = false; // slight downward swipe, downward velocity, or dragged down: close smoothly!
-      }
+      // Closing from the open sheet: any downward pull closes smoothly. Only
+      // a clear flick back UP keeps it open.
+      target = vy < -120 || vt > 0.12;
     }
     target ? _openSheet(velocity: vt) : _close(velocity: vt);
   }
@@ -756,64 +1086,110 @@ class PlayerShellState extends State<PlayerShell>
   /* ───────────────────────── panels (art / lyrics / queue) ───────────────────────── */
 
   void _setPanel(_Panel p) {
+    if (_isVideo && p == _Panel.lyrics)
+      return; // Completely blocked for video songs
     if (p == _Panel.lyrics || p == _Panel.art) {
       _preferredMode = p;
     }
     if (_panel == p) return;
     HapticFeedback.selectionClick();
     _mountTimer?.cancel();
-
+    final token = ++_panelToken;
     final wasDocked = _docked;
+    _panelChangedAt = DateTime.now();
+
+    // Mount the new body NOW. It is invisible AND not painted (_bodyIn == 0),
+    // so the expensive build / layout happens BEFORE any motion starts.
     setState(() {
       _panel = p;
-      // lyrics <-> queue: swap right away (cross-fade). Going back to art
-      // keeps the old body mounted until it has faded out with the dock.
-      if (p != _Panel.art && wasDocked) _bodyPanel = p;
+      _instantSwap = p == _Panel.art || !wasDocked;
+      if (p != _Panel.art) _bodyPanel = p;
     });
-
-    if (p != _Panel.art && !wasDocked) {
-      // mount a beat AFTER the glide starts so frame 1 is never blocked.
-      // The body only becomes visible in the 2nd half of the glide
-      // (see _dockFade `from`), so the mount hitch is hidden.
-      _mountTimer = Timer(const Duration(milliseconds: 60), () {
-        if (mounted && _panel == p && _bodyPanel != p) {
-          setState(() => _bodyPanel = p);
-        }
-      });
-    } else if (p == _Panel.art) {
-      // unmount the old body only after it has fully faded out
-      _mountTimer = Timer(const Duration(milliseconds: 500), () {
-        if (mounted && _panel == _Panel.art && _bodyPanel != _Panel.art) {
-          setState(() => _bodyPanel = _Panel.art);
-        }
-      });
-    }
-
-    _dock.springTo(
-      p == _Panel.art ? 0 : 1,
-      spring: _kDockSpring,
-      velocity: _dock.velocity, // interruptible, no dead stop
-    );
 
     _scrollAcc = 0;
     _userScrolling = false;
     _activePointers = 0;
     _idleTimer?.cancel();
     _showChrome(); // every panel switch starts with the controls visible
-    if (p == _Panel.lyrics) _scheduleIdle();
+
+    // ── LANDSCAPE: the cover stays on the left, only the right pane swaps.
+    // One spring on `_bodyIn` drives the whole cross-fade (controls scale /
+    // fade out, body lifts / fades in). Interruptible, velocity-carrying.
+    if (_landscape) {
+      if (p == _Panel.art) {
+        _bodyShowing = false;
+        _bodyToken++;
+        _bodyIn.springTo(
+          0.0,
+          spring: _kPanelSpring,
+          velocity: _bodyIn.velocity,
+        );
+        // unmount the old body only after it has fully faded out
+        _mountTimer = Timer(const Duration(milliseconds: 600), () {
+          if (mounted && _panel == _Panel.art && _bodyPanel != _Panel.art) {
+            setState(() => _bodyPanel = _Panel.art);
+          }
+        });
+      } else if (_bodyShowing) {
+        // lyrics <-> queue: short cross-fade handled by the AnimatedSwitcher
+        if (p == _Panel.lyrics) _scheduleIdle();
+      } else {
+        _warmThenShowBody(token);
+      }
+      return;
+    }
+
+    if (p == _Panel.art) {
+      // body fades out FAST (it is the only heavy thing), cover glides back.
+      _bodyShowing = false;
+      _bodyToken++;
+      _bodyIn.animateTo(0.0, duration: _kBodyFadeOut, curve: Curves.easeIn);
+      // unmount the old body only after it has fully faded out
+      _mountTimer = Timer(const Duration(milliseconds: 500), () {
+        if (mounted && _panel == _Panel.art && _bodyPanel != _Panel.art) {
+          setState(() => _bodyPanel = _Panel.art);
+        }
+      });
+      _dock.springTo(0, spring: _kDockSpring, velocity: _dock.velocity);
+      return;
+    }
+
+    if (wasDocked) {
+      // lyrics <-> queue: the cover is already docked, just cross-fade.
+      if (!_bodyShowing) _showBody();
+      _dock.springTo(1, spring: _kDockSpring, velocity: _dock.velocity);
+      if (p == _Panel.lyrics) _scheduleIdle();
+      return;
+    }
+
+    // art -> lyrics / queue: let the heavy body build + layout first, then
+    // glide. The body itself fades in only after the cover has docked.
+    _warmThenGlide(token);
   }
 
-  void _togglePanel(_Panel p) => _setPanel(_panel == p ? _Panel.art : p);
+  Future<void> _warmThenGlide(int token) async {
+    for (var i = 0; i < 2; i++) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted || token != _panelToken) return;
+    }
+    _dock.springTo(1, spring: _kDockSpring, velocity: _dock.velocity);
+  }
+
+  void _togglePanel(_Panel p) {
+    if (_isVideo && p == _Panel.lyrics)
+      return; // Completely blocked for video songs
+    _setPanel(_panel == p ? _Panel.art : p);
+  }
 
   /* ───────────── controls show / hide: ONE intent model ─────────────
    *
    * 1. A finger touching / moving NEVER shows the controls. Only a real tap
    *    (no movement) while they are hidden reveals them.
-   * 2. Scroll direction decides (lyrics AND queue): down = hide, up = show.
-   * 3. The 3s idle timer is lyrics-only, and only runs while no finger is
-   *    down and no user scroll / fling is in progress. A touch or scroll
-   *    cancels it, lifting the finger restarts it.
-   * 4. Lyrics auto-scroll (no dragDetails) is ignored entirely.
+   * 2. Scroll direction decides (lyrics AND queue), but ONLY for scrolls
+   *    that were started by a finger. Auto-scroll is ignored entirely.
+   * 3. The 3s idle timer is lyrics-only. It starts only once the lyrics are
+   *    fully visible, and only runs while no finger is down and no user
+   *    scroll / fling is in progress.
    */
 
   bool get _chromeCapable => _panel == _Panel.lyrics || _panel == _Panel.queue;
@@ -838,16 +1214,22 @@ class PlayerShellState extends State<PlayerShell>
     _chrome.springTo(1, spring: kSoftSpring, velocity: _chrome.velocity);
   }
 
-  /// (Re)starts the 3s idle countdown. Lyrics only, and only while shown.
+  /// (Re)starts the 3s idle countdown. Lyrics only, only while shown, and
+  /// only once the lyrics body is actually visible.
   void _scheduleIdle() {
     _idleTimer?.cancel();
-    if (_panel != _Panel.lyrics || _chromeHidden) return;
+    if (_panel != _Panel.lyrics || _chromeHidden || !_bodyShowing) return;
     _idleTimer = Timer(_kIdleHide, _hideChrome);
   }
 
   void _hideChrome() {
     if (!mounted || _panel != _Panel.lyrics || _chromeHidden) return;
-    if (_dragging || _activePointers > 0 || _userScrolling) {
+    if (_dragging ||
+        _activePointers > 0 ||
+        _userScrolling ||
+        _dock.isAnimating ||
+        _bodyIn.isAnimating ||
+        _sheet.isAnimating) {
       _idleTimer = Timer(const Duration(seconds: 1), _hideChrome);
       return;
     }
@@ -883,34 +1265,54 @@ class PlayerShellState extends State<PlayerShell>
     }
   }
 
-  /// Shared by lyrics and queue.
+  /// Shared by lyrics and queue. Only FINGER scrolls count: the lyrics'
+  /// automatic follow-scroll (and the initial jump to the current line) has
+  /// no dragDetails and can therefore never hide the controls.
   bool _onPanelScroll(ScrollNotification n) {
     if (n.metrics.axis != Axis.vertical || _reordering || _dragging) {
       return false;
     }
+    // while the body is not fully there (glide / fade) or right after it
+    // appeared, the list positions itself: ignore all of it
+    if (!_bodyShowing ||
+        _bodyIn.isAnimating ||
+        _dock.isAnimating ||
+        DateTime.now().difference(_panelChangedAt) < _kPanelScrollGrace) {
+      return false;
+    }
+
     if (n is ScrollStartNotification) {
-      _userScrolling = true;
-      _scrollAcc = 0;
-      _idleTimer?.cancel();
+      if (n.dragDetails != null) {
+        _userScrolling = true;
+        _scrollAcc = 0;
+        _idleTimer?.cancel();
+      }
     } else if (n is ScrollUpdateNotification) {
-      _userScrolling = true;
+      // Only real user finger dragging should hide/show bottom controls;
+      // ignore programmatic auto-scrolls (e.g. lyrics jump on load).
+      if (n.dragDetails == null) return false;
+      if (!_userScrolling) return false; // programmatic scroll
       final dy = n.scrollDelta ?? 0;
       if (dy != 0) {
         if (_scrollAcc.sign != dy.sign) _scrollAcc = 0;
         _scrollAcc += dy;
-        // User scrolling down (content moving up): hide bottom controls
+        // content moving up (user scrolls down): hide bottom controls
         if (_scrollAcc > 12 && n.metrics.pixels > 5) {
           _setChromeHidden(true);
         } else if (_scrollAcc < -10) {
-          // User scrolling up (content moving down): reveal bottom controls
+          // content moving down: reveal bottom controls
           _setChromeHidden(false);
         }
       }
     } else if (n is ScrollEndNotification) {
-      _userScrolling = false;
-      _scrollAcc = 0;
-      _scheduleIdle();
-    } else if (n is OverscrollNotification && n.overscroll < 0) {
+      if (_userScrolling) {
+        _userScrolling = false;
+        _scrollAcc = 0;
+        _scheduleIdle();
+      }
+    } else if (n is OverscrollNotification &&
+        n.overscroll < 0 &&
+        _userScrolling) {
       _setChromeHidden(false);
     }
     return false;
@@ -1075,6 +1477,26 @@ class PlayerShellState extends State<PlayerShell>
     }
     final player = context.read<PlayerState>();
 
+    final mq = MediaQuery.of(context);
+    final size = mq.size;
+    final safe = mq.padding;
+
+    // Orientation: set BEFORE _syncTrack / the builders read it. On rotation
+    // with a panel open, re-sync dock / body state (portrait docks the cover,
+    // landscape never does).
+    final land = size.width > size.height;
+    if (land != _landscape) {
+      _landscape = land;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final inPanel = _panel != _Panel.art;
+        _dock.value = (!land && inPanel) ? 1.0 : 0.0;
+        _bodyIn.value = inPanel ? 1.0 : 0.0;
+        _bodyShowing = inPanel && _open;
+        if (inPanel) setState(() => _bodyPanel = _panel);
+      });
+    }
+
     _syncTrack(track);
     _ensureBleed();
     _syncPlaying(_playing);
@@ -1084,9 +1506,6 @@ class PlayerShellState extends State<PlayerShell>
       if (mounted) setState(() => _warm = true);
     });
 
-    final mq = MediaQuery.of(context);
-    final size = mq.size;
-    final safe = mq.padding;
     _travel = size.height * _kSheetStartY; // sheet follows the finger 1:1
 
     final isExpanded = _open || _sheet.value > 0.05 || _docked;
@@ -1205,16 +1624,33 @@ class PlayerShellState extends State<PlayerShell>
                                   borderRadius: BorderRadius.circular(
                                     _kRadiusMini,
                                   ),
-                                  child: SizedBox(
-                                    width: g.art,
-                                    height: g.art,
-                                    child: _TrackMediaView(
-                                      player: player,
-                                      coverUrl:
-                                          (track.coverUrl as String?) ?? '',
-                                      isVideo: _isVideo,
-                                      videoFit: BoxFit.cover,
-                                    ),
+                                  child: ValueListenableBuilder<double?>(
+                                    valueListenable: player.videoAspectNotifier,
+                                    builder: (_, aspect, _) {
+                                      final ar = _isVideo
+                                          ? _clampAr(aspect ?? (16 / 9))
+                                          : 1.0;
+                                      final w = g.artW(ar);
+                                      return SizedBox(
+                                        width: w,
+                                        height: g.art,
+                                        child: (_open || _sheet.value > 0.001)
+                                            ? CoverImage(
+                                                (track.coverUrl as String?) ??
+                                                    '',
+                                              )
+                                            : _TrackMediaView(
+                                                player: player,
+                                                coverUrl:
+                                                    (track.coverUrl
+                                                        as String?) ??
+                                                    '',
+                                                isVideo: _isVideo,
+                                                videoFit: BoxFit.cover,
+                                                isMini: true,
+                                              ),
+                                      );
+                                    },
                                   ),
                                 ),
                               ),
@@ -1370,231 +1806,322 @@ class PlayerShellState extends State<PlayerShell>
     EdgeInsets safe,
     bool isFullBleed,
   ) {
-    final url =
-        ((_shownCover?.isNotEmpty == true
-            ? _shownCover
-            : (track?.coverUrl as String?))) ??
-        '';
-    final currentKey = ValueKey<String>('cover-$url-${_isVideo ? 'v' : 'a'}');
+    return ValueListenableBuilder<double?>(
+      valueListenable: player.videoAspectNotifier,
+      builder: (context, aspect, _) {
+        final targetAr = _isVideo ? _clampAr(aspect ?? (16 / 9)) : 1.0;
+        return TweenAnimationBuilder<double>(
+          tween: Tween<double>(end: targetAr),
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          builder: (context, ar, _) {
+            final url =
+                ((_shownCover?.isNotEmpty == true
+                    ? _shownCover
+                    : (track?.coverUrl as String?))) ??
+                '';
+            final currentKey = ValueKey<String>(
+              'cover-$url-${_isVideo ? 'v' : 'a'}',
+            );
 
-    // exactly the pill's art slot (shared geometry)
-    final mini = _miniGeo(safe).artRect(size);
-    final targetBig = isFullBleed
-        ? _bleedRect(size, safe)
-        : _bigOrFallback(size, safe);
-    final docked = Rect.fromLTWH(24, safe.top + 29, 56, 56);
-    final side = targetBig.width; // laid out ONCE at this size
+            final land = size.width > size.height;
+            final landVideo = land && _isVideo;
+            final bleed = isFullBleed && !_isVideo;
+            final mini = _miniGeo(safe).artRect(size, ar);
+            // Landscape: video flies out to FULL SCREEN, normal songs to the
+            // square slot on the left. Portrait is unchanged.
+            final targetBig = _isVideo
+                ? (land
+                      ? _videoFullRect(size, ar)
+                      : _videoBigRect(size, safe, ar))
+                : land
+                ? _landscapeArtRect(size, safe)
+                : (bleed ? _bleedRect(size, safe) : _bigOrFallback(size, safe));
+            final docked = Rect.fromLTWH(24, safe.top + 29, 56, 56);
+            final big = targetBig.size;
 
-    final media = _TrackMediaView(
-      player: player,
-      coverUrl: url,
-      isVideo: _isVideo,
-      videoFit: BoxFit.contain,
-    );
+            final media = _TrackMediaView(
+              player: player,
+              coverUrl: url,
+              isVideo: _isVideo,
+              videoFit: BoxFit.contain,
+            );
 
-    final cover = RepaintBoundary(
-      child: SizedBox(
-        width: side,
-        height: side,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeIn,
-          transitionBuilder: (child, anim) {
-            final incoming = child.key == currentKey;
-            return FadeTransition(
-              opacity: anim,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: Offset((incoming ? 0.08 : -0.08) * _dir, 0),
-                  end: Offset.zero,
-                ).animate(anim),
-                child: child,
+            final cover = RepaintBoundary(
+              child: SizedBox(
+                width: big.width,
+                height: big.height,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeIn,
+                  transitionBuilder: (child, anim) {
+                    final incoming = child.key == currentKey;
+                    return FadeTransition(
+                      opacity: anim,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: Offset((incoming ? 0.08 : -0.08) * _dir, 0),
+                          end: Offset.zero,
+                        ).animate(anim),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: SizedBox.expand(
+                    key: currentKey,
+                    child: bleed
+                        ? BleedArtworkImage(
+                            art: _isVideo ? null : _bleedArt,
+                            plain: media,
+                            dock: _dock,
+                            sheet: _sheet,
+                          )
+                        : media,
+                  ),
+                ),
+              ),
+            );
+
+            final glowColor =
+                _bleedArt?.average ??
+                (_palette.isNotEmpty
+                    ? _palette.first
+                    : const Color(0xFFB4123A));
+            final glow = RepaintBoundary(
+              child: Center(
+                child: Container(
+                  width: big.width * 0.88,
+                  height: big.height * 0.88,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(big.width * 0.44),
+                    boxShadow: [
+                      BoxShadow(
+                        color: glowColor.withValues(alpha: 0.5),
+                        blurRadius: 60,
+                        spreadRadius: 8,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+            final shadow = RepaintBoundary(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(big.width * 0.032),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      blurRadius: 36,
+                      offset: const Offset(0, 16),
+                    ),
+                  ],
+                ),
+              ),
+            );
+
+            return Positioned.fill(
+              child: AnimatedBuilder(
+                animation: Listenable.merge([
+                  _sheet,
+                  _dock,
+                  _pause,
+                  _artX,
+                  _press,
+                ]),
+                child: cover,
+                builder: (context, child) {
+                  final t = _sheet.value.clamp(0.0, 1.0);
+                  final d = _dock.value.clamp(0.0, 1.0).toDouble();
+
+                  final tgt = Rect.lerp(targetBig, docked, d)!;
+                  final px = Curves.easeOutQuad.transform(t);
+                  final sp = (t + px) / 2;
+                  final cx = lerpDouble(mini.center.dx, tgt.center.dx, px)!;
+                  final cy = lerpDouble(mini.center.dy, tgt.center.dy, t)!;
+
+                  // landscape video lands edge to edge: radius melts to 0
+                  final radius = lerpDouble(
+                    _kRadiusMini,
+                    landVideo
+                        ? 0.0
+                        : lerpDouble(_kRadiusBig, _kRadiusDocked, d)!,
+                    t,
+                  )!;
+
+                  final pauseValue = bleed ? 1.0 : _pause.value;
+                  final pressValue = bleed ? 1.0 : _press.value;
+                  final pauseScale = (landVideo || bleed)
+                      ? 1.0
+                      : ((1 - (1 - pauseValue) * (1 - d) * t) * pressValue);
+                  final dx = _artX.value * t * (1 - d);
+
+                  final ww = lerpDouble(mini.width, tgt.width, sp)!;
+                  final hh = lerpDouble(mini.height, tgt.height, sp)!;
+                  final geomScale = math.max(ww / big.width, hh / big.height);
+                  final s = geomScale * pauseScale;
+                  final m = Matrix4.diagonal3Values(s, s, 1)
+                    ..setTranslationRaw(
+                      cx + dx - big.width * s / 2,
+                      cy - big.height * s / 2,
+                      0,
+                    );
+
+                  final pauseHalo = bleed
+                      ? 1.0
+                      : _smooth((pauseValue - _kPaused) / (1 - _kPaused));
+                  final haloO = landVideo
+                      ? 0.0
+                      : (_smooth((t - 0.9) / 0.1) *
+                                (1 - _smooth(d / 0.12)) *
+                                pauseHalo)
+                            .clamp(0.0, 1.0)
+                            .toDouble();
+
+                  final skipClip = bleed && d < 0.05 && t > 0.9;
+                  // Landscape video: the flying cover cross-fades into the
+                  // sheet's own full-screen video (same rect) and then steps
+                  // aside, so it never covers the video controls.
+                  final hidden =
+                      (!_open && t <= 0.001) || (landVideo && t > 0.985);
+                  final coverFade = landVideo
+                      ? 1.0 - _smooth((t - 0.75) / 0.23)
+                      : 1.0;
+
+                  return Offstage(
+                    offstage: hidden,
+                    child: Opacity(
+                      opacity: coverFade,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Positioned(
+                            key: const ValueKey('halo'),
+                            left: targetBig.left,
+                            top: targetBig.top,
+                            width: big.width,
+                            height: big.height,
+                            child: Transform.translate(
+                              offset: Offset(
+                                cx + dx - targetBig.center.dx,
+                                cy - targetBig.center.dy,
+                              ),
+                              child: IgnorePointer(
+                                child: Opacity(
+                                  opacity: haloO,
+                                  child: bleed ? glow : shadow,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            key: const ValueKey('cover'),
+                            left: 0,
+                            top: 0,
+                            width: big.width,
+                            height: big.height,
+                            child: Transform(
+                              transform: m,
+                              child: IgnorePointer(
+                                ignoring: t < 0.95 || landVideo,
+                                child: Semantics(
+                                  button: true,
+                                  label: _docked
+                                      ? 'Show album art'
+                                      : 'Show lyrics',
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTapDown: (_) {
+                                      if (!bleed && !_isVideo) {
+                                        _press.springTo(
+                                          0.94,
+                                          spring: _kPressSpring,
+                                        );
+                                      }
+                                    },
+                                    onTapUp: (_) => _press.springTo(
+                                      1,
+                                      spring: _kReleaseSpring,
+                                    ),
+                                    onTapCancel: () => _press.springTo(
+                                      1,
+                                      spring: _kReleaseSpring,
+                                    ),
+                                    onTap: () {
+                                      if (_isVideo)
+                                        return; // Completely blocked for video songs!
+                                      _setPanel(
+                                        _docked ? _Panel.art : _Panel.lyrics,
+                                      );
+                                    },
+                                    // landscape: the cover never docks, so swipe-to-skip stays on
+                                    onPanStart: (_docked && !land)
+                                        ? null
+                                        : _artStart,
+                                    onPanUpdate: (_docked && !land)
+                                        ? null
+                                        : _artUpdate,
+                                    onPanEnd: (_docked && !land)
+                                        ? null
+                                        : _artEnd,
+                                    onPanCancel: (_docked && !land)
+                                        ? null
+                                        : () => _artEnd(DragEndDetails()),
+                                    child: ClipRRect(
+                                      clipper: _WindowClipper(
+                                        Size(ww / geomScale, hh / geomScale),
+                                        radius / s,
+                                      ),
+                                      clipBehavior: skipClip
+                                          ? Clip.none
+                                          : Clip.antiAlias,
+                                      child: Stack(
+                                        fit: StackFit.expand,
+                                        children: [
+                                          child!,
+                                          if (_isVideo && !land && t > 0.85)
+                                            Positioned(
+                                              right: 12,
+                                              bottom: 12,
+                                              child: Opacity(
+                                                opacity: ((t - 0.85) / 0.15)
+                                                    .clamp(0.0, 1.0),
+                                                child: _SpringButton(
+                                                  size: 42,
+                                                  label:
+                                                      'Expand video to landscape',
+                                                  onTap:
+                                                      _expandVideoToLandscape,
+                                                  child: _vidDisc(
+                                                    38,
+                                                    const Icon(
+                                                      Icons.fullscreen,
+                                                      color: Colors.white,
+                                                      size: 22,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             );
           },
-          child: SizedBox.expand(
-            key: currentKey,
-            child: isFullBleed
-                ? BleedArtworkImage(
-                    art: _isVideo ? null : _bleedArt,
-                    plain: media,
-                    dock: _dock,
-                    sheet: _sheet,
-                  )
-                : media,
-          ),
-        ),
-      ),
-    );
-
-    // Static halo layers: only their OPACITY changes per frame, never their
-    // geometry. They are only shown while the cover is at rest (see haloO).
-    final glowColor =
-        _bleedArt?.average ??
-        (_palette.isNotEmpty ? _palette.first : const Color(0xFFB4123A));
-    final glow = RepaintBoundary(
-      child: Center(
-        child: Container(
-          width: side * 0.88,
-          height: side * 0.88,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(side * 0.44),
-            boxShadow: [
-              BoxShadow(
-                color: glowColor.withValues(alpha: 0.5),
-                blurRadius: 60,
-                spreadRadius: 8,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    final shadow = RepaintBoundary(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(side * 0.032),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.45),
-              blurRadius: 36,
-              offset: const Offset(0, 16),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    return Positioned.fill(
-      child: AnimatedBuilder(
-        animation: Listenable.merge([_sheet, _dock, _pause, _artX, _press]),
-        child: cover,
-        builder: (context, child) {
-          final t = _sheet.value.clamp(0.0, 1.0);
-          final d = _dock.value.clamp(0.0, 1.0).toDouble();
-
-          // ONE card, ONE path: mini -> (big | bleed | header).
-          // Horizontal position + size lead (ease-out), vertical follows the
-          // sheet linearly, so it tracks the finger and retraces on close.
-          final tgt = Rect.lerp(targetBig, docked, d)!;
-          final px = Curves.easeOutQuad.transform(t);
-          final sp = (t + px) / 2;
-          final cx = lerpDouble(mini.center.dx, tgt.center.dx, px)!;
-          final cy = lerpDouble(mini.center.dy, tgt.center.dy, t)!;
-          final rw = lerpDouble(mini.width, tgt.width, sp)!;
-
-          final radius = lerpDouble(
-            _kRadiusMini,
-            lerpDouble(_kRadiusBig, _kRadiusDocked, d)!,
-            t,
-          )!;
-
-          final pauseValue = isFullBleed ? 1.0 : _pause.value;
-          final pressValue = isFullBleed ? 1.0 : _press.value;
-          final pauseScale = (1 - (1 - pauseValue) * (1 - d) * t) * pressValue;
-          final dx = _artX.value * t * (1 - d);
-
-          final w = rw * pauseScale;
-          final scale = w / side;
-          final m = Matrix4.diagonal3Values(scale, scale, 1)
-            ..setTranslationRaw(cx + dx - w / 2, cy - w / 2, 0);
-          final r = radius / scale; // keep visual radius constant
-
-          // Big blurs inside a scaling Transform are re-rasterised every frame.
-          // So the halo only exists when the cover is (almost) at rest:
-          // it fades in over the last 10% of the open and out in the first
-          // 12% of the dock glide. During the flight it costs nothing.
-          // While paused the cover shrinks, so the (unscaled) halo fades out
-          // with it instead of showing around a smaller cover.
-          final pauseHalo = isFullBleed
-              ? 1.0
-              : _smooth((pauseValue - _kPaused) / (1 - _kPaused));
-          final haloO =
-              (_smooth((t - 0.9) / 0.1) * (1 - _smooth(d / 0.12)) * pauseHalo)
-                  .clamp(0.0, 1.0)
-                  .toDouble();
-
-          final skipClip = isFullBleed && d < 0.05 && t > 0.9;
-          final hidden = !_open && t <= 0.001;
-
-          // CONSTANT tree shape: nothing here is added / removed / swapped
-          // while moving (keys + always-present halo and clip), and the whole
-          // overlay stays mounted (Offstage) when closed, so the cover, its
-          // image and BleedArtworkImage are never rebuilt at open / close.
-          return Offstage(
-            offstage: hidden,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Halo lives OUTSIDE the scaling Transform: fixed size, fixed
-                // blur, only translated + faded. Nothing is re-rasterised.
-                Positioned(
-                  key: const ValueKey('halo'),
-                  left: targetBig.left,
-                  top: targetBig.top,
-                  width: side,
-                  height: side,
-                  child: Transform.translate(
-                    offset: Offset(
-                      cx + dx - targetBig.center.dx,
-                      cy - targetBig.center.dy,
-                    ),
-                    child: IgnorePointer(
-                      child: Opacity(
-                        opacity: haloO,
-                        child: isFullBleed ? glow : shadow,
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  key: const ValueKey('cover'),
-                  left: 0,
-                  top: 0,
-                  width: side,
-                  height: side,
-                  child: Transform(
-                    transform: m,
-                    child: IgnorePointer(
-                      ignoring: t < 0.95,
-                      child: Semantics(
-                        button: true,
-                        label: _docked ? 'Show album art' : 'Show lyrics',
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTapDown: (_) {
-                            if (!isFullBleed) {
-                              _press.springTo(0.94, spring: _kPressSpring);
-                            }
-                          },
-                          onTapUp: (_) =>
-                              _press.springTo(1, spring: _kReleaseSpring),
-                          onTapCancel: () =>
-                              _press.springTo(1, spring: _kReleaseSpring),
-                          onTap: () =>
-                              _setPanel(_docked ? _Panel.art : _Panel.lyrics),
-                          onPanStart: _docked ? null : _artStart,
-                          onPanUpdate: _docked ? null : _artUpdate,
-                          onPanEnd: _docked ? null : _artEnd,
-                          onPanCancel: _docked
-                              ? null
-                              : () => _artEnd(DragEndDetails()),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(r),
-                            clipBehavior: skipClip ? Clip.none : Clip.antiAlias,
-                            child: child,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+        );
+      },
     );
   }
 
@@ -1614,21 +2141,28 @@ class PlayerShellState extends State<PlayerShell>
           fit: StackFit.expand,
           children: [
             const ColoredBox(color: Color(0xFF121214)),
-            BleedBackdrop(
-              art: _bakeFailed ? null : _bleedArt,
-              pending:
-                  !_bakeFailed && _bleedArt == null && _bleedUrl.isNotEmpty,
-              fallback: _fallbackColors(),
-              flow: true,
-              isPlaying: _playing,
-              positionNotifier: player.positionNotifier,
-              duration: player.duration,
-              // drift freezes while anything moves: all GPU goes to the motion
-              paused: () =>
-                  _dragging ||
-                  _sheet.isAnimating ||
-                  _dock.isAnimating ||
-                  _chrome.isAnimating,
+            // The flow painter draws oversized, rotated layers WITHOUT a clip.
+            // ClipRect keeps everything inside this ONE sheet.
+            ClipRect(
+              child: BleedBackdrop(
+                art: _bakeFailed ? null : _bleedArt,
+                pending:
+                    !_bakeFailed && _bleedArt == null && _bleedUrl.isNotEmpty,
+                fallback: _fallbackColors(),
+                flow: true,
+                isPlaying: _playing,
+                positionNotifier: player.positionNotifier,
+                duration: player.duration,
+                // drift freezes while anything moves: all GPU goes to the motion
+                paused: () =>
+                    _dragging ||
+                    _closing ||
+                    _sheet.isAnimating ||
+                    _dock.isAnimating ||
+                    _bodyIn.isAnimating ||
+                    _chrome.isAnimating ||
+                    _videoUiC.isAnimating,
+              ),
             ),
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
@@ -1645,34 +2179,20 @@ class PlayerShellState extends State<PlayerShell>
       child: _sheetColumn(player, track, safe, size, isFullBleed),
     );
 
-    // IMPORTANT: the widget tree below has a CONSTANT shape. Opacity and
-    // ClipRRect are always present (alpha 1.0 / Clip.none cost nothing).
-    // Swapping `child` <-> `Opacity(child)` or `ClipRRect(child)` while the
-    // sheet moves re-mounts the WHOLE sheet (backdrop, controls, lyrics) at
-    // the swap point: that was the hitch at the start of a swipe-down and at
-    // the end of an open.
-    //
-    // Only the backdrop fades (one cheap layer). Controls fade through their
-    // own staggered `_rise`, header / body through `_dockFade(withSheet)`, so
-    // there is no full-screen group-opacity over the whole sheet any more.
+    // CONSTANT tree shape: the Opacity is ALWAYS present.
     final backdropLayer = AnimatedBuilder(
       animation: _sheet,
       child: backdrop,
-      builder: (_, c) {
-        final t = _sheet.value.clamp(0.0, 1.0).toDouble();
-        final alpha = _sheetAlpha(t);
-        if (alpha <= 0.001) return const SizedBox.shrink();
-        if (alpha >= 0.999) return c!;
-        return Opacity(
-          opacity: alpha,
-          child: c,
-        );
-      },
+      builder: (_, c) => Opacity(
+        opacity: _sheetAlpha(_sheet.value.clamp(0.0, 1.0).toDouble()),
+        child: c,
+      ),
     );
 
-    final sheetBody = Stack(
-      fit: StackFit.expand,
-      children: [backdropLayer, column],
+    // ClipRect: the sheet is exactly ONE rectangle, nothing can peek out of
+    // its edges while it moves.
+    final sheetBody = ClipRect(
+      child: Stack(fit: StackFit.expand, children: [backdropLayer, column]),
     );
 
     return Positioned.fill(
@@ -1708,8 +2228,8 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  /// Top stop is tiny so the first row (sync / shuffle / loop / automix)
-  /// is never faded out.
+  /// Top stop is tiny so the first row is never faded out. The child sits in
+  /// its own RepaintBoundary so the mask never forces the list to re-raster.
   Widget _edgeFade(
     Widget child, {
     double topStop = 0.012,
@@ -1728,16 +2248,19 @@ class PlayerShellState extends State<PlayerShell>
         ],
         stops: [0, topStop, bottomStop, 1],
       ).createShader(r),
-      child: child,
+      child: RepaintBoundary(child: child),
     );
   }
 
-  /// Scroll-to-dismiss: pulling a scrollable down past its top drags the sheet.
+  /// Scroll-to-dismiss for LYRICS only: pulling down past the top with a
+  /// FINGER drags the sheet. (The queue does not dismiss any more.)
   Widget _dismissOnOverscroll(Widget child) {
     return NotificationListener<ScrollNotification>(
       onNotification: (n) {
         if (_reordering) return false;
-        if (n is OverscrollNotification && n.overscroll < 0) {
+        if (n is OverscrollNotification &&
+            n.overscroll < 0 &&
+            n.dragDetails != null) {
           if (!_dragging) _dragStart();
           _dragUpdate(-n.overscroll);
           return true;
@@ -1751,13 +2274,13 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  /// Lyrics fade completely out right above the seekbar, so nothing shows
-  /// through behind the controls. When the controls hide, the fade opens
-  /// up to the bottom edge again (lyrics themselves never move).
+  /// Lyrics fade completely out right above the seekbar. When the controls
+  /// hide, the fade opens up to the bottom edge again. The lyrics sit in a
+  /// RepaintBoundary, so animating the mask never re-rasters the lyrics.
   Widget _lyricsFade(Widget child) {
     return AnimatedBuilder(
       animation: _chrome,
-      child: child,
+      child: RepaintBoundary(child: child),
       builder: (_, c) {
         final h = _chrome.value.clamp(0.0, 1.0).toDouble();
         final end = lerpDouble(_lyricsFadeEnd, 1.0, h)!;
@@ -1797,13 +2320,17 @@ class PlayerShellState extends State<PlayerShell>
                 Padding(
                   padding: const EdgeInsets.fromLTRB(0, 2, 0, 0),
                   child: _lyricsFade(
-                    TickerMode(
-                      enabled:
-                          (_open || _sheet.value > 0.05) &&
-                          _panel == _Panel.lyrics,
+                    // tickers run ONLY while nothing moves: the glide / drag /
+                    // close own the whole frame budget
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _dockGliding,
                       child:
                           widget.lyricsBuilder?.call(context) ??
                           LyricsSheet(immersiveListenable: _lyricsImmersive),
+                      builder: (_, gliding, lyrics) => TickerMode(
+                        enabled: !gliding && _bodyShowing && _open,
+                        child: lyrics!,
+                      ),
                     ),
                   ),
                 ),
@@ -1812,20 +2339,20 @@ class PlayerShellState extends State<PlayerShell>
           ),
         );
       case _Panel.queue:
+        // NO _dismissOnOverscroll here: pulling the queue down must never
+        // close the player.
         return RepaintBoundary(
           key: const ValueKey('queue-body'),
           child: KeyedSubtree(
             key: const ValueKey('queue'),
             child: NotificationListener<ScrollNotification>(
               onNotification: _onPanelScroll,
-              child: _dismissOnOverscroll(
-                _edgeFade(
-                  QueuePanel(
-                    onJumpTo: _jumpTo,
-                    onPlayHistory: _playHistory,
-                    onGoToArtist: widget.onGoToArtist,
-                    onReorderingChanged: (v) => _reordering = v,
-                  ),
+              child: _edgeFade(
+                QueuePanel(
+                  onJumpTo: _jumpTo,
+                  onPlayHistory: _playHistory,
+                  onGoToArtist: widget.onGoToArtist,
+                  onReorderingChanged: (v) => _reordering = v,
                 ),
               ),
             ),
@@ -1835,8 +2362,8 @@ class PlayerShellState extends State<PlayerShell>
   }
 
   /// Fades [child] with the `_dock` spring. Opacity only: no layout happens
-  /// during the glide, so the lyrics / queue never get resized mid-motion.
-  /// [from] delays the fade-in until the glide has reached that progress.
+  /// during the glide. CONSTANT TREE SHAPE: the child is ALWAYS mounted
+  /// (Opacity 0.0 skips painting but keeps the subtree alive).
   Widget _dockFade({
     bool inverse = false,
     double from = 0.0,
@@ -1852,8 +2379,26 @@ class PlayerShellState extends State<PlayerShell>
         if (withSheet) {
           f *= _sheetAlpha(_sheet.value.clamp(0.0, 1.0).toDouble());
         }
-        if (f <= 0.001) return const SizedBox.shrink();
-        if (f >= 0.999) return c!;
+        f = f.clamp(0.0, 1.0).toDouble();
+        return IgnorePointer(
+          ignoring: f < 0.6,
+          child: Opacity(opacity: f, child: c),
+        );
+      },
+    );
+  }
+
+  /// Fades the heavy lyrics / queue body with `_bodyIn` (rises only after the
+  /// cover has docked) and with its own steep sheet curve (gone by 70% open,
+  /// so a closing swipe never paints it). Opacity 0 = NOT painted at all.
+  Widget _bodyFade({required Widget child}) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_bodyIn, _sheet]),
+      child: child,
+      builder: (_, c) {
+        final f =
+            _bodyIn.value.clamp(0.0, 1.0).toDouble() *
+            _bodyAlpha(_sheet.value.clamp(0.0, 1.0).toDouble());
         return IgnorePointer(
           ignoring: f < 0.6,
           child: Opacity(opacity: f, child: c),
@@ -1863,14 +2408,13 @@ class PlayerShellState extends State<PlayerShell>
   }
 
   /// Glides the bottom controls away (and back) with the `_chrome` spring.
+  /// Constant tree shape: controls stay mounted.
   Widget _chromeCollapse({required Widget child}) {
     return AnimatedBuilder(
       animation: _chrome,
       child: child,
       builder: (_, c) {
         final h = _chrome.value.clamp(0.0, 1.0).toDouble();
-        if (h >= 0.999) return const SizedBox.shrink();
-        if (h <= 0.001) return c!;
         return IgnorePointer(
           ignoring: h > 0.35,
           child: RepaintBoundary(
@@ -1889,15 +2433,10 @@ class PlayerShellState extends State<PlayerShell>
     return AnimatedBuilder(
       animation: _sheet,
       child: child,
-      builder: (_, c) {
-        final a = _sheetAlpha(_sheet.value.clamp(0.0, 1.0).toDouble());
-        if (a <= 0.001) return const SizedBox.shrink();
-        if (a >= 0.999) return c!;
-        return Opacity(
-          opacity: a,
-          child: c,
-        );
-      },
+      builder: (_, c) => Opacity(
+        opacity: _sheetAlpha(_sheet.value.clamp(0.0, 1.0).toDouble()),
+        child: c,
+      ),
     );
   }
 
@@ -1931,9 +2470,7 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  /// Soft shade behind the bottom controls (lyrics mode only). The backdrop
-  /// is already blurred, so a plain gradient is enough and costs nothing
-  /// (no BackdropFilter over scrolling lyrics).
+  /// Soft shade behind the bottom controls (lyrics mode only).
   Widget _bottomBlur(double height, bool on) {
     return Positioned(
       left: 0,
@@ -1975,6 +2512,19 @@ class PlayerShellState extends State<PlayerShell>
     Size size,
     bool isFullBleed,
   ) {
+    // ── LANDSCAPE: left artwork (drawn by the overlay) + right pane, or a
+    // full-screen video. Same pointer Listener so the controls logic is shared.
+    if (_landscape) {
+      return Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: _onPointerDown,
+        onPointerMove: _onPointerMove,
+        onPointerUp: (e) => _onPointerEnd(e, up: true),
+        onPointerCancel: (e) => _onPointerEnd(e, up: false),
+        child: _landscapeContent(player, track, safe, size),
+      );
+    }
+
     final isLyrics = _panel == _Panel.lyrics;
     final isQueue = _panel == _Panel.queue;
     // layout follows the MOUNTED body, so a fading-out queue never jumps
@@ -2033,12 +2583,13 @@ class PlayerShellState extends State<PlayerShell>
                 : (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
             onVerticalDragCancel: isQueueBody ? null : () => _dragEnd(0),
             child: RepaintBoundary(
-              child: _dockFade(
-                from:
-                    0.45, // body appears after it is mounted: glide stays clean
-                withSheet: true,
+              // Body appears only AFTER the cover has docked (see _showBody),
+              // so the glide itself never paints lyrics / queue.
+              child: _bodyFade(
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
+                  // art <-> panel swaps are instant; only lyrics <-> queue
+                  // cross-fades.
+                  duration: Duration(milliseconds: _instantSwap ? 0 : 200),
                   transitionBuilder: (c, a) =>
                       FadeTransition(opacity: a, child: c),
                   layoutBuilder: (cur, prev) =>
@@ -2079,7 +2630,8 @@ class PlayerShellState extends State<PlayerShell>
       ),
     );
 
-    // Fixed height, fades with the dock: the lyrics region below never moves.
+    // Fixed height ALWAYS (it is never unmounted), so the lyrics region below
+    // never gets resized while the cover glides.
     final compactHeader = _dockFade(
       withSheet: true,
       child: _compactHeader(track),
@@ -2114,85 +2666,78 @@ class PlayerShellState extends State<PlayerShell>
       right: 0,
       bottom: blockBottomInset,
       child: _chromeCollapse(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onVerticalDragStart: (_) => _dragStart(),
-          onVerticalDragUpdate: (d) => _dragUpdate(d.delta.dy),
-          onVerticalDragEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
-          onVerticalDragCancel: () => _dragEnd(0),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _rise(
-                  begin: 0.64,
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 420),
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 2, bottom: 2),
-                        child: ScrubberSlider(
-                          positionNotifier: player.positionNotifier,
-                          duration: _duration,
-                          onSeek: (pos) => player.seek(pos),
-                          activeColor: _seekTint.withValues(alpha: 0.62),
-                          trackColor: _seekTint.withValues(alpha: 0.22),
-                          middleWidget: (!isLyrics && !isQueue)
-                              ? Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2.5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.16),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        CupertinoIcons.waveform,
-                                        size: 11,
-                                        color: Colors.white.withValues(
-                                          alpha: 0.85,
-                                        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _rise(
+                begin: 0.64,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 2, bottom: 2),
+                      child: ScrubberSlider(
+                        positionNotifier: player.positionNotifier,
+                        duration: _duration,
+                        onSeek: (pos) => player.seek(pos),
+                        activeColor: _seekTint.withValues(alpha: 0.62),
+                        trackColor: _seekTint.withValues(alpha: 0.22),
+                        middleWidget: (!isLyrics && !isQueue)
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.16),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      CupertinoIcons.waveform,
+                                      size: 11,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.85,
                                       ),
-                                      const SizedBox(width: 4),
-                                      const Text(
-                                        'Hi-Res Lossless',
-                                        style: TextStyle(
-                                          fontFamily: 'SF Pro',
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
-                                          letterSpacing: -0.2,
-                                        ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'Hi-Res Lossless',
+                                      style: TextStyle(
+                                        fontFamily: 'SF Pro',
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                        letterSpacing: -0.2,
                                       ),
-                                    ],
-                                  ),
-                                )
-                              : null,
-                        ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : null,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: _kRowGap),
-                _rise(
-                  begin: 0.70,
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 340),
-                      child: SizedBox(
-                        height: transportH,
-                        child: _transport(player),
-                      ),
+              ),
+              const SizedBox(height: _kRowGap),
+              _rise(
+                begin: 0.70,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 340),
+                    child: SizedBox(
+                      height: transportH,
+                      child: _transport(player),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -2204,27 +2749,20 @@ class PlayerShellState extends State<PlayerShell>
       right: 0,
       bottom: 0,
       child: _chromeCollapse(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onVerticalDragStart: (_) => _dragStart(),
-          onVerticalDragUpdate: (d) => _dragUpdate(d.delta.dy),
-          onVerticalDragEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
-          onVerticalDragCancel: () => _dragEnd(0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(24, 0, 24, safe.bottom + 16),
-                child: _rise(
-                  begin: 0.76,
-                  child: _tools(
-                    isLyrics,
-                    hasLyrics: player.hasLyrics || player.isLoadingLyrics,
-                  ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(24, 0, 24, safe.bottom + 16),
+              child: _rise(
+                begin: 0.76,
+                child: _tools(
+                  isLyrics,
+                  hasLyrics: player.hasLyrics || player.isLoadingLyrics,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -2247,6 +2785,490 @@ class PlayerShellState extends State<PlayerShell>
       onPointerUp: (e) => _onPointerEnd(e, up: true),
       onPointerCancel: (e) => _onPointerEnd(e, up: false),
       child: content,
+    );
+  }
+
+  /* ───────────────────────── LANDSCAPE ───────────────────────── */
+
+  Widget _landscapeContent(
+    PlayerState player,
+    dynamic track,
+    EdgeInsets safe,
+    Size size,
+  ) {
+    if (_isVideo) return _landscapeVideo(player, track, safe);
+
+    final art = _landscapeArtRect(size, safe);
+    final hasLyrics = player.hasLyrics || player.isLoadingLyrics;
+    _lyricsFadeEnd = 0.84;
+
+    // 1. Controls (seekbar + transport buttons)
+    // Sized compactly (max width 330px so seekbar is never too lengthy in landscape)
+    // Smoothly fades out, scales down, and slides slightly down when a panel opens
+    final controls = AnimatedBuilder(
+      animation: _bodyIn,
+      builder: (_, c) {
+        final b = _smooth(_bodyIn.value);
+        return IgnorePointer(
+          ignoring: b > 0.1,
+          child: Opacity(
+            opacity: (1 - b).clamp(0.0, 1.0),
+            child: Transform.translate(
+              offset: Offset(0, 16 * b),
+              child: Transform.scale(scale: 1.0 - 0.06 * b, child: c),
+            ),
+          ),
+        );
+      },
+      child: RepaintBoundary(
+        child: LayoutBuilder(
+          builder: (_, box) {
+            final seekW = math
+                .min(box.maxWidth * 0.82, 330.0)
+                .clamp(240.0, 360.0)
+                .toDouble();
+            return Center(
+              child: SizedBox(
+                width: seekW,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _rise(
+                      begin: 0.64,
+                      child: ScrubberSlider(
+                        positionNotifier: player.positionNotifier,
+                        duration: _duration,
+                        onSeek: (pos) => player.seek(pos),
+                        activeColor: _seekTint.withValues(alpha: 0.62),
+                        trackColor: _seekTint.withValues(alpha: 0.22),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _rise(
+                      begin: 0.70,
+                      child: SizedBox(height: 84, child: _transport(player)),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    // 2. Panel body (lyrics / queue)
+    // Takes the full height from top to bottom!
+    // Fades in and translates up softly with _bodyIn spring
+    final body = AnimatedBuilder(
+      animation: _bodyIn,
+      builder: (_, c) {
+        final b = _smooth(_bodyIn.value);
+        return IgnorePointer(
+          ignoring: b < 0.5,
+          child: Opacity(
+            opacity: b,
+            child: Transform.translate(
+              offset: Offset(0, 22 * (1 - b)),
+              child: c,
+            ),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 58),
+        child: RepaintBoundary(
+          child: _bodyFade(
+            child: AnimatedSwitcher(
+              duration: Duration(milliseconds: _instantSwap ? 0 : 200),
+              transitionBuilder: (c, a) => FadeTransition(opacity: a, child: c),
+              layoutBuilder: (cur, prev) =>
+                  Stack(fit: StackFit.expand, children: [...prev, ?cur]),
+              child: _panelBody(track),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // 3. Header: title / artist / like / more
+    // Fades out and slides up when lyrics or queue opens
+    final header = AnimatedBuilder(
+      animation: _bodyIn,
+      builder: (_, c) {
+        final b = _smooth(_bodyIn.value);
+        return IgnorePointer(
+          ignoring: b > 0.1,
+          child: Opacity(
+            opacity: (1 - b).clamp(0.0, 1.0),
+            child: Transform.translate(
+              offset: Offset(0, -20 * b),
+              child: c,
+            ),
+          ),
+        );
+      },
+      child: _rise(begin: 0.58, child: _metaRow(track)),
+    );
+
+    // 4. Bottom-right toggle tools (Studio FX is removed!)
+    // In controls: shows Lyrics and Queue buttons at bottom right.
+    // In Lyrics: Queue fades out, only Lyrics button is in bottom right corner.
+    // In Queue: Lyrics fades out, only Queue button is in bottom right corner.
+    final bottomTools = AnimatedBuilder(
+      animation: _bodyIn,
+      builder: (_, _) {
+        final b = _smooth(_bodyIn.value);
+        final inLyrics = _panel == _Panel.lyrics;
+        final inQueue = _panel == _Panel.queue;
+        final lyricsOpacity = inQueue ? (1 - b).clamp(0.0, 1.0) : 1.0;
+        final queueOpacity = inLyrics ? (1 - b).clamp(0.0, 1.0) : 1.0;
+
+        return Positioned(
+          bottom: 0,
+          right: 0,
+          child: RepaintBoundary(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!_isVideo) ...[
+                  IgnorePointer(
+                    ignoring: inQueue && b > 0.4,
+                    child: Opacity(
+                      opacity: lyricsOpacity,
+                      child: PlateButton(
+                        size: 44,
+                        active: inLyrics,
+                        onTap: hasLyrics ? () => _togglePanel(_Panel.lyrics) : null,
+                        child: Opacity(
+                          opacity: hasLyrics ? 1.0 : 0.28,
+                          child: SpringPop(
+                            trigger: inLyrics,
+                            scale: 0.3,
+                            child: Icon(
+                              inLyrics
+                                  ? CupertinoIcons.quote_bubble_fill
+                                  : CupertinoIcons.quote_bubble,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: (inLyrics || inQueue)
+                        ? 14.0 * (1 - b)
+                        : 14.0,
+                  ),
+                ],
+                IgnorePointer(
+                  ignoring: inLyrics && b > 0.4,
+                  child: Opacity(
+                    opacity: queueOpacity,
+                    child: PlateButton(
+                      size: 44,
+                      active: inQueue,
+                      onTap: () => _togglePanel(_Panel.queue),
+                      child: SpringPop(
+                        trigger: inQueue,
+                        scale: 0.3,
+                        child: const Icon(CupertinoIcons.list_bullet, size: 24),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    final grabber = Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: _sheetFade(
+        child: Semantics(
+          button: true,
+          label: 'Close player',
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _close,
+            onPanStart: (_) => _dragStart(),
+            onPanUpdate: (d) => _dragUpdate(d.delta.dy),
+            onPanEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
+            child: Padding(
+              padding: EdgeInsets.only(top: safe.top + 8, bottom: 10),
+              child: Center(
+                child: Container(
+                  width: 36,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned(
+          left: art.right + 28,
+          right: safe.right + 24,
+          top: safe.top + 20,
+          bottom: safe.bottom + 14,
+          child: Stack(
+            fit: StackFit.expand,
+            clipBehavior: Clip.none,
+            children: [
+              // Full-bleed panel body (lyrics or queue). Takes full height!
+              body,
+
+              // Center controls (seekbar + transport). Springs down / out when panel opens.
+              Positioned.fill(
+                top: _kLandMetaH,
+                bottom: 56,
+                child: controls,
+              ),
+
+              // Header: title / artist / like / more. Springs up / out when panel opens.
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: header,
+              ),
+
+              // Bottom-right tools (lyrics + queue in controls; single active button in panel mode).
+              bottomTools,
+            ],
+          ),
+        ),
+        grabber,
+      ],
+    );
+  }
+
+  /// Round dark disc behind the video buttons.
+  Widget _vidDisc(double size, Widget icon) => Container(
+    width: size,
+    height: size,
+    alignment: Alignment.center,
+    decoration: const BoxDecoration(
+      shape: BoxShape.circle,
+      color: Color(0x66000000),
+    ),
+    child: icon,
+  );
+
+  /// Full-screen landscape video. Everything on top of the video is driven by
+  /// ONE spring (`_videoUiC`): the dim fades, the buttons pop (soft scale),
+  /// the bottom info slides up. Hidden = Opacity 0 = nothing painted, so the
+  /// video texture plays with zero overdraw.
+  Widget _landscapeVideo(PlayerState player, dynamic track, EdgeInsets safe) {
+    final title = track is Track
+        ? track.title
+        : MediaNormalizer.cleanTitle(track?.title?.toString());
+    final artist = track is Track
+        ? track.artist
+        : MediaNormalizer.formatArtists(track?.artist?.toString());
+
+    final ui = RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _videoUiC,
+        builder: (_, _) {
+          final v = _videoUiC.value;
+          final o = v.clamp(0.0, 1.0).toDouble();
+          final pop = 0.92 + 0.08 * v.clamp(0.0, 1.06); // tiny natural settle
+          return IgnorePointer(
+            ignoring: o < 0.5,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Opacity(
+                  opacity: o,
+                  child: const ColoredBox(color: Color(0x66000000)),
+                ),
+                // close (top left)
+                Positioned(
+                  top: safe.top + 16,
+                  left: safe.left + 24,
+                  child: Opacity(
+                    opacity: o,
+                    child: Transform.translate(
+                      offset: Offset(0, -14 * (1 - o)),
+                      child: Transform.scale(
+                        scale: pop,
+                        child: _SpringButton(
+                          size: 52,
+                          label: 'Exit full screen',
+                          onTap: _exitLandscapeToPortrait,
+                          child: _vidDisc(
+                            46,
+                            const Icon(
+                              CupertinoIcons.xmark,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // back 10 · play / pause · forward 10
+                Center(
+                  child: Opacity(
+                    opacity: o,
+                    child: Transform.scale(
+                      scale: pop,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _SpringButton(
+                            size: 72,
+                            label: 'Back 10 seconds',
+                            onTap: () => _skip(-10),
+                            child: SpringPop(
+                              pulse: _prevPulse,
+                              dx: -8,
+                              scale: 0.1,
+                              child: _vidDisc(
+                                66,
+                                const Icon(
+                                  CupertinoIcons.gobackward_10,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 44),
+                          _SpringButton(
+                            size: 96,
+                            label: _playing ? 'Pause' : 'Play',
+                            pressedScale: 0.9,
+                            onTap: () {
+                              player.togglePlay();
+                              _pokeVideoUi();
+                            },
+                            child: _vidDisc(
+                              90,
+                              _PlayGlyph(playing: _playing, size: 44),
+                            ),
+                          ),
+                          const SizedBox(width: 44),
+                          _SpringButton(
+                            size: 72,
+                            label: 'Forward 10 seconds',
+                            onTap: () => _skip(10),
+                            child: SpringPop(
+                              pulse: _nextPulse,
+                              dx: 8,
+                              scale: 0.1,
+                              child: _vidDisc(
+                                66,
+                                const Icon(
+                                  CupertinoIcons.goforward_10,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // artist · title · seekbar (bottom)
+                Positioned(
+                  left: safe.left + 24,
+                  right: safe.right + 24,
+                  bottom: safe.bottom + 14,
+                  child: Opacity(
+                    opacity: o,
+                    child: Transform.translate(
+                      offset: Offset(0, 22 * (1 - o)),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          MarqueeScroll(
+                            resetKey: _trackKey,
+                            child: Text(
+                              artist,
+                              style: const TextStyle(
+                                fontFamily: 'SF Pro',
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          MarqueeScroll(
+                            resetKey: _trackKey,
+                            child: Text(
+                              title,
+                              style: const TextStyle(
+                                fontFamily: 'SF Pro Display',
+                                color: Colors.white,
+                                fontSize: 26,
+                                height: 1.2,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          ScrubberSlider(
+                            positionNotifier: player.positionNotifier,
+                            duration: _duration,
+                            onSeek: (pos) {
+                              player.seek(pos);
+                              _pokeVideoUi();
+                            },
+                            activeColor: Colors.white,
+                            trackColor: Colors.white.withValues(alpha: 0.3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _pokeVideoUi(toggle: true),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const ColoredBox(color: Colors.black),
+          RepaintBoundary(
+            child: _TrackMediaView(
+              player: player,
+              coverUrl: _shownCover ?? '',
+              isVideo: true,
+              videoFit: BoxFit.contain,
+            ),
+          ),
+          ui,
+        ],
+      ),
     );
   }
 
@@ -2487,24 +3509,25 @@ class PlayerShellState extends State<PlayerShell>
                   ),
                 ),
               ),
-              PlateButton(
-                size: 44,
-                active: lyricsOpen,
-                onTap: hasLyrics ? () => _togglePanel(_Panel.lyrics) : null,
-                child: Opacity(
-                  opacity: hasLyrics ? 1.0 : 0.28,
-                  child: SpringPop(
-                    trigger: lyricsOpen,
-                    scale: 0.3,
-                    child: Icon(
-                      lyricsOpen
-                          ? CupertinoIcons.quote_bubble_fill
-                          : CupertinoIcons.quote_bubble,
-                      size: 22,
+              if (!_isVideo)
+                PlateButton(
+                  size: 44,
+                  active: lyricsOpen,
+                  onTap: hasLyrics ? () => _togglePanel(_Panel.lyrics) : null,
+                  child: Opacity(
+                    opacity: hasLyrics ? 1.0 : 0.28,
+                    child: SpringPop(
+                      trigger: lyricsOpen,
+                      scale: 0.3,
+                      child: Icon(
+                        lyricsOpen
+                            ? CupertinoIcons.quote_bubble_fill
+                            : CupertinoIcons.quote_bubble,
+                        size: 22,
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -2665,13 +3688,15 @@ class _TrackMediaView extends StatelessWidget {
     required this.player,
     required this.coverUrl,
     required this.isVideo,
-    required this.videoFit,
+    this.videoFit = BoxFit.contain,
+    this.isMini = false,
   });
 
   final PlayerState player;
   final String coverUrl;
   final bool isVideo;
   final BoxFit videoFit;
+  final bool isMini;
 
   @override
   Widget build(BuildContext context) {
@@ -2682,7 +3707,13 @@ class _TrackMediaView extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        CoverImage(coverUrl),
+        ColoredBox(
+          color: const Color(0xFF000000),
+          child: CoverImage(
+            coverUrl,
+            fit: isMini ? BoxFit.cover : BoxFit.contain,
+          ),
+        ),
         ValueListenableBuilder<int?>(
           valueListenable: player.videoTextureIdNotifier,
           builder: (_, textureId, _) {
@@ -2693,8 +3724,22 @@ class _TrackMediaView extends StatelessWidget {
                 if (vSize.width <= 0 || vSize.height <= 0) {
                   return const SizedBox.shrink();
                 }
+                if (isMini) {
+                  return FittedBox(
+                    fit: BoxFit.cover,
+                    clipBehavior: Clip.hardEdge,
+                    child: SizedBox(
+                      width: vSize.width,
+                      height: vSize.height,
+                      child: Texture(
+                        textureId: textureId,
+                        filterQuality: FilterQuality.medium,
+                      ),
+                    ),
+                  );
+                }
                 return ColoredBox(
-                  color: const Color(0xFF0A0A0D),
+                  color: const Color(0xFF000000),
                   child: FittedBox(
                     fit: videoFit,
                     clipBehavior: Clip.hardEdge,

@@ -15,14 +15,9 @@ class ZenifyAtlasSource implements AtlasMusicSource {
   final PlayerState player;
   final ValueNotifier<String?> _now = ValueNotifier<String?>(null);
 
-  final Map<String, ({List<AtlasSong> tracks, List<AtlasChartArtist> artists})>
-  _chartsCache = {};
+  final Map<String, AtlasCountryCharts> _chartsCache = {};
   final Map<String, List<AtlasSong>> _newReleasesCache = {};
-  final Map<
-    String,
-    ({List<AtlasSong> tracks, String playlistTitle, bool isVerified})
-  >
-  _cityPlaylistsCache = {};
+  final Map<String, AtlasCityPlaylist> _cityPlaylistsCache = {};
 
   void _syncNowPlaying() {
     _now.value = player.currentTrack?.id;
@@ -70,8 +65,7 @@ class ZenifyAtlasSource implements AtlasMusicSource {
   }
 
   @override
-  Future<({List<AtlasSong> tracks, List<AtlasChartArtist> artists})>
-  getCountryCharts(String countryIso) async {
+  Future<AtlasCountryCharts> getCountryCharts(String countryIso) async {
     final code = countryIso.toUpperCase();
     if (_chartsCache.containsKey(code)) {
       return _chartsCache[code]!;
@@ -95,13 +89,16 @@ class ZenifyAtlasSource implements AtlasMusicSource {
         for (final a in result.artists)
           AtlasChartArtist(name: a.name, subs: a.subs, image: a.image),
       ];
-      final res = (tracks: atlasTracks, artists: chartArtists);
+      final res = AtlasCountryCharts(tracks: atlasTracks, artists: chartArtists);
       if (atlasTracks.isNotEmpty || chartArtists.isNotEmpty) {
         _chartsCache[code] = res;
       }
       return res;
     } catch (_) {
-      return (tracks: const <AtlasSong>[], artists: const <AtlasChartArtist>[]);
+      return const AtlasCountryCharts(
+        tracks: <AtlasSong>[],
+        artists: <AtlasChartArtist>[],
+      );
     }
   }
 
@@ -136,8 +133,7 @@ class ZenifyAtlasSource implements AtlasMusicSource {
   }
 
   @override
-  Future<({List<AtlasSong> tracks, String playlistTitle, bool isVerified})>
-  getCityPlaylist(AtlasCity city) async {
+  Future<AtlasCityPlaylist> getCityPlaylist(AtlasCity city) async {
     if (_cityPlaylistsCache.containsKey(city.id)) {
       return _cityPlaylistsCache[city.id]!;
     }
@@ -158,7 +154,7 @@ class ZenifyAtlasSource implements AtlasMusicSource {
         if (isMatch && id.isNotEmpty) {
           final res = await InnerTubeService.instance.getPlaylist(id);
           if (res != null && res.tracks.isNotEmpty) {
-            final verified = (
+            final verified = AtlasCityPlaylist(
               tracks: [
                 for (final t in res.tracks)
                   AtlasSong(
@@ -183,7 +179,7 @@ class ZenifyAtlasSource implements AtlasMusicSource {
     // 2. Honest Fallback: Build curated local city mix from city's verified artists
     try {
       final mix = await AtlasContent.instance.cityMix(city);
-      final fallback = (
+      final fallback = AtlasCityPlaylist(
         tracks: mix,
         playlistTitle: '${city.name} Sound Mix',
         isVerified: false,
@@ -193,7 +189,7 @@ class ZenifyAtlasSource implements AtlasMusicSource {
       }
       return fallback;
     } catch (_) {
-      return (
+      return AtlasCityPlaylist(
         tracks: const <AtlasSong>[],
         playlistTitle: '${city.name} Music',
         isVerified: false,

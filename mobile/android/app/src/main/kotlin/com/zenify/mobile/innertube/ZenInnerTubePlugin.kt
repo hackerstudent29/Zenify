@@ -19,6 +19,7 @@ import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
 /**
@@ -33,6 +34,23 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private lateinit var channel: MethodChannel
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    private fun <V> lru(n: Int) = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, V>(n, 0.75f, true) {
+            override fun removeEldestEntry(e: MutableMap.MutableEntry<String, V>?) = size > n
+        }
+    )
+    private val lyricsEp = lru<com.metrolist.innertube.models.BrowseEndpoint>(64)
+    private val lyricsText = lru<String>(64) // "" = confirmed none
+    private val lyricsInflight = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Deferred<String?>>()
+
+    private suspend fun fetchLyrics(videoId: String): String? = try {
+        val ep = lyricsEp[videoId]
+            ?: YouTube.next(WatchEndpoint(videoId = videoId)).getOrNull()?.lyricsEndpoint?.also { lyricsEp[videoId] = it }
+        val t = ep?.let { YouTube.lyrics(it).getOrNull() }?.takeIf { it.isNotBlank() }
+        lyricsText[videoId] = t ?: ""
+        t
+    } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { null }
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(binding.binaryMessenger, "zenify/innertube")
@@ -884,6 +902,7 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                         val outcome = YouTube.next(endpoint)
                         outcome.fold(
                             onSuccess = { nextResult ->
+                                nextResult.lyricsEndpoint?.let { lyricsEp[videoId] = it }
                                 val list = nextResult.items.map { songItemToMap(it) + ("type" to "song") }
                                 replySuccess(result, list)
                             },
@@ -894,27 +913,12 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     }
 
                     "getLyrics" -> {
-                        val videoId = call.argument<String>("videoId")?.replace("yt-", "") ?: ""
-                        if (videoId.isBlank()) {
-                            replySuccess(result, null)
-                            return@launch
-                        }
-                        try {
-                            val next = YouTube.next(WatchEndpoint(videoId = videoId)).getOrNull()
-                            val endpoint = next?.lyricsEndpoint
-                            if (endpoint != null) {
-                                val lyrics = YouTube.lyrics(endpoint).getOrNull()
-                                if (!lyrics.isNullOrBlank()) {
-                                    Log.i("ZenInnerTube", "getLyrics SUCCESS for videoId=$videoId: ${lyrics.length} chars")
-                                    replySuccess(result, lyrics)
-                                    return@launch
-                                }
-                            }
-                            replySuccess(result, null)
-                        } catch (e: Exception) {
-                            Log.w("ZenInnerTube", "getLyrics error for videoId=$videoId: ${e.message}")
-                            replySuccess(result, null)
-                        }
+                        val videoId = call.argument<String>("videoId")?.removePrefix("yt-")?.trim().orEmpty()
+                        if (videoId.isBlank()) { replySuccess(result, null); return@launch }
+                        lyricsText[videoId]?.let { replySuccess(result, it.ifEmpty { null }); return@launch }
+                        val d = lyricsInflight.getOrPut(videoId) { scope.async { fetchLyrics(videoId) } }
+                        val text = try { d.await() } finally { lyricsInflight.remove(videoId, d) }
+                        replySuccess(result, text)
                     }
 
                     "setLocale" -> {

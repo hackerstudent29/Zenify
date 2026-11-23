@@ -93,11 +93,17 @@ class SavedAlbum {
 }
 
 class UserPlaylist {
-  UserPlaylist({required this.id, required this.name, List<String>? trackIds})
-      : trackIds = trackIds ?? [];
+  UserPlaylist({
+    required this.id,
+    required this.name,
+    List<String>? trackIds,
+    this.createdAt,
+  }) : trackIds = trackIds ?? [];
+
   final String id;
   String name;
   final List<String> trackIds;
+  final DateTime? createdAt;
 }
 
 class ArtistInfo {
@@ -262,11 +268,14 @@ class LibraryStore extends ChangeNotifier {
                 final name = (item['name'] as String? ?? '').trim();
                 final rawList = item['tracks'] as List? ?? [];
                 final trackIds = rawList.map((x) => '$x'.trim()).where((x) => x.isNotEmpty).toList();
+                final rawCreated = item['createdAt']?.toString();
+                final createdAt = rawCreated != null ? DateTime.tryParse(rawCreated) : null;
                 if (id.isNotEmpty && !localPlaylistIds.contains(id)) {
                   _playlists.add(UserPlaylist(
                     id: id,
                     name: name.isEmpty ? 'My Playlist' : name,
                     trackIds: trackIds,
+                    createdAt: createdAt,
                   ));
                   changed = true;
                 }
@@ -416,11 +425,14 @@ class LibraryStore extends ChangeNotifier {
                 final name = (item['name'] as String? ?? '').trim();
                 final rawList = item['tracks'] as List? ?? [];
                 final trackIds = rawList.map((x) => '$x'.trim()).where((x) => x.isNotEmpty).toList();
+                final rawCreated = item['createdAt']?.toString();
+                final createdAt = rawCreated != null ? DateTime.tryParse(rawCreated) : null;
                 if (id.isNotEmpty) {
                   _playlists.add(UserPlaylist(
                     id: id,
                     name: name.isEmpty ? 'My Playlist' : name,
                     trackIds: trackIds,
+                    createdAt: createdAt,
                   ));
                 }
               }
@@ -452,7 +464,12 @@ class LibraryStore extends ChangeNotifier {
         ],
         'playlists': [
           for (final p in _playlists)
-            {'id': p.id, 'name': p.name, 'tracks': p.trackIds}
+            {
+              'id': p.id,
+              'name': p.name,
+              'tracks': p.trackIds,
+              if (p.createdAt != null) 'createdAt': p.createdAt!.toIso8601String(),
+            }
         ],
         'tracks': {
           for (final entry in _seen.entries)
@@ -655,6 +672,7 @@ class LibraryStore extends ChangeNotifier {
     final p = UserPlaylist(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: name.trim().isEmpty ? 'My Playlist' : name.trim(),
+      createdAt: DateTime.now(),
     );
     if (first != null) {
       final k = _key(first);
@@ -679,6 +697,7 @@ class LibraryStore extends ChangeNotifier {
     final p = UserPlaylist(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: name.trim().isEmpty ? 'Imported Playlist' : name.trim(),
+      createdAt: DateTime.now(),
     );
     for (final t in tracks) {
       final k = _key(t);

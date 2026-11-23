@@ -7,12 +7,6 @@ import '../models/atlas_models.dart';
 import '../services/passport_store.dart';
 import '../widgets/atlas_components.dart';
 
-typedef _Playlist = ({
-  List<AtlasSong> tracks,
-  String playlistTitle,
-  bool isVerified,
-});
-
 class CityScreen extends StatefulWidget {
   const CityScreen({super.key, required this.city});
   final AtlasCity city;
@@ -22,7 +16,7 @@ class CityScreen extends StatefulWidget {
 }
 
 class _CityScreenState extends State<CityScreen> {
-  late final Future<_Playlist> _playlist;
+  late final Future<AtlasCityPlaylist> _playlist;
 
   @override
   void initState() {
@@ -90,7 +84,7 @@ class _CityScreenState extends State<CityScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  FutureBuilder<_Playlist>(
+                  FutureBuilder<AtlasCityPlaylist>(
                     future: _playlist,
                     builder: (_, snap) {
                       final t = snap.data?.tracks ?? const <AtlasSong>[];
@@ -118,7 +112,7 @@ class _CityScreenState extends State<CityScreen> {
               ),
             ),
           ],
-          FutureBuilder<_Playlist>(
+          FutureBuilder<AtlasCityPlaylist>(
             future: _playlist,
             builder: (context, snap) {
               if (snap.connectionState != ConnectionState.done) {

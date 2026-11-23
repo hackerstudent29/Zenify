@@ -285,7 +285,8 @@ export class LibraryController {
                     artistId: artist.id,
                     duration: item.duration || 180,
                     coverUrl: item.coverUrl || '',
-                    source: 'EXTERNAL'
+                    audioUrl: '',
+                    provider: 'EXTERNAL'
                   }
                 }).catch(() => null);
               }
@@ -347,7 +348,8 @@ export class LibraryController {
                         artistId: defaultArtist.id,
                         duration: 180,
                         coverUrl: '',
-                        source: 'EXTERNAL'
+                        audioUrl: '',
+                        provider: 'EXTERNAL'
                       }
                     }).catch(() => null);
                   }

@@ -22,6 +22,7 @@ class StreamUrlCache(private val maxEntries: Int = 500) {
         val videoUrl: String? = null,
         val videoWidth: Int? = null,
         val videoHeight: Int? = null,
+        val isHls: Boolean = false,
     ) {
         fun isExpired(nowSec: Long = System.currentTimeMillis() / 1000): Boolean =
             nowSec >= (expiresAtSec - 60) // 60s safety margin
@@ -39,6 +40,7 @@ class StreamUrlCache(private val maxEntries: Int = 500) {
             videoUrl = videoUrl,
             videoWidth = videoWidth,
             videoHeight = videoHeight,
+            isHls = isHls,
         )
     }
 
@@ -77,14 +79,28 @@ class StreamUrlCache(private val maxEntries: Int = 500) {
             videoUrl = resolved.videoUrl,
             videoWidth = resolved.videoWidth,
             videoHeight = resolved.videoHeight,
+            isHls = resolved.isHls,
         )
         return true
     }
 
     @Synchronized
     fun invalidate(id: String) {
-        cache.remove(id)
-        incrementGeneration(id)
+        val keysToRemove = cache.keys.filter { it == id || it.startsWith("$id#") }
+        for (k in keysToRemove) {
+            cache.remove(k)
+            incrementGeneration(k)
+        }
+    }
+
+    @Synchronized
+    fun findAnyForVideo(videoId: String): Entry? {
+        for ((k, v) in cache) {
+            if (k == videoId || k.startsWith("$videoId#")) {
+                if (!v.isExpired()) return v
+            }
+        }
+        return null
     }
 
     @Synchronized

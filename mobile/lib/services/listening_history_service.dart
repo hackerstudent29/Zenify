@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/track.dart';
+import '../utils/media_normalizer.dart';
 
 /// Service that monitors user listening activity on device, maintains play history,
 /// tracks frequently played artists & languages, and powers personalized recommendations
@@ -60,20 +61,39 @@ class ListeningHistoryService {
         }
       }
 
-      // 2. Load artist play counts
+      // 2. Load artist play counts & sanitize composite entries
       final rawArtists = prefs.getString(_artistPlaysKey);
       if (rawArtists != null && rawArtists.isNotEmpty) {
         final map = jsonDecode(rawArtists) as Map?;
         if (map != null) {
           _artistPlays.clear();
+          var needsResave = false;
           map.forEach((k, v) {
-            final keyStr = k.toString();
+            final keyStr = k.toString().trim();
             if (v is int &&
                 !keyStr.contains("Instance of") &&
-                !keyStr.contains("ArtistRef")) {
-              _artistPlays[keyStr] = v;
+                !keyStr.contains("ArtistRef") &&
+                keyStr.isNotEmpty &&
+                keyStr.toLowerCase() != 'unknown artist') {
+              final split = MediaNormalizer.splitArtistNames(keyStr);
+              if (split.length > 1) {
+                needsResave = true;
+                for (final artist in split) {
+                  final clean = artist.trim();
+                  if (clean.isNotEmpty &&
+                      clean.toLowerCase() != 'unknown artist') {
+                    _artistPlays[clean] = (_artistPlays[clean] ?? 0) + v;
+                  }
+                }
+              } else {
+                final clean = split.isNotEmpty ? split.first : keyStr;
+                _artistPlays[clean] = (_artistPlays[clean] ?? 0) + v;
+              }
             }
           });
+          if (needsResave) {
+            _persist();
+          }
         }
       }
 
@@ -122,7 +142,9 @@ class ListeningHistoryService {
         for (var i = 0; i < _history.length; i++) {
           final t = _history[i];
           final eventTime = now.subtract(Duration(hours: i * 2));
-          final durMs = t.durationSeconds > 0 ? t.durationSeconds * 1000 : 210000;
+          final durMs = t.durationSeconds > 0
+              ? t.durationSeconds * 1000
+              : 210000;
           final dateKey = _formatDateKey(eventTime);
 
           _sessions.add({
@@ -136,7 +158,9 @@ class ListeningHistoryService {
             'trackDurationMs': durMs,
             'isSkip': false,
             'startedAt': eventTime.toIso8601String(),
-            'endedAt': eventTime.add(Duration(milliseconds: durMs)).toIso8601String(),
+            'endedAt': eventTime
+                .add(Duration(milliseconds: durMs))
+                .toIso8601String(),
             'date': dateKey,
             'dow': (eventTime.weekday - 1).clamp(0, 6),
             'hour': eventTime.hour,
@@ -165,10 +189,21 @@ class ListeningHistoryService {
       _history.removeRange(60, _history.length);
     }
 
-    // 2. Increment artist play count
-    final primaryArtist = track.artist.split(',').first.trim();
-    if (primaryArtist.isNotEmpty && primaryArtist != 'Unknown Artist') {
-      _artistPlays[primaryArtist] = (_artistPlays[primaryArtist] ?? 0) + 1;
+    // 2. Increment artist play count for each distinct individual artist (always split composite strings)
+    final rawArtistNames = track.resolvedArtists.isNotEmpty
+        ? track.resolvedArtists.map((a) => a.name)
+        : [track.artist];
+    final individualArtists = <String>{};
+    for (final raw in rawArtistNames) {
+      for (final artist in MediaNormalizer.splitArtistNames(raw)) {
+        final clean = artist.trim();
+        if (clean.isNotEmpty && clean.toLowerCase() != 'unknown artist') {
+          individualArtists.add(clean);
+        }
+      }
+    }
+    for (final clean in individualArtists) {
+      _artistPlays[clean] = (_artistPlays[clean] ?? 0) + 1;
     }
 
     _trackPlays[track.id] = (_trackPlays[track.id] ?? 0) + 1;
@@ -194,27 +229,40 @@ class ListeningHistoryService {
     // Find cover and artist from recent history
     final track = findTrackById(trackId);
     final coverUrl = track?.coverUrl ?? '';
-    final rawArtist = event['artists'] is List && (event['artists'] as List).isNotEmpty
+    final rawArtist =
+        event['artists'] is List && (event['artists'] as List).isNotEmpty
         ? (event['artists'][0]['artistName']?.toString() ?? '')
         : (track?.artist ?? 'Unknown Artist');
-    final primaryArtist = rawArtist.split(',').first.trim();
+    final splitArtists = MediaNormalizer.splitArtistNames(rawArtist);
+    final primaryArtist = splitArtists.isNotEmpty
+        ? splitArtists.first
+        : 'Unknown Artist';
 
-    final startedAtStr = event['startedAt']?.toString() ?? DateTime.now().toIso8601String();
+    final startedAtStr =
+        event['startedAt']?.toString() ?? DateTime.now().toIso8601String();
     final startedAt = DateTime.tryParse(startedAtStr) ?? DateTime.now();
     final dateKey = _formatDateKey(startedAt);
 
     final sessionEvent = <String, dynamic>{
-      'eventId': event['eventId']?.toString() ?? 'local_${DateTime.now().millisecondsSinceEpoch}',
+      'eventId':
+          event['eventId']?.toString() ??
+          'local_${DateTime.now().millisecondsSinceEpoch}',
       'trackId': trackId,
-      'trackTitle': event['trackTitle']?.toString() ?? (track?.title ?? 'Unknown Track'),
+      'trackTitle':
+          event['trackTitle']?.toString() ?? (track?.title ?? 'Unknown Track'),
       'artistName': primaryArtist.isNotEmpty ? primaryArtist : 'Unknown Artist',
       'trackAlbum': event['trackAlbum']?.toString() ?? (track?.album ?? ''),
       'coverUrl': coverUrl,
       'listenedMs': listenedMs,
-      'trackDurationMs': trackDurationMs > 0 ? trackDurationMs : (track?.durationSeconds != null ? track!.durationSeconds * 1000 : 210000),
+      'trackDurationMs': trackDurationMs > 0
+          ? trackDurationMs
+          : (track?.durationSeconds != null
+                ? track!.durationSeconds * 1000
+                : 210000),
       'isSkip': isSkip,
       'startedAt': startedAt.toIso8601String(),
-      'endedAt': event['endedAt']?.toString() ?? DateTime.now().toIso8601String(),
+      'endedAt':
+          event['endedAt']?.toString() ?? DateTime.now().toIso8601String(),
       'date': dateKey,
       'dow': (startedAt.weekday - 1).clamp(0, 6),
       'hour': startedAt.hour,
@@ -329,26 +377,32 @@ class ListeningHistoryService {
       final tAlbum = ev['trackAlbum']?.toString() ?? '';
 
       if (tId.isNotEmpty) {
-        final t = trackMap.putIfAbsent(tId, () => {
-          'trackId': tId,
-          'trackTitle': tTitle.isNotEmpty ? tTitle : 'Unknown Track',
-          'trackAlbum': tAlbum,
-          'artistName': aName.isNotEmpty ? aName : 'Unknown Artist',
-          'coverUrl': ev['coverUrl']?.toString() ?? '',
-          'plays': 0,
-          'listenedMs': 0,
-        });
+        final t = trackMap.putIfAbsent(
+          tId,
+          () => {
+            'trackId': tId,
+            'trackTitle': tTitle.isNotEmpty ? tTitle : 'Unknown Track',
+            'trackAlbum': tAlbum,
+            'artistName': aName.isNotEmpty ? aName : 'Unknown Artist',
+            'coverUrl': ev['coverUrl']?.toString() ?? '',
+            'plays': 0,
+            'listenedMs': 0,
+          },
+        );
         t['plays'] = (t['plays'] as int) + 1;
         t['listenedMs'] = (t['listenedMs'] as int) + ms;
       }
 
       if (aName.isNotEmpty && aName != 'Unknown Artist') {
-        final a = artistMap.putIfAbsent(aName, () => {
-          'artistKey': aName,
-          'artistName': aName,
-          'plays': 0,
-          'listenedMs': 0,
-        });
+        final a = artistMap.putIfAbsent(
+          aName,
+          () => {
+            'artistKey': aName,
+            'artistName': aName,
+            'plays': 0,
+            'listenedMs': 0,
+          },
+        );
         a['plays'] = (a['plays'] as int) + 1;
         a['listenedMs'] = (a['listenedMs'] as int) + ms;
       }
@@ -380,7 +434,8 @@ class ListeningHistoryService {
       final dateStr = ev['date']?.toString() ?? '';
       if (dateStr.isNotEmpty) {
         activeDays.add(dateStr);
-        timelineMap[dateStr] = (timelineMap[dateStr] ?? 0) + (ms / 60000).round();
+        timelineMap[dateStr] =
+            (timelineMap[dateStr] ?? 0) + (ms / 60000).round();
       }
 
       final dow = (ev['dow'] as num? ?? 0).toInt().clamp(0, 6);
@@ -395,9 +450,11 @@ class ListeningHistoryService {
 
     // Top Tracks
     final topTracks = trackMap.values.toList()
-      ..sort((a, b) => ((b['plays'] as int).compareTo(a['plays'] as int) != 0)
-          ? (b['plays'] as int).compareTo(a['plays'] as int)
-          : (b['listenedMs'] as int).compareTo(a['listenedMs'] as int));
+      ..sort(
+        (a, b) => ((b['plays'] as int).compareTo(a['plays'] as int) != 0)
+            ? (b['plays'] as int).compareTo(a['plays'] as int)
+            : (b['listenedMs'] as int).compareTo(a['listenedMs'] as int),
+      );
     final rankedTracks = topTracks.take(10).toList();
     for (var i = 0; i < rankedTracks.length; i++) {
       rankedTracks[i]['rank'] = i + 1;
@@ -405,9 +462,11 @@ class ListeningHistoryService {
 
     // Top Artists
     final topArtists = artistMap.values.toList()
-      ..sort((a, b) => ((b['plays'] as int).compareTo(a['plays'] as int) != 0)
-          ? (b['plays'] as int).compareTo(a['plays'] as int)
-          : (b['listenedMs'] as int).compareTo(a['listenedMs'] as int));
+      ..sort(
+        (a, b) => ((b['plays'] as int).compareTo(a['plays'] as int) != 0)
+            ? (b['plays'] as int).compareTo(a['plays'] as int)
+            : (b['listenedMs'] as int).compareTo(a['listenedMs'] as int),
+      );
     final rankedArtists = topArtists.take(10).toList();
     for (var i = 0; i < rankedArtists.length; i++) {
       rankedArtists[i]['rank'] = i + 1;
@@ -449,7 +508,15 @@ class ListeningHistoryService {
       });
     });
 
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const dayNames = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
     var peakD = 0;
     var peakH = 20;
     var peakVal = -1;
@@ -469,10 +536,7 @@ class ListeningHistoryService {
     for (var i = timelineLen - 1; i >= 0; i--) {
       final d = now.subtract(Duration(days: i));
       final k = _formatDateKey(d);
-      timelineDays.add({
-        'date': k,
-        'minutes': timelineMap[k] ?? 0,
-      });
+      timelineDays.add({'date': k, 'minutes': timelineMap[k] ?? 0});
     }
 
     // Dynamic Breakdown Calculations
@@ -481,7 +545,10 @@ class ListeningHistoryService {
     final rankedGenres = sortedGenres.isNotEmpty
         ? sortedGenres.map((e) => {'genre': e.key, 'count': e.value}).toList()
         : [
-            {'genre': 'Soundtracks & Pop', 'count': totalPlays > 0 ? totalPlays : 1},
+            {
+              'genre': 'Soundtracks & Pop',
+              'count': totalPlays > 0 ? totalPlays : 1,
+            },
           ];
 
     final sortedLangs = langCounts.entries.toList()
@@ -490,24 +557,36 @@ class ListeningHistoryService {
         ? sortedLangs.map((e) => {'language': e.key, 'count': e.value}).toList()
         : [
             if (primaryLanguage.isNotEmpty)
-              {'language': primaryLanguage, 'count': totalPlays > 0 ? totalPlays : 1},
+              {
+                'language': primaryLanguage,
+                'count': totalPlays > 0 ? totalPlays : 1,
+              },
           ];
 
     final topLang = rankedLanguages.isNotEmpty
         ? (rankedLanguages[0]['language']?.toString() ?? primaryLanguage)
         : primaryLanguage;
-    final topArtistName = rankedArtists.isNotEmpty ? rankedArtists[0]['artistName'] : null;
+    final topArtistName = rankedArtists.isNotEmpty
+        ? rankedArtists[0]['artistName']
+        : null;
 
     final personality = {
-      'archetype': nightPlays > morningPlays ? 'Night Explorer' : 'Acoustic Traveler',
-      'title': nightPlays > morningPlays ? 'Night Explorer' : 'Acoustic Traveler',
+      'archetype': nightPlays > morningPlays
+          ? 'Night Explorer'
+          : 'Acoustic Traveler',
+      'title': nightPlays > morningPlays
+          ? 'Night Explorer'
+          : 'Acoustic Traveler',
       'description': topArtistName != null
           ? 'Deep musical focus, anchored by $topArtistName and immersive soundscapes.'
           : 'Diverse listening habits with an ear for acoustic flow and soulful melodies.',
       'traits': [
         if (nightPlays > morningPlays) 'Night Owl' else 'Morning Listener',
         'Deep Acoustic',
-        if (topLang.isNotEmpty) '${topLang[0].toUpperCase()}${topLang.substring(1)} Fan' else 'Melody Lover',
+        if (topLang.isNotEmpty)
+          '${topLang[0].toUpperCase()}${topLang.substring(1)} Fan'
+        else
+          'Melody Lover',
       ],
     };
 
@@ -520,7 +599,9 @@ class ListeningHistoryService {
       'uniqueArtists': artistMap.length,
       'streakDays': max(1, streakDays),
       'activeDays': activeDays.length,
-      'skipRatePct': totalPlays > 0 ? ((totalSkips / totalPlays) * 100).round() : 0,
+      'skipRatePct': totalPlays > 0
+          ? ((totalSkips / totalPlays) * 100).round()
+          : 0,
       'comparisons': {
         'time': {'deltaPct': 12},
         'plays': {'deltaPct': 8},
@@ -531,7 +612,8 @@ class ListeningHistoryService {
       'heatmapNormalized': heatmapNormalized,
       'peakDay': dayNames[peakD],
       'peakHour': peakH,
-      'heatmapInsight': 'Most active on ${dayNames[peakD]}s around ${peakH > 12 ? '${peakH - 12} PM' : (peakH == 0 ? '12 AM' : '$peakH AM')}',
+      'heatmapInsight':
+          'Most active on ${dayNames[peakD]}s around ${peakH > 12 ? '${peakH - 12} PM' : (peakH == 0 ? '12 AM' : '$peakH AM')}',
       'timeline': timelineDays,
       'discoveriesCount': max(1, artistMap.length ~/ 2),
       'musicPersonality': personality,
@@ -688,7 +770,17 @@ class ListeningHistoryService {
 
   /// Returns user's top played artists ordered by play count descending.
   List<({String name, int plays})> getTopArtists({int limit = 10}) {
-    final entries = _artistPlays.entries.toList()
+    final aggregated = <String, int>{};
+    for (final e in _artistPlays.entries) {
+      final split = MediaNormalizer.splitArtistNames(e.key);
+      for (final name in split) {
+        final clean = name.trim();
+        if (clean.isNotEmpty && clean.toLowerCase() != 'unknown artist') {
+          aggregated[clean] = (aggregated[clean] ?? 0) + e.value;
+        }
+      }
+    }
+    final entries = aggregated.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     return entries
         .take(limit)
@@ -698,9 +790,8 @@ class ListeningHistoryService {
 
   /// Returns the single most-listened artist for "Similar to [Artist]" spotlight.
   String? getFavoriteArtist() {
-    if (_artistPlays.isEmpty) return null;
-    final top = _artistPlays.entries.reduce((a, b) => a.value > b.value ? a : b);
-    return top.key;
+    final top = getTopArtists(limit: 1);
+    return top.isNotEmpty ? top.first.name : null;
   }
 
   /// Returns user's second most-listened artist.
@@ -718,9 +809,11 @@ class ListeningHistoryService {
 
   /// Returns time-of-day greeting, contextual mood, and targeted search term.
   static ({String greeting, String moodLabel, String defaultSearchTerm})
-      getTimeOfDayContext(String preferredLanguage) {
+  getTimeOfDayContext(String preferredLanguage) {
     final hour = DateTime.now().hour;
-    final langPrefix = preferredLanguage.isNotEmpty ? '$preferredLanguage ' : '';
+    final langPrefix = preferredLanguage.isNotEmpty
+        ? '$preferredLanguage '
+        : '';
     if (hour >= 5 && hour < 12) {
       return (
         greeting: 'Good morning',

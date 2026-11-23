@@ -266,8 +266,9 @@ class _FadeSlideInState extends State<FadeSlideIn>
 /*  Cover image                                                         */
 /* ------------------------------------------------------------------ */
 class CoverImage extends StatelessWidget {
-  const CoverImage(this.url, {super.key});
+  const CoverImage(this.url, {super.key, this.fit = BoxFit.cover});
   final String url;
+  final BoxFit fit;
 
   static Widget _empty(double size) => Container(
     color: const Color(0xFF18181B),
@@ -287,7 +288,7 @@ class CoverImage extends StatelessWidget {
     return CachedNetworkImage(
       key: ValueKey(cleanUrl),
       imageUrl: cleanUrl,
-      fit: BoxFit.cover,
+      fit: fit,
       fadeInDuration: Duration.zero,
       fadeOutDuration: Duration.zero,
       placeholder: (_, _) => Container(color: const Color(0xFF18181B)),
@@ -300,7 +301,7 @@ class CoverImage extends StatelessWidget {
           return CachedNetworkImage(
             key: ValueKey(sdUrl),
             imageUrl: sdUrl,
-            fit: BoxFit.cover,
+            fit: fit,
             fadeInDuration: Duration.zero,
             placeholder: (_, _) => Container(color: const Color(0xFF18181B)),
             errorWidget: (_, _, _) {
@@ -311,7 +312,7 @@ class CoverImage extends StatelessWidget {
               return CachedNetworkImage(
                 key: ValueKey(hqUrl),
                 imageUrl: hqUrl,
-                fit: BoxFit.cover,
+                fit: fit,
                 fadeInDuration: Duration.zero,
                 placeholder: (_, _) =>
                     Container(color: const Color(0xFF18181B)),

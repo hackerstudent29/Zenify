@@ -13,7 +13,7 @@ import 'lyrics_service.dart';
 import 'stream_resolver_service.dart';
 import '../data/datasources/catalog_datasource.dart';
 
-const kCacheSchema = 4;
+const kCacheSchema = 6;
 
 /// One-time cache wipe that runs at app start before any network call.
 /// Idempotent: stores `cache_schema` in SharedPreferences.

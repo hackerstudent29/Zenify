@@ -64,7 +64,7 @@ void main() {
 
       expect(find.byType(AppleGlass), findsNothing);
       expect(find.byType(PlayerMoreButton), findsOneWidget);
-      expect(find.byIcon(CupertinoIcons.ellipsis), findsOneWidget);
+      expect(find.byIcon(CupertinoIcons.ellipsis_vertical), findsOneWidget);
 
       await tester.tap(find.byType(PlayerMoreButton));
       await tester.pump();
@@ -80,7 +80,7 @@ void main() {
           home: Scaffold(
             body: Center(
               child: DynamicIslandActionButton(
-                icon: CupertinoIcons.ellipsis,
+                icon: CupertinoIcons.ellipsis_vertical,
                 onTap: () => tapped = true,
               ),
             ),
@@ -89,7 +89,7 @@ void main() {
       );
 
       expect(find.byType(AppleGlass), findsOneWidget);
-      expect(find.byIcon(CupertinoIcons.ellipsis), findsOneWidget);
+      expect(find.byIcon(CupertinoIcons.ellipsis_vertical), findsOneWidget);
 
       await tester.tap(find.byType(DynamicIslandActionButton));
       await tester.pump();
@@ -113,7 +113,7 @@ void main() {
       );
 
       expect(find.byType(DynamicIslandActionButton), findsOneWidget);
-      expect(find.byIcon(CupertinoIcons.ellipsis), findsOneWidget);
+      expect(find.byIcon(CupertinoIcons.ellipsis_vertical), findsOneWidget);
 
       await tester.tap(find.byType(DynamicIslandActionButton));
       await tester.pump();

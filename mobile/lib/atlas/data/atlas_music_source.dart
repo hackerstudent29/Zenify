@@ -13,15 +13,13 @@ abstract class AtlasMusicSource {
   Future<String?> artistImage(String artist);
 
   /// Fetch country charts with country context (gl: countryIso).
-  Future<({List<AtlasSong> tracks, List<AtlasChartArtist> artists})>
-  getCountryCharts(String countryIso);
+  Future<AtlasCountryCharts> getCountryCharts(String countryIso);
 
   /// Fetch country new releases with country context.
   Future<List<AtlasSong>> getCountryNewReleases(String countryIso);
 
   /// Fetch or resolve city playlist with verification.
-  Future<({List<AtlasSong> tracks, String playlistTitle, bool isVerified})>
-  getCityPlaylist(AtlasCity city);
+  Future<AtlasCityPlaylist> getCityPlaylist(AtlasCity city);
 
   /// Replace the queue and start playback.
   Future<void> playQueue(List<AtlasSong> songs, {int startIndex = 0});
@@ -38,27 +36,29 @@ class NullAtlasMusicSource implements AtlasMusicSource {
 
   @override
   Future<List<AtlasSong>> topSongs(String artist, {int limit = 3}) async =>
-      const <AtlasSong>[];
+      const [];
 
   @override
   Future<String?> artistImage(String artist) async => null;
 
   @override
-  Future<({List<AtlasSong> tracks, List<AtlasChartArtist> artists})>
-  getCountryCharts(String countryIso) async =>
-      (tracks: const <AtlasSong>[], artists: const <AtlasChartArtist>[]);
+  Future<AtlasCountryCharts> getCountryCharts(String countryIso) async =>
+      const AtlasCountryCharts(
+        tracks: <AtlasSong>[],
+        artists: <AtlasChartArtist>[],
+      );
 
   @override
   Future<List<AtlasSong>> getCountryNewReleases(String countryIso) async =>
-      const <AtlasSong>[];
+      const [];
 
   @override
-  Future<({List<AtlasSong> tracks, String playlistTitle, bool isVerified})>
-  getCityPlaylist(AtlasCity city) async => (
-    tracks: const <AtlasSong>[],
-    playlistTitle: 'Local Mix',
-    isVerified: false,
-  );
+  Future<AtlasCityPlaylist> getCityPlaylist(AtlasCity city) async =>
+      const AtlasCityPlaylist(
+        tracks: <AtlasSong>[],
+        playlistTitle: 'Local Mix',
+        isVerified: false,
+      );
 
   @override
   Future<void> playQueue(List<AtlasSong> songs, {int startIndex = 0}) async {}

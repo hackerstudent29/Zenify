@@ -54,19 +54,25 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
   @override
   void initState() {
     super.initState();
-    ListeningHistoryService.instance.historyNotifier.addListener(_onHistoryUpdated);
+    ListeningHistoryService.instance.historyNotifier.addListener(
+      _onHistoryUpdated,
+    );
     _fetchInsights();
   }
 
   @override
   void dispose() {
-    ListeningHistoryService.instance.historyNotifier.removeListener(_onHistoryUpdated);
+    ListeningHistoryService.instance.historyNotifier.removeListener(
+      _onHistoryUpdated,
+    );
     super.dispose();
   }
 
   void _onHistoryUpdated() {
     if (!mounted) return;
-    final localData = ListeningHistoryService.instance.getLocalInsights(range: _selectedRange);
+    final localData = ListeningHistoryService.instance.getLocalInsights(
+      range: _selectedRange,
+    );
     setState(() {
       _insightsData = localData;
       _loading = false;

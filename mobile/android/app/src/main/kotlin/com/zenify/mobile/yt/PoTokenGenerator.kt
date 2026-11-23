@@ -22,7 +22,7 @@ import kotlin.coroutines.resume
 class PoTokenGenerator(private val context: Context) : TokenProvider {
     companion object {
         private const val TAG = "PoTokenGenerator"
-        private const val TIMEOUT_MS = 8_000L
+        private const val TIMEOUT_MS = 1_500L
     }
 
     override val capabilities: TokenProviderCapabilities =
@@ -34,27 +34,23 @@ class PoTokenGenerator(private val context: Context) : TokenProvider {
     @Volatile
     private var webView: WebView? = null
 
+    @Volatile private var failures = 0
+    @Volatile private var disabledUntil = 0L
+
     override suspend fun getPoToken(
         videoId: String,
         visitorData: String,
         cookie: String?
     ): PoTokenResult? {
-        cachedResult?.let { res ->
-            if (res.visitorData == visitorData) {
-                return res
-            }
-        }
-
-        return try {
-            withTimeoutOrNull(TIMEOUT_MS) {
-                withContext(Dispatchers.Main) {
-                    generateWebClientPoToken(videoId, visitorData)
-                }
-            }
-        } catch (e: Throwable) {
-            Log.w(TAG, "PO token generation failed or timed out: ${e.message}")
-            null
-        }
+        cachedResult?.takeIf { it.visitorData == visitorData }?.let { return it }
+        if (System.currentTimeMillis() < disabledUntil) return null
+        val r = try {
+            withTimeoutOrNull(TIMEOUT_MS) { withContext(Dispatchers.Main) { generateWebClientPoToken(videoId, visitorData) } }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+          catch (e: Throwable) { null }
+        if (r == null) { if (++failures >= 2) disabledUntil = System.currentTimeMillis() + 10 * 60_000L }
+        else failures = 0
+        return r
     }
 
     @SuppressLint("SetJavaScriptEnabled")

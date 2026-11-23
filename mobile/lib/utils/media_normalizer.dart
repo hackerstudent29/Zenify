@@ -485,8 +485,11 @@ class MediaNormalizer {
 
     void processString(String raw) {
       if (raw.trim().isEmpty) return;
+      var s = decodeHtml(raw).trim();
+      s = s.replaceAll('\u00A0', ' ');
+      s = s.replaceAll(RegExp(r'&amp;', caseSensitive: false), '&');
       // Pre-process parenthesized/bracketed features: "(feat. X)" or "[with Y]" -> ", X"
-      var s = raw.replaceAllMapped(
+      s = s.replaceAllMapped(
         RegExp(
           r'[\(\[]\s*(?:feat\.?|ft\.?|featuring|with)\s+([^\]\)]+)[\)\]]',
           caseSensitive: false,
@@ -497,7 +500,8 @@ class MediaNormalizer {
       final parts = s.split(
         RegExp(
           r'[,;•·●/\\|¦]|(?:\s*//\s*)|(?:\s*--\s*)'
-          r'|(?:\s+(?:&|and|feat\.?|ft\.?|featuring|with|x|X|\+)\s+)',
+          r'|(?:\s*&\s*)'
+          r'|(?:\s+(?:and|feat\.?|ft\.?|featuring|with|x|X|\+)\s+)',
           caseSensitive: false,
         ),
       );

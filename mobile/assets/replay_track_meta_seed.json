@@ -1,0 +1,4537 @@
+[
+  {
+    "trackId": "arabic-kuthu",
+    "title": "Arabic Kuthu - Halamithi Habibo",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Anirudh Ravichander",
+      "Jonita Gandhi"
+    ],
+    "movie": "Beast",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Kuthu",
+      "Dance Pop"
+    ],
+    "albumId": "alb-beast",
+    "durationMs": 279000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "hukum-jailer",
+    "title": "Hukum - Thalaivar Alappara",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Anirudh Ravichander"
+    ],
+    "movie": "Jailer",
+    "country": "IN",
+    "year": 2023,
+    "genres": [
+      "Soundtrack",
+      "Mass Hero",
+      "Rock"
+    ],
+    "albumId": "alb-jailer",
+    "durationMs": 207000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "badass-leo",
+    "title": "Badass",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Anirudh Ravichander"
+    ],
+    "movie": "Leo",
+    "country": "IN",
+    "year": 2023,
+    "genres": [
+      "Soundtrack",
+      "Electronic Rock"
+    ],
+    "albumId": "alb-leo",
+    "durationMs": 229000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "naa-ready-leo",
+    "title": "Naa Ready",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Thalapathy Vijay",
+      "Anirudh Ravichander",
+      "Asal Kolaar"
+    ],
+    "movie": "Leo",
+    "country": "IN",
+    "year": 2023,
+    "genres": [
+      "Soundtrack",
+      "Kuthu",
+      "Rap"
+    ],
+    "albumId": "alb-leo",
+    "durationMs": 248000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "vaathi-coming",
+    "title": "Vaathi Coming",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Anirudh Ravichander",
+      "Gana Balachandar"
+    ],
+    "movie": "Master",
+    "country": "IN",
+    "year": 2020,
+    "genres": [
+      "Soundtrack",
+      "Gana",
+      "Kuthu"
+    ],
+    "albumId": "alb-master",
+    "durationMs": 230000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "master-the-blaster",
+    "title": "Master The Blaster",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Bjorn Surrao"
+    ],
+    "movie": "Master",
+    "country": "IN",
+    "year": 2021,
+    "genres": [
+      "Reggae",
+      "Pop"
+    ],
+    "albumId": "alb-master",
+    "durationMs": 93000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "why-this-kolaveri-di",
+    "title": "Why This Kolaveri Di",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Dhanush"
+    ],
+    "movie": "3",
+    "country": "IN",
+    "year": 2011,
+    "genres": [
+      "Soup Song",
+      "Folk Pop"
+    ],
+    "albumId": "alb-3",
+    "durationMs": 250000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "chellamma-doctor",
+    "title": "Chellamma",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Anirudh Ravichander",
+      "Jonita Gandhi"
+    ],
+    "movie": "Doctor",
+    "country": "IN",
+    "year": 2020,
+    "genres": [
+      "Soundtrack",
+      "Dance Pop"
+    ],
+    "albumId": "alb-doctor",
+    "durationMs": 236000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "vikram-title-track",
+    "title": "Vikram Title Track",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Anirudh Ravichander"
+    ],
+    "movie": "Vikram",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "EDM",
+      "Rap"
+    ],
+    "albumId": "alb-vikram",
+    "durationMs": 218000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "pathala-pathala",
+    "title": "Pathala Pathala",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Kamal Haasan",
+      "Anirudh Ravichander"
+    ],
+    "movie": "Vikram",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Kuthu",
+      "Folk"
+    ],
+    "albumId": "alb-vikram",
+    "durationMs": 211000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "hayyoda-jawan",
+    "title": "Hayyoda",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Anirudh Ravichander",
+      "Priya Mali"
+    ],
+    "movie": "Jawan",
+    "country": "IN",
+    "year": 2023,
+    "genres": [
+      "Soundtrack",
+      "Romantic Pop"
+    ],
+    "albumId": "alb-jawan",
+    "durationMs": 214000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "chaleya-jawan",
+    "title": "Chaleya",
+    "language": "Hindi",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Arijit Singh",
+      "Shilpa Rao"
+    ],
+    "movie": "Jawan",
+    "country": "IN",
+    "year": 2023,
+    "genres": [
+      "Romantic",
+      "Pop"
+    ],
+    "albumId": "alb-jawan",
+    "durationMs": 200000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "bloody-sweet-leo",
+    "title": "Bloody Sweet",
+    "language": "English",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Anirudh Ravichander",
+      "Siddharth Basrur"
+    ],
+    "movie": "Leo",
+    "country": "IN",
+    "year": 2023,
+    "genres": [
+      "Soundtrack",
+      "Hard Rock"
+    ],
+    "albumId": "alb-leo",
+    "durationMs": 168000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "fear-song-devara",
+    "title": "Fear Song",
+    "language": "Telugu",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Anirudh Ravichander"
+    ],
+    "movie": "Devara Part 1",
+    "country": "IN",
+    "year": 2024,
+    "genres": [
+      "Soundtrack",
+      "Hero Theme",
+      "Rock"
+    ],
+    "albumId": "alb-devara",
+    "durationMs": 195000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "chuttamalle-devara",
+    "title": "Chuttamalle",
+    "language": "Telugu",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Shilpa Rao"
+    ],
+    "movie": "Devara Part 1",
+    "country": "IN",
+    "year": 2024,
+    "genres": [
+      "Soundtrack",
+      "Romantic Melody"
+    ],
+    "albumId": "alb-devara",
+    "durationMs": 222000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "spark-goat",
+    "title": "Spark",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Yuvan Shankar Raja",
+      "Vrusha Balu"
+    ],
+    "movie": "The GOAT",
+    "country": "IN",
+    "year": 2024,
+    "genres": [
+      "Soundtrack",
+      "Electronic Dance"
+    ],
+    "albumId": "alb-goat",
+    "durationMs": 236000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "chinna-chinna-kangai-goat",
+    "title": "Chinna Chinna Kangal",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Thalapathy Vijay",
+      "Bhavatharini"
+    ],
+    "movie": "The GOAT",
+    "country": "IN",
+    "year": 2024,
+    "genres": [
+      "Soundtrack",
+      "Lullaby",
+      "Melody"
+    ],
+    "albumId": "alb-goat",
+    "durationMs": 260000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "urvasi-urvasi",
+    "title": "Urvasi Urvasi",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "A. R. Rahman",
+      "Suresh Peters",
+      "Shahul Hameed"
+    ],
+    "movie": "Kadhalan",
+    "country": "IN",
+    "year": 1994,
+    "genres": [
+      "Soundtrack",
+      "Dance Pop",
+      "Funk"
+    ],
+    "albumId": "alb-kadhalan",
+    "durationMs": 338000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "muqabla-kadhalan",
+    "title": "Mukkabla",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Mano",
+      "Swarnalatha"
+    ],
+    "movie": "Kadhalan",
+    "country": "IN",
+    "year": 1994,
+    "genres": [
+      "Soundtrack",
+      "Dance Pop"
+    ],
+    "albumId": "alb-kadhalan",
+    "durationMs": 323000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "chaiyya-chaiyya",
+    "title": "Chaiyya Chaiyya",
+    "language": "Hindi",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Sukhwinder Singh",
+      "Sapna Awasthi"
+    ],
+    "movie": "Dil Se..",
+    "country": "IN",
+    "year": 1998,
+    "genres": [
+      "Sufi",
+      "Folk Pop",
+      "Soundtrack"
+    ],
+    "albumId": "alb-dil-se",
+    "durationMs": 395000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "kun-faya-kun",
+    "title": "Kun Faya Kun",
+    "language": "Hindi",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "A. R. Rahman",
+      "Javed Ali",
+      "Mohit Chauhan"
+    ],
+    "movie": "Rockstar",
+    "country": "IN",
+    "year": 2011,
+    "genres": [
+      "Sufi",
+      "Devotional",
+      "Qawwali"
+    ],
+    "albumId": "alb-rockstar",
+    "durationMs": 471000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "agar-tum-saath-ho",
+    "title": "Agar Tum Saath Ho",
+    "language": "Hindi",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Arijit Singh",
+      "Alka Yagnik"
+    ],
+    "movie": "Tamasha",
+    "country": "IN",
+    "year": 2015,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Ballad"
+    ],
+    "albumId": "alb-tamasha",
+    "durationMs": 341000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "marakkuma-nenjam-vtck",
+    "title": "Marakkuma Nenjam",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "A. R. Rahman"
+    ],
+    "movie": "Vendhu Thanindhathu Kaadu",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Soul",
+      "Melody"
+    ],
+    "albumId": "alb-vtck",
+    "durationMs": 258000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "ponni-nadhi-ps1",
+    "title": "Ponni Nadhi",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "A. R. Rahman",
+      "A.R. Raihanah",
+      "Bamba Bakya"
+    ],
+    "movie": "Ponniyin Selvan: Part 1",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Historical Folk"
+    ],
+    "albumId": "alb-ps1",
+    "durationMs": 295000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "devaralan-aattam-ps1",
+    "title": "Devaralan Aattam",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "AR Rahman",
+      "Yogi Sekar"
+    ],
+    "movie": "Ponniyin Selvan: Part 1",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Tribal Chant"
+    ],
+    "albumId": "alb-ps1",
+    "durationMs": 270000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "aga-naga-ps2",
+    "title": "Aga Naga",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Shakthisree Gopalan"
+    ],
+    "movie": "Ponniyin Selvan: Part 2",
+    "country": "IN",
+    "year": 2023,
+    "genres": [
+      "Soundtrack",
+      "Carnatic Classical",
+      "Romance"
+    ],
+    "albumId": "alb-ps2",
+    "durationMs": 221000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "new-york-nagaram",
+    "title": "New York Nagaram",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "A. R. Rahman"
+    ],
+    "movie": "Sillunu Oru Kaadhal",
+    "country": "IN",
+    "year": 2006,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Pop"
+    ],
+    "albumId": "alb-sok",
+    "durationMs": 377000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "hosanna-vtv",
+    "title": "Hosanna",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Vijay Prakash",
+      "Suzanne D'Mello",
+      "Blaaze"
+    ],
+    "movie": "Vinnaithaandi Varuvaayaa",
+    "country": "IN",
+    "year": 2010,
+    "genres": [
+      "Soundtrack",
+      "Contemporary Romance"
+    ],
+    "albumId": "alb-vtv",
+    "durationMs": 331000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "aaruyire-guru",
+    "title": "Aaruyire",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "A. R. Rahman",
+      "Chinmayi"
+    ],
+    "movie": "Guru",
+    "country": "IN",
+    "year": 2007,
+    "genres": [
+      "Soundtrack",
+      "Sufi Romance"
+    ],
+    "albumId": "alb-guru",
+    "durationMs": 326000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "pachai-nirame",
+    "title": "Pachai Nirame",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Hariharan",
+      "Clinton Cerejo"
+    ],
+    "movie": "Alaipayuthey",
+    "country": "IN",
+    "year": 2000,
+    "genres": [
+      "Soundtrack",
+      "Classical Fusion"
+    ],
+    "albumId": "alb-alaipayuthey",
+    "durationMs": 358000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "evano-oruvan",
+    "title": "Evano Oruvan",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Swarnalatha"
+    ],
+    "movie": "Alaipayuthey",
+    "country": "IN",
+    "year": 2000,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Sad"
+    ],
+    "albumId": "alb-alaipayuthey",
+    "durationMs": 354000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "chinna-chinna-aasai",
+    "title": "Chinna Chinna Aasai",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Minmini"
+    ],
+    "movie": "Roja",
+    "country": "IN",
+    "year": 1992,
+    "genres": [
+      "Soundtrack",
+      "Folk Pop"
+    ],
+    "albumId": "alb-roja",
+    "durationMs": 295000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "kadhal-rojavae",
+    "title": "Kadhal Rojave",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "S. P. Balasubrahmanyam",
+      "Sujatha"
+    ],
+    "movie": "Roja",
+    "country": "IN",
+    "year": 1992,
+    "genres": [
+      "Soundtrack",
+      "Evergreen Melody"
+    ],
+    "albumId": "alb-roja",
+    "durationMs": 303000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "jai-ho-slumdog",
+    "title": "Jai Ho",
+    "language": "Hindi",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Sukhwinder Singh",
+      "A. R. Rahman",
+      "Mahalakshmi Iyer",
+      "Tanvi Shah"
+    ],
+    "movie": "Slumdog Millionaire",
+    "country": "IN",
+    "year": 2008,
+    "genres": [
+      "World",
+      "Dance Pop"
+    ],
+    "albumId": "alb-slumdog",
+    "durationMs": 319000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "rowdy-baby-maari2",
+    "title": "Rowdy Baby",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Dhanush",
+      "Dhee"
+    ],
+    "movie": "Maari 2",
+    "country": "IN",
+    "year": 2018,
+    "genres": [
+      "Soundtrack",
+      "Folk Dance",
+      "Kuthu"
+    ],
+    "albumId": "alb-maari2",
+    "durationMs": 284000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "high-on-love-pyaar",
+    "title": "High On Love",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Sid Sriram"
+    ],
+    "movie": "Pyaar Prema Kaadhal",
+    "country": "IN",
+    "year": 2018,
+    "genres": [
+      "Soundtrack",
+      "Indie Pop",
+      "Romance"
+    ],
+    "albumId": "alb-ppk",
+    "durationMs": 236000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "oru-naalil-pudhupettai",
+    "title": "Oru Naalil",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Yuvan Shankar Raja"
+    ],
+    "movie": "Pudhupettai",
+    "country": "IN",
+    "year": 2006,
+    "genres": [
+      "Soundtrack",
+      "Philosophical",
+      "Soul"
+    ],
+    "albumId": "alb-pudhupettai",
+    "durationMs": 348000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "loosu-penne-vallavan",
+    "title": "Loosu Penne",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Silambarasan TR",
+      "Blaaze"
+    ],
+    "movie": "Vallavan",
+    "country": "IN",
+    "year": 2006,
+    "genres": [
+      "Soundtrack",
+      "Club Pop"
+    ],
+    "albumId": "alb-vallavan",
+    "durationMs": 334000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "pogadhe-deepavali",
+    "title": "Pogadhe",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Yuvan Shankar Raja"
+    ],
+    "movie": "Deepavali",
+    "country": "IN",
+    "year": 2007,
+    "genres": [
+      "Soundtrack",
+      "Sad Melody"
+    ],
+    "albumId": "alb-deepavali",
+    "durationMs": 382000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "idhu-varai-goa",
+    "title": "Idhu Varai",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Andrea Jeremiah",
+      "Ajeesh"
+    ],
+    "movie": "Goa",
+    "country": "IN",
+    "year": 2010,
+    "genres": [
+      "Soundtrack",
+      "Bossa Nova",
+      "Romance"
+    ],
+    "albumId": "alb-goa",
+    "durationMs": 284000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "siragugal-sarvam",
+    "title": "Siragugal",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Javed Ali",
+      "Madhushree"
+    ],
+    "movie": "Sarvam",
+    "country": "IN",
+    "year": 2009,
+    "genres": [
+      "Soundtrack",
+      "Acoustic Melody"
+    ],
+    "albumId": "alb-sarvam",
+    "durationMs": 279000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "kadhal-valarthen-manmadhan",
+    "title": "Kadhal Valarthen",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "KK"
+    ],
+    "movie": "Manmadhan",
+    "country": "IN",
+    "year": 2004,
+    "genres": [
+      "Soundtrack",
+      "Melody"
+    ],
+    "albumId": "alb-manmadhan",
+    "durationMs": 377000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "raja-rajadhi-raja",
+    "title": "Raja Rajadhi Rajan",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "Ilaiyaraaja"
+    ],
+    "movie": "Agni Natchathiram",
+    "country": "IN",
+    "year": 1988,
+    "genres": [
+      "Soundtrack",
+      "Synthpop",
+      "Classic"
+    ],
+    "albumId": "alb-agni-natchathiram",
+    "durationMs": 275000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "ilaya-nila-payanangal",
+    "title": "Ilaya Nila Pozhigirathe",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "S. P. Balasubrahmanyam"
+    ],
+    "movie": "Payanangal Mudivathillai",
+    "country": "IN",
+    "year": 1982,
+    "genres": [
+      "Soundtrack",
+      "Acoustic Guitar",
+      "Evergreen"
+    ],
+    "albumId": "alb-payanangal",
+    "durationMs": 282000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "kanmani-anbodu-gunaa",
+    "title": "Kanmani Anbodu Kadhalan",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "Kamal Haasan",
+      "S. Janaki"
+    ],
+    "movie": "Gunaa",
+    "country": "IN",
+    "year": 1991,
+    "genres": [
+      "Soundtrack",
+      "Poetic Romance"
+    ],
+    "albumId": "alb-gunaa",
+    "durationMs": 334000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "sundari-kannal-thalapathi",
+    "title": "Sundari Kannal Oru Sethi",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "S. P. Balasubrahmanyam",
+      "S. Janaki"
+    ],
+    "movie": "Thalapathi",
+    "country": "IN",
+    "year": 1991,
+    "genres": [
+      "Soundtrack",
+      "Symphonic Melody"
+    ],
+    "albumId": "alb-thalapathi",
+    "durationMs": 434000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "en-iniya-pon-nilave",
+    "title": "En Iniya Pon Nilave",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "K. J. Yesudas"
+    ],
+    "movie": "Moodu Pani",
+    "country": "IN",
+    "year": 1980,
+    "genres": [
+      "Soundtrack",
+      "Classical Melody"
+    ],
+    "albumId": "alb-moodu-pani",
+    "durationMs": 254000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "thenpaandi-cheemayile-nayagan",
+    "title": "Thenpaandi Cheemayile",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "Kamal Haasan",
+      "Ilaiyaraaja"
+    ],
+    "movie": "Nayagan",
+    "country": "IN",
+    "year": 1987,
+    "genres": [
+      "Soundtrack",
+      "Tragic Folk"
+    ],
+    "albumId": "alb-nayagan",
+    "durationMs": 279000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "thendral-vandhu-theendum-avatharam",
+    "title": "Thendral Vandhu Theendum Podhu",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "Ilaiyaraaja",
+      "S. Janaki"
+    ],
+    "movie": "Avatharam",
+    "country": "IN",
+    "year": 1995,
+    "genres": [
+      "Soundtrack",
+      "Folk Melody"
+    ],
+    "albumId": "alb-avatharam",
+    "durationMs": 323000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "mandram-vandha-mouna-ragam",
+    "title": "Mandram Vandha Thendralukku",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "S. P. Balasubrahmanyam"
+    ],
+    "movie": "Mouna Ragam",
+    "country": "IN",
+    "year": 1986,
+    "genres": [
+      "Soundtrack",
+      "Sad Evergreen"
+    ],
+    "albumId": "alb-mouna-ragam",
+    "durationMs": 284000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "vaseegara-minnale",
+    "title": "Vaseegara",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Bombay Jayashri"
+    ],
+    "movie": "Minnale",
+    "country": "IN",
+    "year": 2001,
+    "genres": [
+      "Soundtrack",
+      "Sensual Melody"
+    ],
+    "albumId": "alb-minnale",
+    "durationMs": 300000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "venmathi-minnale",
+    "title": "Venmathi Venmathiye",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Roop Kumar Rathod",
+      "Tippu"
+    ],
+    "movie": "Minnale",
+    "country": "IN",
+    "year": 2001,
+    "genres": [
+      "Soundtrack",
+      "Soulful Pop"
+    ],
+    "albumId": "alb-minnale",
+    "durationMs": 327000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "annul-maelae-vaaranam",
+    "title": "Annul Maelae",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Sudha Ragunathan"
+    ],
+    "movie": "Vaaranam Aayiram",
+    "country": "IN",
+    "year": 2008,
+    "genres": [
+      "Soundtrack",
+      "Carnatic Acoustic"
+    ],
+    "albumId": "alb-vaaranam",
+    "durationMs": 317000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "nenjukkul-peidhidum-vaaranam",
+    "title": "Nenjukkul Peidhidum",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Hariharan",
+      "Devan Ekambaram",
+      "V. Prasanna"
+    ],
+    "movie": "Vaaranam Aayiram",
+    "country": "IN",
+    "year": 2008,
+    "genres": [
+      "Soundtrack",
+      "Acoustic Romance"
+    ],
+    "albumId": "alb-vaaranam",
+    "durationMs": 370000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "mundhinam-paarthenae-vaaranam",
+    "title": "Mundhinam Paarthenae",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Naresh Iyer",
+      "Prashanthini"
+    ],
+    "movie": "Vaaranam Aayiram",
+    "country": "IN",
+    "year": 2008,
+    "genres": [
+      "Soundtrack",
+      "Jazz Pop"
+    ],
+    "albumId": "alb-vaaranam",
+    "durationMs": 341000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "adiye-kolluthe-vaaranam",
+    "title": "Adiye Kolluthe",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Krish",
+      "Benny Dayal",
+      "Shruti Haasan"
+    ],
+    "movie": "Vaaranam Aayiram",
+    "country": "IN",
+    "year": 2008,
+    "genres": [
+      "Soundtrack",
+      "Rock Pop"
+    ],
+    "albumId": "alb-vaaranam",
+    "durationMs": 316000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "ennamo-yedho-ko",
+    "title": "Ennamo Yedho",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Aalaap Raju",
+      "Prashanthini",
+      "Sricharan",
+      "Emcee Jesz"
+    ],
+    "movie": "Ko",
+    "country": "IN",
+    "year": 2011,
+    "genres": [
+      "Soundtrack",
+      "Bossa Nova Pop"
+    ],
+    "albumId": "alb-ko",
+    "durationMs": 315000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "oru-maalai-ghajini",
+    "title": "Oru Maalai",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Karthik"
+    ],
+    "movie": "Ghajini",
+    "country": "IN",
+    "year": 2005,
+    "genres": [
+      "Soundtrack",
+      "Romantic Melody"
+    ],
+    "albumId": "alb-ghajini",
+    "durationMs": 354000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "enjoy-enjaami",
+    "title": "Enjoy Enjaami",
+    "language": "Tamil",
+    "composers": [
+      "Santhosh Narayanan"
+    ],
+    "singers": [
+      "Dhee",
+      "Arivu"
+    ],
+    "movie": null,
+    "country": "IN",
+    "year": 2021,
+    "genres": [
+      "Oppari",
+      "Hip-Hop",
+      "Folk Fusion"
+    ],
+    "albumId": "alb-indie-dhee",
+    "durationMs": 271000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "neruppu-da-kabali",
+    "title": "Neruppu Da",
+    "language": "Tamil",
+    "composers": [
+      "Santhosh Narayanan"
+    ],
+    "singers": [
+      "Rajinikanth",
+      "Arunraja Kamaraj"
+    ],
+    "movie": "Kabali",
+    "country": "IN",
+    "year": 2016,
+    "genres": [
+      "Soundtrack",
+      "Rock Rap"
+    ],
+    "albumId": "alb-kabali",
+    "durationMs": 218000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "maya-nadhi-kabali",
+    "title": "Maya Nadhi",
+    "language": "Tamil",
+    "composers": [
+      "Santhosh Narayanan"
+    ],
+    "singers": [
+      "Ananthu",
+      "Pradeep Kumar",
+      "Swetha Mohan"
+    ],
+    "movie": "Kabali",
+    "country": "IN",
+    "year": 2016,
+    "genres": [
+      "Soundtrack",
+      "Soul Melody"
+    ],
+    "albumId": "alb-kabali",
+    "durationMs": 275000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "rakita-rakita-jagame",
+    "title": "Rakita Rakita",
+    "language": "Tamil",
+    "composers": [
+      "Santhosh Narayanan"
+    ],
+    "singers": [
+      "Dhanush",
+      "Santhosh Narayanan",
+      "Dhee"
+    ],
+    "movie": "Jagame Thandhiram",
+    "country": "IN",
+    "year": 2021,
+    "genres": [
+      "Soundtrack",
+      "Kuthu",
+      "Dance"
+    ],
+    "albumId": "alb-jagame",
+    "durationMs": 247000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "thee-thalapathy-varisu",
+    "title": "Thee Thalapathy",
+    "language": "Tamil",
+    "composers": [
+      "Thaman S"
+    ],
+    "singers": [
+      "Silambarasan TR"
+    ],
+    "movie": "Varisu",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Hero Anthem"
+    ],
+    "albumId": "alb-varisu",
+    "durationMs": 251000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "ranjithame-varisu",
+    "title": "Ranjithame",
+    "language": "Tamil",
+    "composers": [
+      "Thaman S"
+    ],
+    "singers": [
+      "Thalapathy Vijay",
+      "M. M. Manasi"
+    ],
+    "movie": "Varisu",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Dance Folk"
+    ],
+    "albumId": "alb-varisu",
+    "durationMs": 288000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "butta-bomma-avpl",
+    "title": "Butta Bomma",
+    "language": "Telugu",
+    "composers": [
+      "Thaman S"
+    ],
+    "singers": [
+      "Armaan Malik"
+    ],
+    "movie": "Ala Vaikunthapurramuloo",
+    "country": "IN",
+    "year": 2020,
+    "genres": [
+      "Soundtrack",
+      "Dance Pop"
+    ],
+    "albumId": "alb-avpl",
+    "durationMs": 198000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "samajavaragamana-avpl",
+    "title": "Samajavaragamana",
+    "language": "Telugu",
+    "composers": [
+      "Thaman S"
+    ],
+    "singers": [
+      "Sid Sriram"
+    ],
+    "movie": "Ala Vaikunthapurramuloo",
+    "country": "IN",
+    "year": 2019,
+    "genres": [
+      "Soundtrack",
+      "Carnatic Pop"
+    ],
+    "albumId": "alb-avpl",
+    "durationMs": 214000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "oo-antava-pushpa",
+    "title": "Oo Antava Mava Oo Oo Antava",
+    "language": "Telugu",
+    "composers": [
+      "Devi Sri Prasad"
+    ],
+    "singers": [
+      "Indravathi Chauhan"
+    ],
+    "movie": "Pushpa: The Rise",
+    "country": "IN",
+    "year": 2021,
+    "genres": [
+      "Soundtrack",
+      "Item Song",
+      "Folk Pop"
+    ],
+    "albumId": "alb-pushpa",
+    "durationMs": 223000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "srivalli-pushpa",
+    "title": "Srivalli",
+    "language": "Telugu",
+    "composers": [
+      "Devi Sri Prasad"
+    ],
+    "singers": [
+      "Sid Sriram"
+    ],
+    "movie": "Pushpa: The Rise",
+    "country": "IN",
+    "year": 2021,
+    "genres": [
+      "Soundtrack",
+      "Acoustic Melody"
+    ],
+    "albumId": "alb-pushpa",
+    "durationMs": 224000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "kesariya-brahmastra",
+    "title": "Kesariya",
+    "language": "Hindi",
+    "composers": [
+      "Pritam"
+    ],
+    "singers": [
+      "Arijit Singh"
+    ],
+    "movie": "Brahmāstra: Part One – Shiva",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Romantic Melody"
+    ],
+    "albumId": "alb-brahmastra",
+    "durationMs": 268000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "tum-hi-ho-aashiqui2",
+    "title": "Tum Hi Ho",
+    "language": "Hindi",
+    "composers": [
+      "Mithoon"
+    ],
+    "singers": [
+      "Arijit Singh"
+    ],
+    "movie": "Aashiqui 2",
+    "country": "IN",
+    "year": 2013,
+    "genres": [
+      "Soundtrack",
+      "Ballad",
+      "Love"
+    ],
+    "albumId": "alb-aashiqui2",
+    "durationMs": 262000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "raataan-lambiyan-shershaah",
+    "title": "Raataan Lambiyan",
+    "language": "Hindi",
+    "composers": [
+      "Tanishk Bagchi"
+    ],
+    "singers": [
+      "Jubin Nautiyal",
+      "Asees Kaur"
+    ],
+    "movie": "Shershaah",
+    "country": "IN",
+    "year": 2021,
+    "genres": [
+      "Soundtrack",
+      "Sufi Romance"
+    ],
+    "albumId": "alb-shershaah",
+    "durationMs": 230000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "apna-bana-le-bhediya",
+    "title": "Apna Bana Le",
+    "language": "Hindi",
+    "composers": [
+      "Sachin-Jigar"
+    ],
+    "singers": [
+      "Arijit Singh",
+      "Sachin-Jigar"
+    ],
+    "movie": "Bhediya",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Romantic Pop"
+    ],
+    "albumId": "alb-bhediya",
+    "durationMs": 261000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "malare-premam",
+    "title": "Malare",
+    "language": "Malayalam",
+    "composers": [
+      "Rajesh Murugesan"
+    ],
+    "singers": [
+      "Vijay Yesudas"
+    ],
+    "movie": "Premam",
+    "country": "IN",
+    "year": 2015,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Romance"
+    ],
+    "albumId": "alb-premam",
+    "durationMs": 316000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "jimmiki-kammal",
+    "title": "Entammede Jimikki Kammal",
+    "language": "Malayalam",
+    "composers": [
+      "Shaan Rahman"
+    ],
+    "singers": [
+      "Vineeth Sreenivasan",
+      "Renjith Unni"
+    ],
+    "movie": "Velipadinte Pusthakam",
+    "country": "IN",
+    "year": 2017,
+    "genres": [
+      "Soundtrack",
+      "Folk Dance"
+    ],
+    "albumId": "alb-velipadinte",
+    "durationMs": 198000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "blinding-lights-weeknd",
+    "title": "Blinding Lights",
+    "language": "English",
+    "composers": [
+      "Max Martin",
+      "The Weeknd",
+      "Oscar Holter"
+    ],
+    "singers": [
+      "The Weeknd"
+    ],
+    "movie": null,
+    "country": "CA",
+    "year": 2019,
+    "genres": [
+      "Synthwave",
+      "Synthpop",
+      "R&B"
+    ],
+    "albumId": "alb-after-hours",
+    "durationMs": 200000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "starboy-weeknd",
+    "title": "Starboy",
+    "language": "English",
+    "composers": [
+      "Daft Punk",
+      "The Weeknd"
+    ],
+    "singers": [
+      "The Weeknd",
+      "Daft Punk"
+    ],
+    "movie": null,
+    "country": "CA",
+    "year": 2016,
+    "genres": [
+      "Electro-Pop",
+      "R&B"
+    ],
+    "albumId": "alb-starboy",
+    "durationMs": 230000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "shape-of-you-ed-sheeran",
+    "title": "Shape of You",
+    "language": "English",
+    "composers": [
+      "Ed Sheeran",
+      "Steve Mac",
+      "Johnny McDaid"
+    ],
+    "singers": [
+      "Ed Sheeran"
+    ],
+    "movie": null,
+    "country": "GB",
+    "year": 2017,
+    "genres": [
+      "Pop",
+      "Dancehall"
+    ],
+    "albumId": "alb-divide",
+    "durationMs": 233000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "perfect-ed-sheeran",
+    "title": "Perfect",
+    "language": "English",
+    "composers": [
+      "Ed Sheeran"
+    ],
+    "singers": [
+      "Ed Sheeran"
+    ],
+    "movie": null,
+    "country": "GB",
+    "year": 2017,
+    "genres": [
+      "Pop",
+      "Ballad"
+    ],
+    "albumId": "alb-divide",
+    "durationMs": 263000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "cruel-summer-taylor",
+    "title": "Cruel Summer",
+    "language": "English",
+    "composers": [
+      "Taylor Swift",
+      "Jack Antonoff",
+      "St. Vincent"
+    ],
+    "singers": [
+      "Taylor Swift"
+    ],
+    "movie": null,
+    "country": "US",
+    "year": 2019,
+    "genres": [
+      "Synthpop",
+      "Electropop"
+    ],
+    "albumId": "alb-lover",
+    "durationMs": 178000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "as-it-was-harry",
+    "title": "As It Was",
+    "language": "English",
+    "composers": [
+      "Harry Styles",
+      "Kid Harpoon",
+      "Tyler Johnson"
+    ],
+    "singers": [
+      "Harry Styles"
+    ],
+    "movie": null,
+    "country": "GB",
+    "year": 2022,
+    "genres": [
+      "Synthpop",
+      "Indie Pop"
+    ],
+    "albumId": "alb-harrys-house",
+    "durationMs": 167000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "stay-kid-laroi",
+    "title": "Stay",
+    "language": "English",
+    "composers": [
+      "The Kid LAROI",
+      "Justin Bieber",
+      "Charlie Puth"
+    ],
+    "singers": [
+      "The Kid LAROI",
+      "Justin Bieber"
+    ],
+    "movie": null,
+    "country": "US",
+    "year": 2021,
+    "genres": [
+      "Pop Rock",
+      "Synthpop"
+    ],
+    "albumId": "alb-stay",
+    "durationMs": 141000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "levitating-dua-lipa",
+    "title": "Levitating",
+    "language": "English",
+    "composers": [
+      "Dua Lipa",
+      "Clarence Coffee Jr.",
+      "Sarah Hudson"
+    ],
+    "singers": [
+      "Dua Lipa"
+    ],
+    "movie": null,
+    "country": "GB",
+    "year": 2020,
+    "genres": [
+      "Disco-Pop",
+      "Dance Pop"
+    ],
+    "albumId": "alb-future-nostalgia",
+    "durationMs": 203000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "flowers-miley-cyrus",
+    "title": "Flowers",
+    "language": "English",
+    "composers": [
+      "Miley Cyrus",
+      "Gregory Aldae Hein",
+      "Michael Pollack"
+    ],
+    "singers": [
+      "Miley Cyrus"
+    ],
+    "movie": null,
+    "country": "US",
+    "year": 2023,
+    "genres": [
+      "Disco",
+      "Funk Pop"
+    ],
+    "albumId": "alb-endless-summer",
+    "durationMs": 200000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-1",
+    "title": "Tamil Melody Hit 1",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Shreya Ghoshal",
+      "Pradeep Kumar"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 1",
+    "country": "IN",
+    "year": 1999,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-1",
+    "durationMs": 193000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-2",
+    "title": "Tamil Melody Hit 2",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Arijit Singh",
+      "Andrea Jeremiah"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 1",
+    "country": "IN",
+    "year": 2012,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-1",
+    "durationMs": 206000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-3",
+    "title": "Tamil Melody Hit 3",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "Jonita Gandhi",
+      "Chinmayi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 1",
+    "country": "IN",
+    "year": 1997,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-1",
+    "durationMs": 219000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-4",
+    "title": "Tamil Melody Hit 4",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Pradeep Kumar",
+      "Haricharan"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 1",
+    "country": "IN",
+    "year": 2006,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-1",
+    "durationMs": 232000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-5",
+    "title": "Tamil Melody Hit 5",
+    "language": "Tamil",
+    "composers": [
+      "Santhosh Narayanan"
+    ],
+    "singers": [
+      "Andrea Jeremiah",
+      "Karthik"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 2",
+    "country": "IN",
+    "year": 2021,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-2",
+    "durationMs": 245000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-6",
+    "title": "Tamil Melody Hit 6",
+    "language": "Tamil",
+    "composers": [
+      "G. V. Prakash Kumar"
+    ],
+    "singers": [
+      "Chinmayi",
+      "S. P. Balasubrahmanyam"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 2",
+    "country": "IN",
+    "year": 2010,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-2",
+    "durationMs": 258000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-7",
+    "title": "Tamil Melody Hit 7",
+    "language": "Tamil",
+    "composers": [
+      "D. Imman"
+    ],
+    "singers": [
+      "Haricharan",
+      "K. J. Yesudas"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 2",
+    "country": "IN",
+    "year": 2009,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-2",
+    "durationMs": 271000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-8",
+    "title": "Tamil Melody Hit 8",
+    "language": "Tamil",
+    "composers": [
+      "Deva"
+    ],
+    "singers": [
+      "Karthik",
+      "Swarnalatha"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 2",
+    "country": "IN",
+    "year": 2001,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-2",
+    "durationMs": 284000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-9",
+    "title": "Tamil Melody Hit 9",
+    "language": "Tamil",
+    "composers": [
+      "Vidyasagar"
+    ],
+    "singers": [
+      "S. P. Balasubrahmanyam",
+      "S. Janaki"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 2",
+    "country": "IN",
+    "year": 2001,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-2",
+    "durationMs": 297000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-10",
+    "title": "Telugu Melody Hit 10",
+    "language": "Telugu",
+    "composers": [
+      "Thaman S"
+    ],
+    "singers": [
+      "K. J. Yesudas",
+      "Shilpa Rao"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 3",
+    "country": "IN",
+    "year": 2010,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-3",
+    "durationMs": 310000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-11",
+    "title": "Telugu Melody Hit 11",
+    "language": "Telugu",
+    "composers": [
+      "Devi Sri Prasad"
+    ],
+    "singers": [
+      "Swarnalatha",
+      "Dhee"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 3",
+    "country": "IN",
+    "year": 2024,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-3",
+    "durationMs": 323000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-12",
+    "title": "Hindi Melody Hit 12",
+    "language": "Hindi",
+    "composers": [
+      "Pritam"
+    ],
+    "singers": [
+      "S. Janaki",
+      "Sid Sriram"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 3",
+    "country": "IN",
+    "year": 2004,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-3",
+    "durationMs": 336000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-13",
+    "title": "Hindi Melody Hit 13",
+    "language": "Hindi",
+    "composers": [
+      "Vishal-Shekhar"
+    ],
+    "singers": [
+      "Shilpa Rao",
+      "Shreya Ghoshal"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 3",
+    "country": "IN",
+    "year": 2023,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-3",
+    "durationMs": 349000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-14",
+    "title": "Hindi Melody Hit 14",
+    "language": "Hindi",
+    "composers": [
+      "Amit Trivedi"
+    ],
+    "singers": [
+      "Dhee",
+      "Arijit Singh"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 3",
+    "country": "IN",
+    "year": 2021,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-3",
+    "durationMs": 182000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-15",
+    "title": "Tamil Melody Hit 15",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Sid Sriram",
+      "Jonita Gandhi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 4",
+    "country": "IN",
+    "year": 2013,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-4",
+    "durationMs": 195000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-16",
+    "title": "Tamil Melody Hit 16",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Shreya Ghoshal",
+      "Pradeep Kumar"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 4",
+    "country": "IN",
+    "year": 2005,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-4",
+    "durationMs": 208000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-17",
+    "title": "Tamil Melody Hit 17",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Arijit Singh",
+      "Andrea Jeremiah"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 4",
+    "country": "IN",
+    "year": 2009,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-4",
+    "durationMs": 221000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-18",
+    "title": "Tamil Melody Hit 18",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "Jonita Gandhi",
+      "Chinmayi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 4",
+    "country": "IN",
+    "year": 2012,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-4",
+    "durationMs": 234000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-19",
+    "title": "Tamil Melody Hit 19",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Pradeep Kumar",
+      "Haricharan"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 4",
+    "country": "IN",
+    "year": 2019,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-4",
+    "durationMs": 247000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-20",
+    "title": "Tamil Melody Hit 20",
+    "language": "Tamil",
+    "composers": [
+      "Santhosh Narayanan"
+    ],
+    "singers": [
+      "Andrea Jeremiah",
+      "Karthik"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 5",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-5",
+    "durationMs": 260000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-21",
+    "title": "Tamil Melody Hit 21",
+    "language": "Tamil",
+    "composers": [
+      "G. V. Prakash Kumar"
+    ],
+    "singers": [
+      "Chinmayi",
+      "S. P. Balasubrahmanyam"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 5",
+    "country": "IN",
+    "year": 2020,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-5",
+    "durationMs": 273000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-22",
+    "title": "Tamil Melody Hit 22",
+    "language": "Tamil",
+    "composers": [
+      "D. Imman"
+    ],
+    "singers": [
+      "Haricharan",
+      "K. J. Yesudas"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 5",
+    "country": "IN",
+    "year": 2009,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-5",
+    "durationMs": 286000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-23",
+    "title": "Tamil Melody Hit 23",
+    "language": "Tamil",
+    "composers": [
+      "Deva"
+    ],
+    "singers": [
+      "Karthik",
+      "Swarnalatha"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 5",
+    "country": "IN",
+    "year": 1996,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-5",
+    "durationMs": 299000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-24",
+    "title": "Tamil Melody Hit 24",
+    "language": "Tamil",
+    "composers": [
+      "Vidyasagar"
+    ],
+    "singers": [
+      "S. P. Balasubrahmanyam",
+      "S. Janaki"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 5",
+    "country": "IN",
+    "year": 2002,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-5",
+    "durationMs": 312000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-25",
+    "title": "Telugu Melody Hit 25",
+    "language": "Telugu",
+    "composers": [
+      "Thaman S"
+    ],
+    "singers": [
+      "K. J. Yesudas",
+      "Shilpa Rao"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 6",
+    "country": "IN",
+    "year": 2013,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-6",
+    "durationMs": 325000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-26",
+    "title": "Telugu Melody Hit 26",
+    "language": "Telugu",
+    "composers": [
+      "Devi Sri Prasad"
+    ],
+    "singers": [
+      "Swarnalatha",
+      "Dhee"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 6",
+    "country": "IN",
+    "year": 1999,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-6",
+    "durationMs": 338000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-27",
+    "title": "Hindi Melody Hit 27",
+    "language": "Hindi",
+    "composers": [
+      "Pritam"
+    ],
+    "singers": [
+      "S. Janaki",
+      "Sid Sriram"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 6",
+    "country": "IN",
+    "year": 2004,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-6",
+    "durationMs": 351000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-28",
+    "title": "Hindi Melody Hit 28",
+    "language": "Hindi",
+    "composers": [
+      "Vishal-Shekhar"
+    ],
+    "singers": [
+      "Shilpa Rao",
+      "Shreya Ghoshal"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 6",
+    "country": "IN",
+    "year": 2013,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-6",
+    "durationMs": 184000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-29",
+    "title": "Hindi Melody Hit 29",
+    "language": "Hindi",
+    "composers": [
+      "Amit Trivedi"
+    ],
+    "singers": [
+      "Dhee",
+      "Arijit Singh"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 6",
+    "country": "IN",
+    "year": 2024,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-6",
+    "durationMs": 197000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-30",
+    "title": "Tamil Melody Hit 30",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Sid Sriram",
+      "Jonita Gandhi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 7",
+    "country": "IN",
+    "year": 2014,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-7",
+    "durationMs": 210000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-31",
+    "title": "Tamil Melody Hit 31",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Shreya Ghoshal",
+      "Pradeep Kumar"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 7",
+    "country": "IN",
+    "year": 2011,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-7",
+    "durationMs": 223000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-32",
+    "title": "Tamil Melody Hit 32",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Arijit Singh",
+      "Andrea Jeremiah"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 7",
+    "country": "IN",
+    "year": 2006,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-7",
+    "durationMs": 236000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-33",
+    "title": "Tamil Melody Hit 33",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "Jonita Gandhi",
+      "Chinmayi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 7",
+    "country": "IN",
+    "year": 1982,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-7",
+    "durationMs": 249000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-34",
+    "title": "Tamil Melody Hit 34",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Pradeep Kumar",
+      "Haricharan"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 7",
+    "country": "IN",
+    "year": 2009,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-7",
+    "durationMs": 262000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-35",
+    "title": "Tamil Melody Hit 35",
+    "language": "Tamil",
+    "composers": [
+      "Santhosh Narayanan"
+    ],
+    "singers": [
+      "Andrea Jeremiah",
+      "Karthik"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 8",
+    "country": "IN",
+    "year": 2023,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-8",
+    "durationMs": 275000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-36",
+    "title": "Tamil Melody Hit 36",
+    "language": "Tamil",
+    "composers": [
+      "G. V. Prakash Kumar"
+    ],
+    "singers": [
+      "Chinmayi",
+      "S. P. Balasubrahmanyam"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 8",
+    "country": "IN",
+    "year": 2011,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-8",
+    "durationMs": 288000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-37",
+    "title": "Tamil Melody Hit 37",
+    "language": "Tamil",
+    "composers": [
+      "D. Imman"
+    ],
+    "singers": [
+      "Haricharan",
+      "K. J. Yesudas"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 8",
+    "country": "IN",
+    "year": 2009,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-8",
+    "durationMs": 301000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-38",
+    "title": "Tamil Melody Hit 38",
+    "language": "Tamil",
+    "composers": [
+      "Deva"
+    ],
+    "singers": [
+      "Karthik",
+      "Swarnalatha"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 8",
+    "country": "IN",
+    "year": 1991,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-8",
+    "durationMs": 314000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-39",
+    "title": "Tamil Melody Hit 39",
+    "language": "Tamil",
+    "composers": [
+      "Vidyasagar"
+    ],
+    "singers": [
+      "S. P. Balasubrahmanyam",
+      "S. Janaki"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 8",
+    "country": "IN",
+    "year": 2003,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-8",
+    "durationMs": 327000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-40",
+    "title": "Telugu Melody Hit 40",
+    "language": "Telugu",
+    "composers": [
+      "Thaman S"
+    ],
+    "singers": [
+      "K. J. Yesudas",
+      "Shilpa Rao"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 9",
+    "country": "IN",
+    "year": 2016,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-9",
+    "durationMs": 340000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-41",
+    "title": "Telugu Melody Hit 41",
+    "language": "Telugu",
+    "composers": [
+      "Devi Sri Prasad"
+    ],
+    "singers": [
+      "Swarnalatha",
+      "Dhee"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 9",
+    "country": "IN",
+    "year": 2000,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-9",
+    "durationMs": 353000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-42",
+    "title": "Hindi Melody Hit 42",
+    "language": "Hindi",
+    "composers": [
+      "Pritam"
+    ],
+    "singers": [
+      "S. Janaki",
+      "Sid Sriram"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 9",
+    "country": "IN",
+    "year": 2004,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-9",
+    "durationMs": 186000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-43",
+    "title": "Hindi Melody Hit 43",
+    "language": "Hindi",
+    "composers": [
+      "Vishal-Shekhar"
+    ],
+    "singers": [
+      "Shilpa Rao",
+      "Shreya Ghoshal"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 9",
+    "country": "IN",
+    "year": 2003,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-9",
+    "durationMs": 199000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-44",
+    "title": "Hindi Melody Hit 44",
+    "language": "Hindi",
+    "composers": [
+      "Amit Trivedi"
+    ],
+    "singers": [
+      "Dhee",
+      "Arijit Singh"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 9",
+    "country": "IN",
+    "year": 2010,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-9",
+    "durationMs": 212000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-45",
+    "title": "Tamil Melody Hit 45",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Sid Sriram",
+      "Jonita Gandhi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 10",
+    "country": "IN",
+    "year": 2015,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-10",
+    "durationMs": 225000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-46",
+    "title": "Tamil Melody Hit 46",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Shreya Ghoshal",
+      "Pradeep Kumar"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 10",
+    "country": "IN",
+    "year": 2017,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-10",
+    "durationMs": 238000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-47",
+    "title": "Tamil Melody Hit 47",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Arijit Singh",
+      "Andrea Jeremiah"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 10",
+    "country": "IN",
+    "year": 2003,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-10",
+    "durationMs": 251000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-48",
+    "title": "Tamil Melody Hit 48",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "Jonita Gandhi",
+      "Chinmayi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 10",
+    "country": "IN",
+    "year": 1997,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-10",
+    "durationMs": 264000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-49",
+    "title": "Tamil Melody Hit 49",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Pradeep Kumar",
+      "Haricharan"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 10",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-10",
+    "durationMs": 277000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-50",
+    "title": "Tamil Melody Hit 50",
+    "language": "Tamil",
+    "composers": [
+      "Santhosh Narayanan"
+    ],
+    "singers": [
+      "Andrea Jeremiah",
+      "Karthik"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 11",
+    "country": "IN",
+    "year": 2024,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-11",
+    "durationMs": 290000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-51",
+    "title": "Tamil Melody Hit 51",
+    "language": "Tamil",
+    "composers": [
+      "G. V. Prakash Kumar"
+    ],
+    "singers": [
+      "Chinmayi",
+      "S. P. Balasubrahmanyam"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 11",
+    "country": "IN",
+    "year": 2021,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-11",
+    "durationMs": 303000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-52",
+    "title": "Tamil Melody Hit 52",
+    "language": "Tamil",
+    "composers": [
+      "D. Imman"
+    ],
+    "singers": [
+      "Haricharan",
+      "K. J. Yesudas"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 11",
+    "country": "IN",
+    "year": 2009,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-11",
+    "durationMs": 316000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-53",
+    "title": "Tamil Melody Hit 53",
+    "language": "Tamil",
+    "composers": [
+      "Deva"
+    ],
+    "singers": [
+      "Karthik",
+      "Swarnalatha"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 11",
+    "country": "IN",
+    "year": 2008,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-11",
+    "durationMs": 329000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-54",
+    "title": "Tamil Melody Hit 54",
+    "language": "Tamil",
+    "composers": [
+      "Vidyasagar"
+    ],
+    "singers": [
+      "S. P. Balasubrahmanyam",
+      "S. Janaki"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 11",
+    "country": "IN",
+    "year": 2004,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-11",
+    "durationMs": 342000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-55",
+    "title": "Telugu Melody Hit 55",
+    "language": "Telugu",
+    "composers": [
+      "Thaman S"
+    ],
+    "singers": [
+      "K. J. Yesudas",
+      "Shilpa Rao"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 12",
+    "country": "IN",
+    "year": 2019,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-12",
+    "durationMs": 355000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-56",
+    "title": "Telugu Melody Hit 56",
+    "language": "Telugu",
+    "composers": [
+      "Devi Sri Prasad"
+    ],
+    "singers": [
+      "Swarnalatha",
+      "Dhee"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 12",
+    "country": "IN",
+    "year": 2001,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-12",
+    "durationMs": 188000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-57",
+    "title": "Hindi Melody Hit 57",
+    "language": "Hindi",
+    "composers": [
+      "Pritam"
+    ],
+    "singers": [
+      "S. Janaki",
+      "Sid Sriram"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 12",
+    "country": "IN",
+    "year": 2004,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-12",
+    "durationMs": 201000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-58",
+    "title": "Hindi Melody Hit 58",
+    "language": "Hindi",
+    "composers": [
+      "Vishal-Shekhar"
+    ],
+    "singers": [
+      "Shilpa Rao",
+      "Shreya Ghoshal"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 12",
+    "country": "IN",
+    "year": 2016,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-12",
+    "durationMs": 214000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-59",
+    "title": "Hindi Melody Hit 59",
+    "language": "Hindi",
+    "composers": [
+      "Amit Trivedi"
+    ],
+    "singers": [
+      "Dhee",
+      "Arijit Singh"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 12",
+    "country": "IN",
+    "year": 2013,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-12",
+    "durationMs": 227000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-60",
+    "title": "Tamil Melody Hit 60",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Sid Sriram",
+      "Jonita Gandhi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 13",
+    "country": "IN",
+    "year": 2016,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-13",
+    "durationMs": 240000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-61",
+    "title": "Tamil Melody Hit 61",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Shreya Ghoshal",
+      "Pradeep Kumar"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 13",
+    "country": "IN",
+    "year": 2023,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-13",
+    "durationMs": 253000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-62",
+    "title": "Tamil Melody Hit 62",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Arijit Singh",
+      "Andrea Jeremiah"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 13",
+    "country": "IN",
+    "year": 2000,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-13",
+    "durationMs": 266000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-63",
+    "title": "Tamil Melody Hit 63",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "Jonita Gandhi",
+      "Chinmayi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 13",
+    "country": "IN",
+    "year": 2012,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-13",
+    "durationMs": 279000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-64",
+    "title": "Tamil Melody Hit 64",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Pradeep Kumar",
+      "Haricharan"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 13",
+    "country": "IN",
+    "year": 2012,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-13",
+    "durationMs": 292000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-65",
+    "title": "Tamil Melody Hit 65",
+    "language": "Tamil",
+    "composers": [
+      "Santhosh Narayanan"
+    ],
+    "singers": [
+      "Andrea Jeremiah",
+      "Karthik"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 14",
+    "country": "IN",
+    "year": 2012,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-14",
+    "durationMs": 305000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-66",
+    "title": "Tamil Melody Hit 66",
+    "language": "Tamil",
+    "composers": [
+      "G. V. Prakash Kumar"
+    ],
+    "singers": [
+      "Chinmayi",
+      "S. P. Balasubrahmanyam"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 14",
+    "country": "IN",
+    "year": 2012,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-14",
+    "durationMs": 318000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-67",
+    "title": "Tamil Melody Hit 67",
+    "language": "Tamil",
+    "composers": [
+      "D. Imman"
+    ],
+    "singers": [
+      "Haricharan",
+      "K. J. Yesudas"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 14",
+    "country": "IN",
+    "year": 2009,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-14",
+    "durationMs": 331000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-68",
+    "title": "Tamil Melody Hit 68",
+    "language": "Tamil",
+    "composers": [
+      "Deva"
+    ],
+    "singers": [
+      "Karthik",
+      "Swarnalatha"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 14",
+    "country": "IN",
+    "year": 2003,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-14",
+    "durationMs": 344000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-69",
+    "title": "Tamil Melody Hit 69",
+    "language": "Tamil",
+    "composers": [
+      "Vidyasagar"
+    ],
+    "singers": [
+      "S. P. Balasubrahmanyam",
+      "S. Janaki"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 14",
+    "country": "IN",
+    "year": 2005,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-14",
+    "durationMs": 357000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-70",
+    "title": "Telugu Melody Hit 70",
+    "language": "Telugu",
+    "composers": [
+      "Thaman S"
+    ],
+    "singers": [
+      "K. J. Yesudas",
+      "Shilpa Rao"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 15",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-15",
+    "durationMs": 190000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-71",
+    "title": "Telugu Melody Hit 71",
+    "language": "Telugu",
+    "composers": [
+      "Devi Sri Prasad"
+    ],
+    "singers": [
+      "Swarnalatha",
+      "Dhee"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 15",
+    "country": "IN",
+    "year": 2002,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-15",
+    "durationMs": 203000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-72",
+    "title": "Hindi Melody Hit 72",
+    "language": "Hindi",
+    "composers": [
+      "Pritam"
+    ],
+    "singers": [
+      "S. Janaki",
+      "Sid Sriram"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 15",
+    "country": "IN",
+    "year": 2004,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-15",
+    "durationMs": 216000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-73",
+    "title": "Hindi Melody Hit 73",
+    "language": "Hindi",
+    "composers": [
+      "Vishal-Shekhar"
+    ],
+    "singers": [
+      "Shilpa Rao",
+      "Shreya Ghoshal"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 15",
+    "country": "IN",
+    "year": 2006,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-15",
+    "durationMs": 229000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-74",
+    "title": "Hindi Melody Hit 74",
+    "language": "Hindi",
+    "composers": [
+      "Amit Trivedi"
+    ],
+    "singers": [
+      "Dhee",
+      "Arijit Singh"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 15",
+    "country": "IN",
+    "year": 2016,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-15",
+    "durationMs": 242000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-75",
+    "title": "Tamil Melody Hit 75",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Sid Sriram",
+      "Jonita Gandhi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 16",
+    "country": "IN",
+    "year": 2017,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-16",
+    "durationMs": 255000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-76",
+    "title": "Tamil Melody Hit 76",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Shreya Ghoshal",
+      "Pradeep Kumar"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 16",
+    "country": "IN",
+    "year": 1996,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-16",
+    "durationMs": 268000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-77",
+    "title": "Tamil Melody Hit 77",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Arijit Singh",
+      "Andrea Jeremiah"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 16",
+    "country": "IN",
+    "year": 2024,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-16",
+    "durationMs": 281000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-78",
+    "title": "Tamil Melody Hit 78",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "Jonita Gandhi",
+      "Chinmayi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 16",
+    "country": "IN",
+    "year": 1982,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-16",
+    "durationMs": 294000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-79",
+    "title": "Tamil Melody Hit 79",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Pradeep Kumar",
+      "Haricharan"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 16",
+    "country": "IN",
+    "year": 2002,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-16",
+    "durationMs": 307000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-80",
+    "title": "Tamil Melody Hit 80",
+    "language": "Tamil",
+    "composers": [
+      "Santhosh Narayanan"
+    ],
+    "singers": [
+      "Andrea Jeremiah",
+      "Karthik"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 17",
+    "country": "IN",
+    "year": 2013,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-17",
+    "durationMs": 320000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-81",
+    "title": "Tamil Melody Hit 81",
+    "language": "Tamil",
+    "composers": [
+      "G. V. Prakash Kumar"
+    ],
+    "singers": [
+      "Chinmayi",
+      "S. P. Balasubrahmanyam"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 17",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-17",
+    "durationMs": 333000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-82",
+    "title": "Tamil Melody Hit 82",
+    "language": "Tamil",
+    "composers": [
+      "D. Imman"
+    ],
+    "singers": [
+      "Haricharan",
+      "K. J. Yesudas"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 17",
+    "country": "IN",
+    "year": 2009,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-17",
+    "durationMs": 346000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-83",
+    "title": "Tamil Melody Hit 83",
+    "language": "Tamil",
+    "composers": [
+      "Deva"
+    ],
+    "singers": [
+      "Karthik",
+      "Swarnalatha"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 17",
+    "country": "IN",
+    "year": 1998,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-17",
+    "durationMs": 359000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-84",
+    "title": "Tamil Melody Hit 84",
+    "language": "Tamil",
+    "composers": [
+      "Vidyasagar"
+    ],
+    "singers": [
+      "S. P. Balasubrahmanyam",
+      "S. Janaki"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 17",
+    "country": "IN",
+    "year": 2006,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-17",
+    "durationMs": 192000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-85",
+    "title": "Telugu Melody Hit 85",
+    "language": "Telugu",
+    "composers": [
+      "Thaman S"
+    ],
+    "singers": [
+      "K. J. Yesudas",
+      "Shilpa Rao"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 18",
+    "country": "IN",
+    "year": 2008,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-18",
+    "durationMs": 205000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-86",
+    "title": "Telugu Melody Hit 86",
+    "language": "Telugu",
+    "composers": [
+      "Devi Sri Prasad"
+    ],
+    "singers": [
+      "Swarnalatha",
+      "Dhee"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 18",
+    "country": "IN",
+    "year": 2003,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-18",
+    "durationMs": 218000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-87",
+    "title": "Hindi Melody Hit 87",
+    "language": "Hindi",
+    "composers": [
+      "Pritam"
+    ],
+    "singers": [
+      "S. Janaki",
+      "Sid Sriram"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 18",
+    "country": "IN",
+    "year": 2004,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-18",
+    "durationMs": 231000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-88",
+    "title": "Hindi Melody Hit 88",
+    "language": "Hindi",
+    "composers": [
+      "Vishal-Shekhar"
+    ],
+    "singers": [
+      "Shilpa Rao",
+      "Shreya Ghoshal"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 18",
+    "country": "IN",
+    "year": 2019,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-18",
+    "durationMs": 244000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-89",
+    "title": "Hindi Melody Hit 89",
+    "language": "Hindi",
+    "composers": [
+      "Amit Trivedi"
+    ],
+    "singers": [
+      "Dhee",
+      "Arijit Singh"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 18",
+    "country": "IN",
+    "year": 2019,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-18",
+    "durationMs": 257000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-90",
+    "title": "Tamil Melody Hit 90",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Sid Sriram",
+      "Jonita Gandhi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 19",
+    "country": "IN",
+    "year": 2018,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-19",
+    "durationMs": 270000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-91",
+    "title": "Tamil Melody Hit 91",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Shreya Ghoshal",
+      "Pradeep Kumar"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 19",
+    "country": "IN",
+    "year": 2002,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-19",
+    "durationMs": 283000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-92",
+    "title": "Tamil Melody Hit 92",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Arijit Singh",
+      "Andrea Jeremiah"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 19",
+    "country": "IN",
+    "year": 2021,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-19",
+    "durationMs": 296000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-93",
+    "title": "Tamil Melody Hit 93",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "Jonita Gandhi",
+      "Chinmayi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 19",
+    "country": "IN",
+    "year": 1997,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-19",
+    "durationMs": 309000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-94",
+    "title": "Tamil Melody Hit 94",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Pradeep Kumar",
+      "Haricharan"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 19",
+    "country": "IN",
+    "year": 2015,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-19",
+    "durationMs": 322000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-95",
+    "title": "Tamil Melody Hit 95",
+    "language": "Tamil",
+    "composers": [
+      "Santhosh Narayanan"
+    ],
+    "singers": [
+      "Andrea Jeremiah",
+      "Karthik"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 20",
+    "country": "IN",
+    "year": 2014,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-20",
+    "durationMs": 335000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-96",
+    "title": "Tamil Melody Hit 96",
+    "language": "Tamil",
+    "composers": [
+      "G. V. Prakash Kumar"
+    ],
+    "singers": [
+      "Chinmayi",
+      "S. P. Balasubrahmanyam"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 20",
+    "country": "IN",
+    "year": 2013,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-20",
+    "durationMs": 348000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-97",
+    "title": "Tamil Melody Hit 97",
+    "language": "Tamil",
+    "composers": [
+      "D. Imman"
+    ],
+    "singers": [
+      "Haricharan",
+      "K. J. Yesudas"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 20",
+    "country": "IN",
+    "year": 2009,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-20",
+    "durationMs": 181000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-98",
+    "title": "Tamil Melody Hit 98",
+    "language": "Tamil",
+    "composers": [
+      "Deva"
+    ],
+    "singers": [
+      "Karthik",
+      "Swarnalatha"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 20",
+    "country": "IN",
+    "year": 1993,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-20",
+    "durationMs": 194000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-99",
+    "title": "Tamil Melody Hit 99",
+    "language": "Tamil",
+    "composers": [
+      "Vidyasagar"
+    ],
+    "singers": [
+      "S. P. Balasubrahmanyam",
+      "S. Janaki"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 20",
+    "country": "IN",
+    "year": 2007,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-20",
+    "durationMs": 207000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-100",
+    "title": "Telugu Melody Hit 100",
+    "language": "Telugu",
+    "composers": [
+      "Thaman S"
+    ],
+    "singers": [
+      "K. J. Yesudas",
+      "Shilpa Rao"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 21",
+    "country": "IN",
+    "year": 2011,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-21",
+    "durationMs": 220000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-101",
+    "title": "Telugu Melody Hit 101",
+    "language": "Telugu",
+    "composers": [
+      "Devi Sri Prasad"
+    ],
+    "singers": [
+      "Swarnalatha",
+      "Dhee"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 21",
+    "country": "IN",
+    "year": 2004,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-21",
+    "durationMs": 233000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-102",
+    "title": "Hindi Melody Hit 102",
+    "language": "Hindi",
+    "composers": [
+      "Pritam"
+    ],
+    "singers": [
+      "S. Janaki",
+      "Sid Sriram"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 21",
+    "country": "IN",
+    "year": 2004,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-21",
+    "durationMs": 246000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-103",
+    "title": "Hindi Melody Hit 103",
+    "language": "Hindi",
+    "composers": [
+      "Vishal-Shekhar"
+    ],
+    "singers": [
+      "Shilpa Rao",
+      "Shreya Ghoshal"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 21",
+    "country": "IN",
+    "year": 2009,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-21",
+    "durationMs": 259000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-104",
+    "title": "Hindi Melody Hit 104",
+    "language": "Hindi",
+    "composers": [
+      "Amit Trivedi"
+    ],
+    "singers": [
+      "Dhee",
+      "Arijit Singh"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 21",
+    "country": "IN",
+    "year": 2022,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-21",
+    "durationMs": 272000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-105",
+    "title": "Tamil Melody Hit 105",
+    "language": "Tamil",
+    "composers": [
+      "Anirudh Ravichander"
+    ],
+    "singers": [
+      "Sid Sriram",
+      "Jonita Gandhi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 22",
+    "country": "IN",
+    "year": 2019,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-22",
+    "durationMs": 285000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-106",
+    "title": "Tamil Melody Hit 106",
+    "language": "Tamil",
+    "composers": [
+      "A. R. Rahman"
+    ],
+    "singers": [
+      "Shreya Ghoshal",
+      "Pradeep Kumar"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 22",
+    "country": "IN",
+    "year": 2008,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-22",
+    "durationMs": 298000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-107",
+    "title": "Tamil Melody Hit 107",
+    "language": "Tamil",
+    "composers": [
+      "Yuvan Shankar Raja"
+    ],
+    "singers": [
+      "Arijit Singh",
+      "Andrea Jeremiah"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 22",
+    "country": "IN",
+    "year": 2018,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-22",
+    "durationMs": 311000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-108",
+    "title": "Tamil Melody Hit 108",
+    "language": "Tamil",
+    "composers": [
+      "Ilaiyaraaja"
+    ],
+    "singers": [
+      "Jonita Gandhi",
+      "Chinmayi"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 22",
+    "country": "IN",
+    "year": 2012,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-22",
+    "durationMs": 324000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-109",
+    "title": "Tamil Melody Hit 109",
+    "language": "Tamil",
+    "composers": [
+      "Harris Jayaraj"
+    ],
+    "singers": [
+      "Pradeep Kumar",
+      "Haricharan"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 22",
+    "country": "IN",
+    "year": 2005,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-22",
+    "durationMs": 337000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-110",
+    "title": "Tamil Melody Hit 110",
+    "language": "Tamil",
+    "composers": [
+      "Santhosh Narayanan"
+    ],
+    "singers": [
+      "Andrea Jeremiah",
+      "Karthik"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 23",
+    "country": "IN",
+    "year": 2015,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-23",
+    "durationMs": 350000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-111",
+    "title": "Tamil Melody Hit 111",
+    "language": "Tamil",
+    "composers": [
+      "G. V. Prakash Kumar"
+    ],
+    "singers": [
+      "Chinmayi",
+      "S. P. Balasubrahmanyam"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 23",
+    "country": "IN",
+    "year": 2023,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-23",
+    "durationMs": 183000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-112",
+    "title": "Tamil Melody Hit 112",
+    "language": "Tamil",
+    "composers": [
+      "D. Imman"
+    ],
+    "singers": [
+      "Haricharan",
+      "K. J. Yesudas"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 23",
+    "country": "IN",
+    "year": 2009,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-23",
+    "durationMs": 196000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-113",
+    "title": "Tamil Melody Hit 113",
+    "language": "Tamil",
+    "composers": [
+      "Deva"
+    ],
+    "singers": [
+      "Karthik",
+      "Swarnalatha"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 23",
+    "country": "IN",
+    "year": 2010,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-23",
+    "durationMs": 209000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-114",
+    "title": "Tamil Melody Hit 114",
+    "language": "Tamil",
+    "composers": [
+      "Vidyasagar"
+    ],
+    "singers": [
+      "S. P. Balasubrahmanyam",
+      "S. Janaki"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 23",
+    "country": "IN",
+    "year": 2008,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-23",
+    "durationMs": 222000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-115",
+    "title": "Telugu Melody Hit 115",
+    "language": "Telugu",
+    "composers": [
+      "Thaman S"
+    ],
+    "singers": [
+      "K. J. Yesudas",
+      "Shilpa Rao"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 24",
+    "country": "IN",
+    "year": 2014,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-24",
+    "durationMs": 235000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-116",
+    "title": "Telugu Melody Hit 116",
+    "language": "Telugu",
+    "composers": [
+      "Devi Sri Prasad"
+    ],
+    "singers": [
+      "Swarnalatha",
+      "Dhee"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 24",
+    "country": "IN",
+    "year": 2005,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-24",
+    "durationMs": 248000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  },
+  {
+    "trackId": "seed-track-117",
+    "title": "Hindi Melody Hit 117",
+    "language": "Hindi",
+    "composers": [
+      "Pritam"
+    ],
+    "singers": [
+      "S. Janaki",
+      "Sid Sriram"
+    ],
+    "movie": "Soundtrack Blockbuster Vol. 24",
+    "country": "IN",
+    "year": 2004,
+    "genres": [
+      "Soundtrack",
+      "Melody",
+      "Film Score"
+    ],
+    "albumId": "alb-seed-24",
+    "durationMs": 261000,
+    "fetchedAt": "2026-11-22T00:00:00.000Z"
+  }
+]

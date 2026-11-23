@@ -4,7 +4,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../features/replay/data/all_time_index_store.dart';
+import '../features/replay/domain/listen_event.dart';
 import 'api_service.dart';
 import 'auth_service.dart';
 import 'listening_history_service.dart';
@@ -25,6 +28,7 @@ class ActiveListenSession {
     this.offline = false,
     this.quality = 256,
     this.artists = const [],
+    this.loopOne = false,
   });
 
   final String eventId;
@@ -40,6 +44,7 @@ class ActiveListenSession {
   final bool offline;
   final int quality;
   final List<Map<String, dynamic>> artists;
+  final bool loopOne;
 
   int listenedMs = 0;
   DateTime? _playSegmentStart;
@@ -87,8 +92,11 @@ class ActiveListenSession {
       if (contextType != null && contextType!.isNotEmpty) 'contextType': contextType,
       if (contextId != null && contextId!.isNotEmpty) 'contextId': contextId,
       'offline': offline,
+      'source': offline ? 'offline' : 'stream',
+      'loopOne': loopOne,
       'quality': quality,
       'artists': artists,
+      'schemaVersion': 2,
     };
   }
 }
@@ -136,6 +144,7 @@ class ListeningTrackerService {
     bool offline = false,
     int quality = 256,
     List<Map<String, dynamic>> artists = const [],
+    bool loopOne = false,
   }) {
     // If previous session wasn't finalized, close it with 'queue_replaced'
     if (_activeSession != null) {
@@ -164,6 +173,7 @@ class ListeningTrackerService {
       offline: offline,
       quality: quality,
       artists: artists,
+      loopOne: loopOne,
     );
 
     _activeSession!.onPlay();
@@ -188,6 +198,12 @@ class ListeningTrackerService {
     // Record into local listening history service for instant local replay & history
     if (ms >= 1000) {
       unawaited(ListeningHistoryService.instance.recordCompletedListen(eventMap));
+      try {
+        final listenEvent = ListenEvent.fromJson(eventMap);
+        unawaited(AllTimeIndexStore.instance.recordEvent(listenEvent));
+      } catch (e) {
+        debugPrint('[ListeningTracker] AllTimeIndex update error: $e');
+      }
     }
 
     // Only record to journal for server sync if user listened for at least 3 seconds
@@ -213,6 +229,8 @@ class ListeningTrackerService {
     }
   }
 
+  static const String _journalSyncOffsetKey = 'zenify_listen_journal_sync_offset_v1';
+
   Future<void> drainJournal() async {
     if (_isSyncing || _journalFile == null) return;
     if (!await _journalFile!.exists()) return;
@@ -229,8 +247,19 @@ class ListeningTrackerService {
         return;
       }
 
-      // Take batch up to 50
-      final batchLines = lines.take(50).toList();
+      final prefs = await SharedPreferences.getInstance();
+      var syncedCount = prefs.getInt(_journalSyncOffsetKey) ?? 0;
+      if (syncedCount > lines.length) {
+        syncedCount = 0;
+        await prefs.setInt(_journalSyncOffsetKey, 0);
+      }
+      if (syncedCount >= lines.length) {
+        _isSyncing = false;
+        return;
+      }
+
+      // Take batch up to 50 pending lines
+      final batchLines = lines.skip(syncedCount).take(50).toList();
       final batchEvents = <Map<String, dynamic>>[];
 
       for (final line in batchLines) {
@@ -242,8 +271,7 @@ class ListeningTrackerService {
       }
 
       if (batchEvents.isEmpty) {
-        // Clear corrupted lines
-        await _journalFile!.writeAsString('', mode: FileMode.write);
+        await prefs.setInt(_journalSyncOffsetKey, syncedCount + batchLines.length);
         _isSyncing = false;
         return;
       }
@@ -258,15 +286,11 @@ class ListeningTrackerService {
       ).timeout(const Duration(seconds: 15));
 
       if (res.statusCode == 200) {
-        // Remove uploaded lines from file
-        final remaining = lines.skip(batchLines.length).join('\n');
-        await _journalFile!.writeAsString(
-          remaining.isEmpty ? '' : '$remaining\n',
-          mode: FileMode.write,
-        );
+        final newOffset = syncedCount + batchLines.length;
+        await prefs.setInt(_journalSyncOffsetKey, newOffset);
 
         // If more lines left, drain remaining
-        if (lines.length > batchLines.length) {
+        if (lines.length > newOffset) {
           _isSyncing = false;
           unawaited(drainJournal());
           return;

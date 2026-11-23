@@ -10,8 +10,6 @@ import '../services/passport_store.dart';
 import '../widgets/atlas_components.dart';
 import 'city_screen.dart';
 
-typedef _Charts = ({List<AtlasSong> tracks, List<AtlasChartArtist> artists});
-
 class CountryScreen extends StatefulWidget {
   const CountryScreen({super.key, required this.country});
   final AtlasCountry country;
@@ -21,7 +19,7 @@ class CountryScreen extends StatefulWidget {
 }
 
 class _CountryScreenState extends State<CountryScreen> {
-  late final Future<_Charts> _charts;
+  late final Future<AtlasCountryCharts> _charts;
   late final Future<List<AtlasSong>> _releases;
 
   @override
@@ -81,7 +79,7 @@ class _CountryScreenState extends State<CountryScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  FutureBuilder<_Charts>(
+                  FutureBuilder<AtlasCountryCharts>(
                     future: _charts,
                     builder: (_, snap) {
                       final t = snap.data?.tracks ?? const <AtlasSong>[];
@@ -145,7 +143,7 @@ class _CountryScreenState extends State<CountryScreen> {
               ),
             ),
           ],
-          FutureBuilder<_Charts>(
+          FutureBuilder<AtlasCountryCharts>(
             future: _charts,
             builder: (context, snap) {
               if (snap.connectionState != ConnectionState.done) {

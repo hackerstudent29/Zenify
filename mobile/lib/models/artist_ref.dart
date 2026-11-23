@@ -14,6 +14,8 @@ class ArtistRef {
   final String? imageUrl;
   final String? role;
 
+  String? get avatarUrl => imageUrl;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,

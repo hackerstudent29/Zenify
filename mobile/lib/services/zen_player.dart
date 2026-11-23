@@ -42,6 +42,8 @@ class AudioPlayer implements FxEngine {
   final _autoTransitionC = StreamController<String>.broadcast();
   final _errorC = StreamController<String>.broadcast();
   final _videoSizeC = StreamController<({int width, int height})>.broadcast();
+  final _videoSizeHintC = StreamController<({int width, int height})>.broadcast();
+  final _videoUnavailableC = StreamController<void>.broadcast();
 
   Stream<PlayerState> get onPlayerStateChanged => _stateC.stream;
   Stream<bool> get onBufferingChanged => _bufferingC.stream;
@@ -51,6 +53,8 @@ class AudioPlayer implements FxEngine {
   Stream<String> get onAutoTransition => _autoTransitionC.stream;
   Stream<String> get onError => _errorC.stream;
   Stream<({int width, int height})> get onVideoSizeChanged => _videoSizeC.stream;
+  Stream<({int width, int height})> get onVideoSizeHint => _videoSizeHintC.stream;
+  Stream<void> get onVideoUnavailable => _videoUnavailableC.stream;
   PlayerState get state => _state;
 
   void _onEvent(dynamic e) {
@@ -78,9 +82,10 @@ class AudioPlayer implements FxEngine {
         _durC.add(Duration(milliseconds: (e['ms'] as num).toInt()));
       case 'resolved':
         if (kDebugMode) {
+          final ttl = e['ttlMs'] ?? e['ms'];
           final ldb = e['loudnessDb'];
           final ldbStr = ldb != null ? ' loudness=${ldb}dB' : '';
-          debugPrint('ZenPlayer: resolved ${e['id']} via client ${e['client']} in ${e['ms']}ms (fromCache=${e['fromCache']})$ldbStr');
+          debugPrint('ZenPlayer: resolved ${e['id']} via client ${e['client']} (ttlMs=$ttl, fromCache=${e['fromCache']})$ldbStr');
         }
       case 'error':
         final errMsg = e['message']?.toString() ?? e['kind']?.toString() ?? 'playback error';
@@ -92,6 +97,12 @@ class AudioPlayer implements FxEngine {
         final w = (e['width'] as num?)?.toInt() ?? 0;
         final h = (e['height'] as num?)?.toInt() ?? 0;
         _videoSizeC.add((width: w, height: h));
+      case 'videoSizeHint':
+        final w = (e['width'] as num?)?.toInt() ?? 0;
+        final h = (e['height'] as num?)?.toInt() ?? 0;
+        _videoSizeHintC.add((width: w, height: h));
+      case 'videoUnavailable':
+        _videoUnavailableC.add(null);
     }
   }
 
@@ -207,12 +218,32 @@ class AudioPlayer implements FxEngine {
   Future<void> setLifecycle(bool isForeground) =>
       _call('setLifecycle', {'isForeground': isForeground});
 
+  Future<void> setVideoViewport({
+    required String state,
+    int widthPx = 0,
+    int heightPx = 0,
+  }) => _call('setVideoViewport', {
+    'state': state,
+    'widthPx': widthPx,
+    'heightPx': heightPx,
+  });
+
   Future<void> dispose() async {
     _state = PlayerState.disposed;
     _fxTimer?.cancel();
     await _sub?.cancel();
     await _call('dispose');
-    for (final c in [_stateC, _bufferingC, _posC, _durC, _errorC, _autoTransitionC, _videoSizeC]) {
+    for (final c in [
+      _stateC,
+      _bufferingC,
+      _posC,
+      _durC,
+      _errorC,
+      _autoTransitionC,
+      _videoSizeC,
+      _videoSizeHintC,
+      _videoUnavailableC,
+    ]) {
       await c.close();
     }
     await _doneC.close();

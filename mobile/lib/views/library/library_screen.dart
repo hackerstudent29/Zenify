@@ -24,6 +24,7 @@ import '../../design_system/widgets/media_navigation_sheet.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
+import '../../features/replay/presentation/replay_screen.dart';
 import '../../features/story_sharing/story_sharing.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
@@ -82,7 +83,8 @@ enum _Cat {
   albums('Albums', Icons.album_rounded),
   songs('Songs', Icons.music_note_rounded),
   liked('Favourite Songs', CupertinoIcons.star_fill),
-  downloaded('Downloaded', CupertinoIcons.arrow_down_circle_fill);
+  downloaded('Downloaded', CupertinoIcons.arrow_down_circle_fill),
+  replay('Replay & Insights', CupertinoIcons.chart_bar_fill);
 
   const _Cat(this.label, this.icon);
   final String label;
@@ -1327,6 +1329,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
         _push(context, const _LikedPage());
       case _Cat.downloaded:
         _push(context, const _DownloadedPage());
+      case _Cat.replay:
+        _push(context, const ReplayScreen());
     }
   }
 

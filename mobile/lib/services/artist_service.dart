@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/track.dart';
 import '../utils/media_normalizer.dart';
@@ -119,15 +122,55 @@ class ArtistService {
   ArtistService._();
   static final ArtistService instance = ArtistService._();
 
+  static const String _avatarCachePrefKey = 'zenify_persisted_artist_avatars_v1';
+  static bool _avatarsLoaded = false;
+  static Timer? _avatarSaveTimer;
+
   static final Map<String, ({ArtistProfile profile, DateTime expires})> _cache = {};
   static final Map<String, Future<ArtistProfile?>> _inFlight = {};
   static final Map<String, String> _avatarCache = {};
   static final Map<String, Future<String>> _inFlightAvatars = {};
 
-  static void clearCache() {
+  Future<void> init() async {
+    await ensureAvatarsLoaded();
+  }
+
+  static Future<void> ensureAvatarsLoaded() async {
+    if (_avatarsLoaded) return;
+    _avatarsLoaded = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_avatarCachePrefKey);
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw) as Map?;
+        if (decoded != null) {
+          decoded.forEach((k, v) {
+            if (v is String && v.isNotEmpty) {
+              _avatarCache[k.toString().toLowerCase()] = v;
+            }
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  static void _persistAvatarsDebounced() {
+    _avatarSaveTimer?.cancel();
+    _avatarSaveTimer = Timer(const Duration(milliseconds: 500), () async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_avatarCachePrefKey, jsonEncode(_avatarCache));
+      } catch (_) {}
+    });
+  }
+
+  static void clearCache({bool keepAvatars = true}) {
     _cache.clear();
     _inFlight.clear();
-    _avatarCache.clear();
+    if (!keepAvatars) {
+      _avatarCache.clear();
+      SharedPreferences.getInstance().then((p) => p.remove(_avatarCachePrefKey)).catchError((_) => false);
+    }
     _inFlightAvatars.clear();
   }
 
@@ -140,12 +183,15 @@ class ArtistService {
     final key = artistName.trim().toLowerCase();
     if (key.isEmpty || avatarUrl.isEmpty) return;
     _avatarCache[key] = avatarUrl;
+    _persistAvatarsDebounced();
   }
 
   static Future<String> resolveArtistAvatar(String artistName) async {
-    final clean = artistName.trim();
+    final clean = MediaNormalizer.cleanTitle(artistName).trim();
     final key = clean.toLowerCase();
     if (key.isEmpty || key == 'unknown artist') return '';
+    await ensureAvatarsLoaded();
+
     if (_avatarCache.containsKey(key) && _avatarCache[key]!.isNotEmpty) {
       return _avatarCache[key]!;
     }
@@ -157,19 +203,60 @@ class ArtistService {
     // 1. Check user favorite artists from preferences
     for (final fa in UserPreferencesService.instance.currentPrefs.favoriteArtists) {
       if (fa.name.trim().toLowerCase() == key && fa.image.isNotEmpty) {
-        _avatarCache[key] = fa.image;
+        cacheAvatar(clean, fa.image);
         return fa.image;
       }
     }
 
-    // 2. Fetch authentic artist profile / avatar from InnerTube
+    // 2. Fetch authentic artist profile / avatar from InnerTube with multi-strategy fallbacks
     final future = () async {
       try {
+        // Strategy A: Native InnerTube searchArtists (returns official artist circular avatar directly)
+        final artists = await InnerTubeService.instance.searchArtists(clean, limit: 3);
+        if (artists.isNotEmpty) {
+          for (final a in artists) {
+            if (a.name.toLowerCase() == key ||
+                a.name.toLowerCase().contains(key) ||
+                key.contains(a.name.toLowerCase())) {
+              if (a.image.isNotEmpty) {
+                cacheAvatar(clean, a.image);
+                return a.image;
+              }
+            }
+          }
+          final first = artists.first;
+          if (first.image.isNotEmpty) {
+            cacheAvatar(clean, first.image);
+            return first.image;
+          }
+        }
+
+        // Strategy B: searchArtist (musicCardShelf / artistChannel hit)
         final hit = await InnerTubeService.instance.searchArtist(clean);
         if (hit != null && hit.thumb != null && hit.thumb!.isNotEmpty) {
           final upgraded = MediaNormalizer.upgradeArtworkUrl(hit.thumb!, isArtistAvatar: true);
-          _avatarCache[key] = upgraded;
+          cacheAvatar(clean, upgraded);
           return upgraded;
+        }
+
+        // Strategy C: Search artist songs and extract artist avatar from credits
+        final songHits = await InnerTubeService.instance.search('$clean songs');
+        if (songHits.isNotEmpty) {
+          for (final song in songHits) {
+            for (final ar in song.resolvedArtists) {
+              if (ar.name.toLowerCase() == key && ar.imageUrl != null && ar.imageUrl!.isNotEmpty) {
+                final upgraded = MediaNormalizer.upgradeArtworkUrl(ar.imageUrl!, isArtistAvatar: true);
+                cacheAvatar(clean, upgraded);
+                return upgraded;
+              }
+            }
+          }
+          final first = songHits.first;
+          if (first.coverUrl.isNotEmpty) {
+            final upgraded = MediaNormalizer.upgradeArtworkUrl(first.coverUrl, isArtistAvatar: true);
+            cacheAvatar(clean, upgraded);
+            return upgraded;
+          }
         }
       } catch (_) {}
       return '';
@@ -181,6 +268,19 @@ class ArtistService {
     } finally {
       _inFlightAvatars.remove(key);
     }
+  }
+
+  static String resolveHeroCoverUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return '';
+    var u = url.trim();
+    if (u.contains('googleusercontent.com') || u.contains('ggpht.com')) {
+      final base = u.replaceAll(
+        RegExp(r'=(?:w\d+-h\d+|s\d+|w\d+)(?:-[a-z0-9_-]+)*$', caseSensitive: false),
+        '',
+      );
+      return '$base=w1600-l90-rj';
+    }
+    return MediaNormalizer.upgradeBannerUrl(u);
   }
 
   /// Synchronous 0ms cache lookup for immediate rendering on navigation.
@@ -267,7 +367,7 @@ class ArtistService {
             ? MediaNormalizer.upgradeArtworkUrl(rawThumb, isArtistAvatar: true)
             : '';
         coverUrl = rawBanner != null && rawBanner.isNotEmpty
-            ? MediaNormalizer.upgradeBannerUrl(rawBanner)
+            ? resolveHeroCoverUrl(rawBanner)
             : imageUrl;
         if (imageUrl.isNotEmpty) {
           cacheAvatar(name, imageUrl);

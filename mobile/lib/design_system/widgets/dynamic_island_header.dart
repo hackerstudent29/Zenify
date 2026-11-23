@@ -606,45 +606,87 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
                 final double vis = hasContent ? math.max(cVal, nVal) : 0.0;
                 final double f = vis.clamp(0.0, 1.0).toDouble();
 
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // State A: Individual discrete circular glass buttons (Left back & Right more)
-                    // Visible when at top / title not presented
-                    Positioned.fill(
-                      child: Opacity(
-                        opacity: (1.0 - f).clamp(0.0, 1.0),
-                        child: IgnorePointer(
-                          ignoring: f >= 0.5,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              _buildLeftDock(context, canPop, isDock),
-                              _buildRightDock(context),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final double totalWidth = constraints.maxWidth;
+                    final double halfWidth = totalWidth / 2;
+                    final double expandWidth = h + (halfWidth - h) * f;
 
-                    // State B: Expanded single unified floating glass capsule
-                    // Holding Left <, Page Title, and Right ⋮
-                    if (hasContent)
-                      Positioned.fill(
-                        child: Opacity(
-                          opacity: f.clamp(0.0, 1.0),
-                          child: IgnorePointer(
-                            ignoring: f < 0.5,
-                            child: Transform.scale(
-                              scale: 0.94 + 0.06 * f,
-                              child: _buildUnifiedCapsule(
-                                  context, canPop, isDock),
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.center,
+                      children: [
+                        // When transitioning between 0 and 1, render expanding glass capsules
+                        if (hasContent && f > 0.001 && f < 0.999) ...[
+                          // Left expanding glass capsule
+                          Positioned(
+                            left: 0,
+                            top: 0,
+                            width: expandWidth,
+                            height: h,
+                            child: IgnorePointer(
+                              child: AppleGlass(
+                                borderRadius: BorderRadius.circular(h / 2),
+                                child: const SizedBox.expand(),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                  ],
+                          // Right expanding glass capsule
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            width: expandWidth,
+                            height: h,
+                            child: IgnorePointer(
+                              child: AppleGlass(
+                                borderRadius: BorderRadius.circular(h / 2),
+                                child: const SizedBox.expand(),
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        // State A: Individual discrete circular glass buttons (Left back & Right more)
+                        // Visible when at top / title not presented
+                        if (f < 0.999)
+                          Positioned.fill(
+                            child: Opacity(
+                              opacity: (1.0 - f).clamp(0.0, 1.0),
+                              child: IgnorePointer(
+                                ignoring: f >= 0.5,
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    _buildLeftDock(context, canPop, isDock),
+                                    _buildRightDock(context),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
+                        // State B: Expanded single unified floating glass capsule
+                        // Holding Left <, Page Title (strictly centered), and Right ⋮
+                        if (hasContent && f > 0.001)
+                          Positioned.fill(
+                            child: Opacity(
+                              opacity: f.clamp(0.0, 1.0),
+                              child: IgnorePointer(
+                                ignoring: f < 0.5,
+                                child: _buildUnifiedCapsule(
+                                  context,
+                                  canPop,
+                                  isDock,
+                                  expansionProgress: f,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 );
               },
             ),
@@ -725,7 +767,12 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
   /// Single unified floating glass capsule matching:
   /// height: 52px; border-radius: 26px; padding: 0 4px;
   /// Holding [ Back <    Title (centered)    Vertical ⋮ ]
-  Widget _buildUnifiedCapsule(BuildContext context, bool canPop, bool isDock) {
+  Widget _buildUnifiedCapsule(
+    BuildContext context,
+    bool canPop,
+    bool isDock, {
+    double expansionProgress = 1.0,
+  }) {
     final h = widget.height;
     final notifier = IslandNotifier.instance;
     final active = notifier.current;
@@ -783,7 +830,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
                             onDone: () =>
                                 IslandNotifier.instance.dismiss(id: active.id),
                           )
-                        : _titleContent(),
+                        : _titleContent(expansionProgress: expansionProgress),
                   ),
                 ),
               ),
@@ -934,9 +981,13 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
     );
   }
 
-  Widget _titleContent() {
+  Widget _titleContent({double expansionProgress = 1.0}) {
     final fg = LiquidGlassController.instance.c.foreground;
-    return widget.centerWidget ??
+    final titleAlpha = Curves.easeOutCubic
+        .transform(((expansionProgress - 0.25) / 0.75).clamp(0.0, 1.0));
+    final titleScale = 0.88 + 0.12 * expansionProgress;
+
+    final child = widget.centerWidget ??
         Text(
           widget.title,
           key: ValueKey('title-${widget.title}'),
@@ -952,6 +1003,16 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
             letterSpacing: -0.3,
           ),
         );
+
+    if (expansionProgress >= 0.999) return child;
+
+    return Opacity(
+      opacity: titleAlpha,
+      child: Transform.scale(
+        scale: titleScale,
+        child: child,
+      ),
+    );
   }
 
   /// Discrete right circular button

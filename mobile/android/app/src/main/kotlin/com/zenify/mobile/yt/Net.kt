@@ -1,5 +1,7 @@
 package com.zenify.mobile.yt
 
+import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import java.net.Inet4Address
@@ -15,15 +17,27 @@ object PreferIpv4Dns : Dns {
 }
 
 object Net {
+    val dispatcher = Dispatcher().apply {
+        maxRequests = 64
+        maxRequestsPerHost = 16
+    }
+
     val ok: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .dns(PreferIpv4Dns)
-            .connectionPool(okhttp3.ConnectionPool(8, 10, TimeUnit.MINUTES))
-            .connectTimeout(8, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .dispatcher(dispatcher)
+            .connectionPool(ConnectionPool(8, 10, TimeUnit.MINUTES))
+            .connectTimeout(6, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .followRedirects(true)
             .followSslRedirects(true)
+            .build()
+    }
+
+    val api: OkHttpClient by lazy {
+        ok.newBuilder()
+            .callTimeout(8, TimeUnit.SECONDS)
             .build()
     }
 }

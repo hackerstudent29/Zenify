@@ -695,9 +695,9 @@ private class Engine(val fs: Float, onBands: (FloatArray) -> Unit) {
 
     fun setLoudnessDb(db: Double?) {
         targetLoudnessGain = if (db != null) {
-            // Keep volume punchy between 0 dB and -2 to -3 dB max as required,
-            // preventing drastic -10 dB drops when StudioFX is turned on.
-            val clampedDb = (-db).coerceIn(-2.5, 2.0).toFloat()
+            // Normalize audio loudness consistently across all songs (-12 dB to +10 dB),
+            // matching standard -14 LUFS target so quiet and loud tracks play at the exact same level.
+            val clampedDb = (-db).coerceIn(-12.0, 10.0).toFloat()
             10f.pow(clampedDb / 20f)
         } else {
             1f

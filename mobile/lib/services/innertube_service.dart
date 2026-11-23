@@ -1540,6 +1540,7 @@ class InnerTubeService {
       final singles = <Map<String, dynamic>>[];
       final playlists = <Map<String, dynamic>>[];
       final related = <Map<String, dynamic>>[];
+      final videos = <Track>[];
 
       if (sections is List) {
         for (final section in sections) {
@@ -1669,6 +1670,26 @@ class InnerTubeService {
                 }
               } catch (_) {}
             }
+          } else if (shelfTitle.contains('video')) {
+            for (final item in contents) {
+              final c = _twoRowCard(item);
+              if (c != null) {
+                final vid = c['browseId'] ?? c['id'];
+                if (vid != null) {
+                  videos.add(
+                    Track(
+                      id: 'yt-$vid',
+                      title: c['title'] ?? 'Video',
+                      artist: artistName ?? 'Artist',
+                      album: 'Music Video',
+                      coverUrl: c['coverUrl'] ?? '',
+                      durationSeconds: 240,
+                      source: 'youtube',
+                    ),
+                  );
+                }
+              }
+            }
           } else if (shelfTitle.contains('single') ||
               shelfTitle.contains('ep')) {
             for (final item in contents) {
@@ -1731,6 +1752,7 @@ class InnerTubeService {
         'singles': singles,
         'playlists': playlists,
         'related': related,
+        'videos': videos,
       };
     } catch (e) {
       if (kDebugMode) debugPrint('[InnerTube] getArtistChannel error: $e');

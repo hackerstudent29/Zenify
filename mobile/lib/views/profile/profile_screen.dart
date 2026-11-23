@@ -17,7 +17,7 @@ import '../../services/settings_service.dart';
 import '../../services/user_preferences_service.dart';
 import '../auth/onboarding_sheet.dart';
 import '../auth/welcome_screen.dart';
-import '../insights/insights_screen.dart';
+import '../../features/replay/presentation/replay_screen.dart';
 import '../room_together/room_together_screen.dart';
 import '../settings/settings_screen.dart';
 import 'profile_edit_sheets.dart';
@@ -180,7 +180,7 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
                   chevron: true,
                   onTap: () => Navigator.of(context).push(
                     CupertinoPageRoute<void>(
-                      builder: (_) => const InsightsScreen(),
+                      builder: (_) => const ReplayScreen(),
                     ),
                   ),
                 ),

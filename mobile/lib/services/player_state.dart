@@ -23,6 +23,7 @@ import 'listening_tracker_service.dart';
 import 'lyrics_service.dart';
 import 'permission_service.dart';
 import 'queue_state.dart';
+import 'settings_service.dart';
 import 'stream_resolver_service.dart';
 import 'zenify_audio_handler.dart';
 
@@ -81,6 +82,9 @@ class PlayerState extends ChangeNotifier
   /// Natural rendered video dimensions reported by ExoPlayer (0x0 until first frame).
   final ValueNotifier<Size> videoSizeNotifier = ValueNotifier<Size>(Size.zero);
 
+  /// Real-time aspect ratio (w/h, null = unknown) for aspect-aware video card layouts.
+  final ValueNotifier<double?> videoAspectNotifier = ValueNotifier<double?>(null);
+
   /// Plug in a palette extractor (e.g. palette_generator) from the UI layer.
   Future<Color?> Function(Track track)? accentResolver;
 
@@ -90,6 +94,7 @@ class PlayerState extends ChangeNotifier
   bool _isBuffering = false;
   bool _isShuffle = false;
   bool _autoplay = true;
+  bool _crossfadingToNext = false;
   ZenifyRepeatMode _repeatMode = ZenifyRepeatMode.off;
   Duration _duration = const Duration(seconds: 210);
   List<Track> _queue = [];
@@ -299,13 +304,44 @@ class PlayerState extends ChangeNotifier
       _audioPlayer.onAutoTransition.listen((id) => _onAutoTransition(id)),
     );
     _subs.add(
+      _audioPlayer.onVideoSizeHint.listen((hint) {
+        if (hint.width > 0 && hint.height > 0) {
+          final ar = hint.width / hint.height;
+          videoAspectNotifier.value = ar;
+          if (videoSizeNotifier.value.width <= 0 ||
+              videoSizeNotifier.value.height <= 0) {
+            videoSizeNotifier.value = Size(
+              hint.width.toDouble(),
+              hint.height.toDouble(),
+            );
+          }
+          if (videoTextureIdNotifier.value == null) {
+            unawaited(_ensureVideoTexturePrepared());
+          }
+        }
+      }),
+    );
+    _subs.add(
       _audioPlayer.onVideoSizeChanged.listen((sz) {
         if (sz.width > 0 && sz.height > 0) {
           videoSizeNotifier.value = Size(
             sz.width.toDouble(),
             sz.height.toDouble(),
           );
+          final ar = sz.width / sz.height;
+          videoAspectNotifier.value = ar;
+          if (videoTextureIdNotifier.value == null) {
+            unawaited(_ensureVideoTexturePrepared());
+          }
         }
+      }),
+    );
+    _subs.add(
+      _audioPlayer.onVideoUnavailable.listen((_) {
+        videoTextureIdNotifier.value = null;
+        videoSizeNotifier.value = Size.zero;
+        videoAspectNotifier.value = null;
+        notifyListeners();
       }),
     );
     _subs.add(_audioPlayer.onError.listen(_onEngineError));
@@ -454,6 +490,23 @@ class PlayerState extends ChangeNotifier
     if (!_hasPrefetchedNext && pos.inSeconds >= 12 && _currentTrack != null) {
       _hasPrefetchedNext = true;
       _prefetchNext();
+    }
+
+    // Active crossfade transition if crossfadeSeconds is enabled in Settings
+    final xfadeSec = SettingsState.instance.crossfadeSeconds;
+    if (xfadeSec > 0 &&
+        _duration > Duration(seconds: xfadeSec * 2) &&
+        !_isTransitioning &&
+        _isPlaying) {
+      final rem = _duration - pos;
+      if (rem <= Duration(seconds: xfadeSec) && rem > Duration.zero) {
+        final fraction = (rem.inMilliseconds / (xfadeSec * 1000.0)).clamp(0.05, 1.0);
+        _applyVolume(volumeNotifier.value * fraction);
+        if (rem <= const Duration(milliseconds: 350) && !_crossfadingToNext) {
+          _crossfadingToNext = true;
+          advance(reason: AdvanceReason.trackCompleted);
+        }
+      }
     }
   }
 
@@ -763,22 +816,34 @@ class PlayerState extends ChangeNotifier
     _seekTarget = null;
     _lastPrefetchedNextKey = null;
     videoSizeNotifier.value = Size.zero;
+    videoAspectNotifier.value = null;
     _duration = Duration(seconds: track.durationSeconds);
     _setPosition(
       startMs != null ? Duration(milliseconds: startMs) : Duration.zero,
     );
     _pushHistory(track);
+    final isOffline = DownloadService.instance.isDownloaded(track.id);
+    final isLoopOne = _queueState?.repeatMode == RepeatMode.one;
+    final ctx = _queueState?.context;
+    final contextTypeStr = ctx?.type.name;
+    final contextIdStr = ctx?.id;
+
     ListeningTrackerService.instance.startTrack(
       trackId: track.id,
       trackTitle: track.title,
       trackAlbum: track.album,
       trackDurationMs: track.durationSeconds * 1000,
+      offline: isOffline,
+      loopOne: isLoopOne,
+      contextType: contextTypeStr,
+      contextId: contextIdStr,
       artists: [
-        {
-          'artistKey': track.artist,
-          'artistName': track.artist,
-          'isPrimary': true,
-        },
+        for (final name in track.artistNames)
+          {
+            'artistKey': name,
+            'artistName': name,
+            'isPrimary': name == track.artistNames.firstOrNull,
+          },
       ],
     );
 
@@ -832,8 +897,13 @@ class PlayerState extends ChangeNotifier
       notifyListeners();
 
       // Apple Music always eases audio in instead of cutting it.
+      final xfadeSec = SettingsState.instance.crossfadeSeconds;
+      final rampDuration = xfadeSec > 0
+          ? Duration(milliseconds: math.min(xfadeSec * 1000, 2500))
+          : const Duration(milliseconds: 260);
+      _crossfadingToNext = false;
       unawaited(
-        _rampVolume(volumeNotifier.value, const Duration(milliseconds: 260)),
+        _rampVolume(volumeNotifier.value, rampDuration),
       );
 
       _playedSessionTrackIds.add(track.id);
@@ -908,6 +978,11 @@ class PlayerState extends ChangeNotifier
     _isBuffering = true;
     notifyListeners();
 
+    // Volume normalization (Settings)
+    final norm = SettingsState.instance.normalizeVolume;
+    final loudnessDb = norm ? null : 0.0;
+    unawaited(_audioPlayer.setLoudnessDb(loudnessDb));
+
     Object? error;
 
     // 0. TOP PRIORITY: Offline Local Storage (100% offline playback, 0 network, instant)
@@ -940,12 +1015,16 @@ class PlayerState extends ChangeNotifier
         !videoId.startsWith('gen-')) {
       try {
         if (token != _playToken) return;
+        if (track.isVideo) {
+          unawaited(_ensureVideoTexturePrepared(token));
+        }
         await _audioPlayer.playMedia(
           mediaId: videoId,
           title: track.title,
           artist: track.artist,
           artworkUrl: track.coverUrl,
           startMs: startMs,
+          loudnessDb: loudnessDb,
           isVideo: track.isVideo,
         );
         return;
@@ -970,6 +1049,7 @@ class PlayerState extends ChangeNotifier
           artist: track.artist,
           artworkUrl: track.coverUrl,
           startMs: startMs,
+          loudnessDb: loudnessDb,
         );
         return;
       } catch (e) {
@@ -978,7 +1058,7 @@ class PlayerState extends ChangeNotifier
     }
 
     // 3 & 4. On-device StreamResolverService + Zenify /stream-youtube proxy
-    if (await _playViaResolverAndProxy(track, token, startMs: startMs)) {
+    if (await _playViaResolverAndProxy(track, token, startMs: startMs, loudnessDb: loudnessDb)) {
       return;
     }
 
@@ -990,6 +1070,7 @@ class PlayerState extends ChangeNotifier
     Track track,
     int token, {
     int? startMs,
+    double? loudnessDb,
   }) async {
     final videoId = track.id.replaceFirst('yt-', '').trim();
 
@@ -1011,6 +1092,7 @@ class PlayerState extends ChangeNotifier
             artist: track.artist,
             artworkUrl: track.coverUrl,
             startMs: startMs,
+            loudnessDb: loudnessDb,
             isVideo: streams.videoUrl != null && streams.videoUrl!.isNotEmpty,
           );
           return true;
@@ -1037,6 +1119,7 @@ class PlayerState extends ChangeNotifier
           artist: track.artist,
           artworkUrl: track.coverUrl,
           startMs: startMs,
+          loudnessDb: loudnessDb,
         );
         return true;
       }
@@ -1062,6 +1145,7 @@ class PlayerState extends ChangeNotifier
           artist: track.artist,
           artworkUrl: track.coverUrl,
           startMs: startMs,
+          loudnessDb: loudnessDb,
         );
         return true;
       } catch (_) {}
@@ -1100,19 +1184,24 @@ class PlayerState extends ChangeNotifier
       if (nextTrack.isVideo && videoTextureIdNotifier.value == null) {
         unawaited(_ensureVideoTexturePrepared());
       }
-      // Gapless next track setup & native engine prefetch with metadata
+      // Gapless next track setup & native engine prefetch with metadata (respects Settings)
+      final isGapless = SettingsState.instance.gaplessPlayback;
       final nextLocal = DownloadService.instance.getLocalAudioPath(
         nextTrack.id,
       );
-      unawaited(
-        _audioPlayer.setNext(
-          nextLocal ?? nextTrack.id,
-          title: nextTrack.title,
-          artist: nextTrack.artist,
-          artworkUrl: nextTrack.coverUrl,
-          isVideo: nextTrack.isVideo,
-        ),
-      );
+      if (isGapless) {
+        unawaited(
+          _audioPlayer.setNext(
+            nextLocal ?? nextTrack.id,
+            title: nextTrack.title,
+            artist: nextTrack.artist,
+            artworkUrl: nextTrack.coverUrl,
+            isVideo: nextTrack.isVideo,
+          ),
+        );
+      } else {
+        unawaited(_audioPlayer.setNext(null));
+      }
       // Only resolve lookahead (tracks N+2, N+3) when the current track is well underway
       // to avoid speculative InnerTube player network traffic during track skips.
       if (lookahead.isNotEmpty && positionNotifier.value.inSeconds >= 45) {
@@ -1317,6 +1406,7 @@ class PlayerState extends ChangeNotifier
           _consecutiveErrorCount = 0;
           _lastRecoveryAttemptKey = null;
           videoSizeNotifier.value = Size.zero;
+          videoAspectNotifier.value = null;
           if (track.isVideo) {
             unawaited(_ensureVideoTexturePrepared(token));
           } else if (videoTextureIdNotifier.value != null) {
@@ -1334,17 +1424,28 @@ class PlayerState extends ChangeNotifier
           _isLoadingLyrics = true;
           lyricIndexNotifier.value = -1;
 
+          final isOffline = DownloadService.instance.isDownloaded(track.id);
+          final isLoopOne = q.repeatMode == RepeatMode.one;
+          final ctx = q.context;
+          final contextTypeStr = ctx?.type.name;
+          final contextIdStr = ctx?.id;
+
           ListeningTrackerService.instance.startTrack(
             trackId: track.id,
             trackTitle: track.title,
             trackAlbum: track.album,
             trackDurationMs: track.durationSeconds * 1000,
+            offline: isOffline,
+            loopOne: isLoopOne,
+            contextType: contextTypeStr,
+            contextId: contextIdStr,
             artists: [
-              {
-                'artistKey': track.artist,
-                'artistName': track.artist,
-                'isPrimary': true,
-              },
+              for (final name in track.artistNames)
+                {
+                  'artistKey': name,
+                  'artistName': name,
+                  'isPrimary': name == track.artistNames.firstOrNull,
+                },
             ],
           );
           notifyListeners();
@@ -1434,7 +1535,7 @@ class PlayerState extends ChangeNotifier
   /// Immediately populates the radio queue when user starts playing a song,
   /// matching the seed song's language and user affinity without repeats.
   Future<void> _prepopulateRadio(Track seed) async {
-    if (_prepopulatingRadio || _collectionLocked || !_autoplay) return;
+    if (_prepopulatingRadio || _collectionLocked || !_autoplay || !SettingsState.instance.autoplaySimilar) return;
     _prepopulatingRadio = true;
     try {
       final userLang = ListeningHistoryService.instance.primaryLanguage;
@@ -1738,10 +1839,27 @@ class PlayerState extends ChangeNotifier
     } catch (_) {}
   }
 
+  Future<void> setVideoViewport({
+    required String state,
+    int widthPx = 0,
+    int heightPx = 0,
+  }) async {
+    try {
+      await _audioPlayer.setVideoViewport(
+        state: state,
+        widthPx: widthPx,
+        heightPx: heightPx,
+      );
+    } catch (_) {}
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final isForeground = state == AppLifecycleState.resumed;
     unawaited(_audioPlayer.setLifecycle(isForeground));
+    if (!isForeground) {
+      unawaited(setVideoViewport(state: 'hidden'));
+    }
     if (isForeground) {
       notifyListeners();
     }
@@ -1782,6 +1900,7 @@ class PlayerState extends ChangeNotifier
     accentColorNotifier.dispose();
     videoTextureIdNotifier.dispose();
     videoSizeNotifier.dispose();
+    videoAspectNotifier.dispose();
     super.dispose();
   }
 }

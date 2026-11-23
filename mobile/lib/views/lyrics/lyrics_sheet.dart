@@ -943,6 +943,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
 
   // ----- scroll velocity effect -----
 
+  // ignore: unused_element
   void _kickFx(double delta) {
     final v = (_scrollFx.value * 0.55 + (delta / 38) * 0.45)
         .clamp(-1.0, 1.0)
@@ -1360,12 +1361,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
                 ).createShader(r),
                 child: NotificationListener<ScrollNotification>(
                   onNotification: (n) {
-                    if (n is ScrollUpdateNotification &&
-                        _manual &&
-                        n.scrollDelta != null) {
-                      _kickFx(n.scrollDelta!);
-                    }
-                    if (n is ScrollStartNotification && n.dragDetails != null) {
+                    if (n is ScrollStartNotification) {
                       _resume?.cancel();
                       if (!_manual) setState(() => _manual = true);
                     } else if (n is UserScrollNotification &&
@@ -1668,31 +1664,9 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  /// Elastic scroll effect: while the user drags / flings, tiles far from the
-  /// middle of the screen trail slightly behind the scroll direction and
-  /// shrink a touch. It relaxes back to rest with the velocity decay.
+  /// Lightweight pass-through: avoids expensive render-tree traversal during scroll.
   Widget _scrollFxWrap(Widget child, Alignment alignment) {
-    return AnimatedBuilder(
-      animation: widget.scrollFx,
-      child: child,
-      builder: (context, child) {
-        final v = widget.scrollFx.value;
-        if (v.abs() < 0.003) return child!;
-        final ro = context.findRenderObject();
-        if (ro is! RenderBox || !ro.attached || !ro.hasSize) return child!;
-        final screenH = MediaQuery.sizeOf(context).height;
-        final y = ro.localToGlobal(Offset(0, ro.size.height / 2)).dy;
-        final n = ((y - screenH * 0.45) / (screenH * 0.5))
-            .clamp(-1.0, 1.0)
-            .toDouble();
-        final dy = v * n * 14.0;
-        final sc = 1 - 0.022 * v.abs() * n.abs();
-        return Transform.translate(
-          offset: Offset(0, dy),
-          child: Transform.scale(scale: sc, alignment: alignment, child: child),
-        );
-      },
-    );
+    return child;
   }
 
   @override
@@ -1817,11 +1791,11 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
             alignment: alignment,
             child: child,
           );
-          if (dp.b > 0.18 && dp.o > 0.06) {
+          if (dp.b > 0.5 && dp.o > 0.1 && !widget.manual) {
             w = ImageFiltered(
               imageFilter: ImageFilter.blur(
-                sigmaX: dp.b,
-                sigmaY: dp.b,
+                sigmaX: math.min(dp.b, 2.0),
+                sigmaY: math.min(dp.b, 2.0),
                 tileMode: TileMode.decal,
               ),
               child: w,

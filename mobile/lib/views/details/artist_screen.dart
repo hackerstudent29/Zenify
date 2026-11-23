@@ -344,12 +344,14 @@ class _ArtistSheetEntry {
     required this.coverUrl,
     required this.onTap,
     this.circular = false,
+    this.isVideo = false,
   });
   final String title;
   final String subtitle;
   final String coverUrl;
   final VoidCallback onTap;
   final bool circular;
+  final bool isVideo;
 }
 
 class _SecHeader extends StatelessWidget {
@@ -634,6 +636,120 @@ class _Shelf extends StatelessWidget {
   }
 }
 
+class _VideoCard extends StatelessWidget {
+  const _VideoCard({required this.track, required this.onTap});
+  final Track track;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final shadow = [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.35),
+        blurRadius: 12,
+        offset: const Offset(0, 5),
+      ),
+    ];
+    return _Press(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                DecoratedBox(
+                  decoration: ShapeDecoration(
+                    shape: _sq(16.0),
+                    shadows: shadow,
+                  ),
+                  child: _Img(track.coverUrl, radius: 16.0),
+                ),
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.52),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Icon(
+                      CupertinoIcons.play_fill,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            MediaNormalizer.cleanCompactTitle(track.title),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14.5,
+              height: 1.3,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.15,
+            ),
+          ),
+          Text(
+            track.artist.isNotEmpty ? track.artist : 'Music Video',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              height: 1.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VideoShelf extends StatelessWidget {
+  const _VideoShelf({required this.count, required this.builder});
+  final int count;
+  final Widget Function(int) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = MediaQuery.sizeOf(context).width;
+    final ext = (w * 0.88).clamp(310.0, 440.0);
+    final cw = ext - 14;
+    final shelfH = (cw * 9 / 16) + 70;
+    return SizedBox(
+      height: shelfH,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        physics: _SnapPhysics(
+          parent: const BouncingScrollPhysics(),
+          itemExtent: ext,
+        ),
+        itemExtent: ext,
+        itemCount: count,
+        itemBuilder: (_, i) => Padding(
+          padding: const EdgeInsets.only(right: _kGap),
+          child: builder(i),
+        ),
+      ),
+    );
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Songs: row, paged "stack", and the See All sheet                    */
 /* ------------------------------------------------------------------ */
@@ -845,51 +961,55 @@ class _LatestRelease extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Press(
-        scale: 0.98,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-          child: Row(
-            children: [
-              SizedBox(width: 72, height: 72, child: _Img(release.cover, radius: 6.0)),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      release.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: -0.25,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                CupertinoIcons.chevron_right,
-                size: 14,
-                color: AppColors.textTertiary,
-              ),
-            ],
+    scale: 0.98,
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 72,
+            height: 72,
+            child: _Img(release.cover, radius: 6.0),
           ),
-        ),
-      );
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  release.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: -0.25,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            CupertinoIcons.chevron_right,
+            size: 14,
+            color: AppColors.textTertiary,
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -1018,8 +1138,32 @@ class _AboutCardState extends State<_AboutCard> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AspectRatio(
-                aspectRatio: 1.45,
-                child: _Img(widget.imageUrl, radius: 0),
+                aspectRatio: 1.55,
+                child: widget.imageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: widget.imageUrl,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        placeholder: (_, _) =>
+                            Container(color: AppColors.surface2),
+                        errorWidget: (_, _, _) => Container(
+                          color: AppColors.surface2,
+                          child: const Icon(
+                            CupertinoIcons.person_fill,
+                            color: AppColors.textTertiary,
+                            size: 36,
+                          ),
+                        ),
+                      )
+                    : Container(
+                        color: AppColors.surface2,
+                        child: const Icon(
+                          CupertinoIcons.person_fill,
+                          color: AppColors.textTertiary,
+                          size: 36,
+                        ),
+                      ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
@@ -1201,10 +1345,90 @@ class _ArtistScreenState extends State<ArtistScreen>
   bool _scrolling = false;
   bool _heroVisible = true;
   double _heroH = 460;
+  double _imageAspectRatio = 0.75;
+  String? _resolvedImageRatioUrl;
+
+  /// Resolves the full, uncropped HD artist hero picture by stripping any forced Google CDN
+  /// cropping parameters (-p, -c, -h\d+) so Google serves the full uncropped original photo.
+  static String resolveFullArtistHeroUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return '';
+    var u = url.trim();
+    if (u.contains('googleusercontent.com') || u.contains('ggpht.com')) {
+      final base = u.replaceAll(
+        RegExp(
+          r'=(?:w\d+-h\d+|s\d+|w\d+)(?:-[a-z0-9_-]+)*$',
+          caseSensitive: false,
+        ),
+        '',
+      );
+      return '$base=w1600-l90-rj';
+    }
+    return MediaNormalizer.upgradeBannerUrl(u);
+  }
+
+  void _resolveImageDimensions(String url) {
+    if (url.isEmpty || _resolvedImageRatioUrl == url) return;
+    _resolvedImageRatioUrl = url;
+
+    // 1. Check if dimensions are in the URL
+    final dimMatch = RegExp(
+      r'[=_-]w(\d+)-h(\d+)',
+      caseSensitive: false,
+    ).firstMatch(url);
+    if (dimMatch != null) {
+      final w = double.tryParse(dimMatch.group(1) ?? '') ?? 0;
+      final h = double.tryParse(dimMatch.group(2) ?? '') ?? 0;
+      if (w > 0 && h > 0) {
+        final ratio = w / h;
+        if ((_imageAspectRatio - ratio).abs() > 0.01) {
+          _imageAspectRatio = ratio;
+        }
+      }
+    }
+
+    // 2. Resolve image stream safely and schedule setState for the next frame
+    try {
+      final provider = CachedNetworkImageProvider(url);
+      final stream = provider.resolve(ImageConfiguration.empty);
+      late ImageStreamListener listener;
+      listener = ImageStreamListener(
+        (ImageInfo info, bool synchronousCall) {
+          final w = info.image.width;
+          final h = info.image.height;
+          if (w > 0 && h > 0) {
+            final ratio = w / h;
+            if ((_imageAspectRatio - ratio).abs() > 0.01) {
+              void update() {
+                if (mounted) {
+                  setState(() {
+                    _imageAspectRatio = ratio;
+                  });
+                }
+              }
+
+              if (synchronousCall) {
+                WidgetsBinding.instance.addPostFrameCallback((_) => update());
+              } else {
+                update();
+              }
+            }
+          }
+          stream.removeListener(listener);
+        },
+        onError: (_, _) {
+          stream.removeListener(listener);
+        },
+      );
+      stream.addListener(listener);
+    } catch (_) {}
+  }
 
   @override
   void initState() {
     super.initState();
+    if (widget.imageUrl != null && widget.imageUrl!.isNotEmpty) {
+      _resolveImageDimensions(resolveFullArtistHeroUrl(widget.imageUrl!));
+    }
     _load();
     LibraryStore.instance.ensureLoaded();
     LibraryStore.instance.addListener(_onLibrary);
@@ -1721,12 +1945,35 @@ class _ArtistScreenState extends State<ArtistScreen>
                       child: Row(
                         children: [
                           SizedBox(
-                            width: 48,
+                            width: e.isVideo ? 72 : 48,
                             height: 48,
-                            child: _Img(
-                              e.coverUrl,
-                              radius: e.circular ? 24 : 6,
-                              circular: e.circular,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                _Img(
+                                  e.coverUrl,
+                                  radius: e.circular ? 24 : 6,
+                                  circular: e.circular,
+                                ),
+                                if (e.isVideo)
+                                  Center(
+                                    child: Container(
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.55,
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        CupertinoIcons.play_fill,
+                                        size: 11,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 14),
@@ -1894,8 +2141,11 @@ class _ArtistScreenState extends State<ArtistScreen>
   Widget build(BuildContext context) {
     final player = context.watch<PlayerState>();
     final width = MediaQuery.sizeOf(context).width;
-    // Expansive, grand hero height with generous portrait photography breathing room
-    final heroH = math.min(width * 1.25, 480.0);
+    final screenH = MediaQuery.sizeOf(context).height;
+    // Calculate natural height for hero image so 100% of the image is shown without cutting top, bottom or sides
+    final naturalH = width / _imageAspectRatio;
+    final heroImgH = naturalH.clamp(280.0, screenH * 0.78);
+    final heroH = heroImgH;
     _heroH = heroH;
 
     final reduce = MediaQuery.disableAnimationsOf(context);
@@ -1931,9 +2181,6 @@ class _ArtistScreenState extends State<ArtistScreen>
     final allSongs = own.isEmpty ? _tracks : own;
     final songs = allSongs.take(_kSheetSongs).toList(); // sheet + queue
     final stackSongs = songs.take(_kStackSongs).toList(); // first section
-    final others = _tracks
-        .where((t) => !t.artist.toLowerCase().contains(lower))
-        .toList();
 
     final map = <String, _Release>{};
     for (final t in allSongs) {
@@ -1952,9 +2199,9 @@ class _ArtistScreenState extends State<ArtistScreen>
           .tracks
           .add(t);
     }
-    final releases = map.values.toList();
     final albums = _artistProfile != null && _artistProfile!.albums.isNotEmpty
         ? _artistProfile!.albums
+              .where((a) => a.type.toLowerCase() == 'album')
               .map(
                 (a) => _Release(
                   a.title,
@@ -1965,9 +2212,10 @@ class _ArtistScreenState extends State<ArtistScreen>
                 ),
               )
               .toList()
-        : releases.where((r) => r.tracks.length >= 3).toList();
+        : const <_Release>[];
     final singles = _artistProfile != null && _artistProfile!.singles.isNotEmpty
         ? _artistProfile!.singles
+              .where((s) => s.type.toLowerCase() != 'album')
               .map(
                 (s) => _Release(
                   s.title,
@@ -1978,7 +2226,11 @@ class _ArtistScreenState extends State<ArtistScreen>
                 ),
               )
               .toList()
-        : releases.where((r) => r.tracks.length < 3).toList();
+        : const <_Release>[];
+    final musicVideos = _artistProfile?.musicVideos ?? const <Track>[];
+    final videoTracks = musicVideos
+        .map((v) => v.copyWith(isVideo: true))
+        .toList();
     final featuredPlaylists = _artistProfile?.featuredPlaylists ?? const [];
 
     _Release? latest;
@@ -1992,31 +2244,12 @@ class _ArtistScreenState extends State<ArtistScreen>
         );
     if (dated.isNotEmpty) {
       latest = dated.first;
-    } else if (releases.isNotEmpty) {
-      latest = releases.first;
     }
 
-    final relMap = <String, Track>{};
-    for (final t in others) {
-      relMap.putIfAbsent(t.artist, () => t);
-    }
     final related =
         _artistProfile != null && _artistProfile!.relatedArtists.isNotEmpty
         ? _artistProfile!.relatedArtists
-              .map(
-                (r) => MapEntry(
-                  r.name,
-                  Track(
-                    id: r.browseId ?? '',
-                    title: '',
-                    artist: r.name,
-                    album: '',
-                    coverUrl: r.imageUrl,
-                  ),
-                ),
-              )
-              .toList()
-        : relMap.entries.toList();
+        : const <RelatedArtistItem>[];
 
     final rawImg =
         _resolvedImage ??
@@ -2031,19 +2264,20 @@ class _ArtistScreenState extends State<ArtistScreen>
         widget.imageUrl ??
         (img.isNotEmpty ? img : '');
     final bannerImg = rawBanner.isNotEmpty
-        ? MediaNormalizer.upgradeBannerUrl(rawBanner)
+        ? resolveFullArtistHeroUrl(rawBanner)
         : '';
 
     if (_coverKey != bannerImg && bannerImg.isNotEmpty) {
       _coverKey = bannerImg;
+      _resolveImageDimensions(bannerImg);
       _extractTint(bannerImg);
       _detectAnimated(bannerImg);
     }
 
     final bio = _parseBio((_resolvedBio ?? widget.bio ?? '').trim(), name);
     final audience = _audienceLine;
-    // Keep generous, beautiful space for the artist image so face and portrait breathe freely
-    final heroSpace = math.max(heroH - 145.0, 310.0);
+    // Keep seamless zero-gap spacing: content begins directly at the bottom edge of the image
+    final heroSpace = heroImgH;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -2057,7 +2291,7 @@ class _ArtistScreenState extends State<ArtistScreen>
           return Stack(
             children: [
               _backdrop(base, heroH),
-              _heroArt(base, heroH, bannerImg, img),
+              _heroArt(base, heroH, heroImgH, bannerImg, img),
               NotificationListener<ScrollNotification>(
                 onNotification: _onScrollNote,
                 child: CustomScrollView(
@@ -2264,11 +2498,9 @@ class _ArtistScreenState extends State<ArtistScreen>
 
                               if (singles.isNotEmpty) ...[
                                 _SecHeader(
-                                  albums.isEmpty ? 'Releases' : 'Singles & EPs',
+                                  'Singles & EPs',
                                   onSeeAll: () => _showAllSection(
-                                    title: albums.isEmpty
-                                        ? 'Releases'
-                                        : 'Singles & EPs',
+                                    title: 'Singles & EPs',
                                     subtitle:
                                         '$name · ${singles.length} ${singles.length == 1 ? 'release' : 'releases'}',
                                     entries: [
@@ -2302,6 +2534,50 @@ class _ArtistScreenState extends State<ArtistScreen>
                                               ? 'Single'
                                               : 'EP'),
                                     onTap: () => _openAlbum(singles[i]),
+                                  ),
+                                ),
+                              ],
+
+                              if (musicVideos.isNotEmpty) ...[
+                                _SecHeader(
+                                  'Music Videos',
+                                  onSeeAll: musicVideos.length > 2
+                                      ? () => _showAllSection(
+                                          title: 'Music Videos',
+                                          subtitle:
+                                              '$name · ${musicVideos.length} ${musicVideos.length == 1 ? 'video' : 'videos'}',
+                                          entries: [
+                                            for (
+                                              var idx = 0;
+                                              idx < musicVideos.length;
+                                              idx++
+                                            )
+                                              _ArtistSheetEntry(
+                                                title:
+                                                    MediaNormalizer.cleanCompactTitle(
+                                                      musicVideos[idx].title,
+                                                    ),
+                                                subtitle:
+                                                    musicVideos[idx]
+                                                        .artist
+                                                        .isNotEmpty
+                                                    ? musicVideos[idx].artist
+                                                    : 'Music Video',
+                                                coverUrl:
+                                                    musicVideos[idx].coverUrl,
+                                                isVideo: true,
+                                                onTap: () =>
+                                                    _play(videoTracks, idx),
+                                              ),
+                                          ],
+                                        )
+                                      : null,
+                                ),
+                                _VideoShelf(
+                                  count: musicVideos.length,
+                                  builder: (i) => _VideoCard(
+                                    track: musicVideos[i],
+                                    onTap: () => _play(videoTracks, i),
                                   ),
                                 ),
                               ],
@@ -2368,21 +2644,22 @@ class _ArtistScreenState extends State<ArtistScreen>
                                     entries: [
                                       for (final r in related)
                                         _ArtistSheetEntry(
-                                          title: r.key,
+                                          title: r.name,
                                           subtitle: 'Artist',
-                                          coverUrl: r.value.coverUrl,
+                                          coverUrl: r.imageUrl,
                                           circular: true,
                                           onTap: () => Navigator.push(
                                             context,
                                             ZenPageRoute(
                                               builder: (_) => ArtistScreen(
-                                                artistName: r.key,
-                                                browseId: r.value.id.isNotEmpty
-                                                    ? r.value.id
+                                                artistName: r.name,
+                                                browseId:
+                                                    (r.browseId != null &&
+                                                        r.browseId!.isNotEmpty)
+                                                    ? r.browseId
                                                     : null,
-                                                imageUrl:
-                                                    r.value.coverUrl.isNotEmpty
-                                                    ? r.value.coverUrl
+                                                imageUrl: r.imageUrl.isNotEmpty
+                                                    ? r.imageUrl
                                                     : null,
                                               ),
                                             ),
@@ -2394,25 +2671,25 @@ class _ArtistScreenState extends State<ArtistScreen>
                                 _Shelf(
                                   count: related.length,
                                   builder: (i) => _Cover(
-                                    url: related[i].value.coverUrl,
-                                    title: related[i].key,
+                                    url: related[i].imageUrl,
+                                    title: related[i].name,
                                     subtitle: 'Artist',
                                     circular: true,
                                     onTap: () => Navigator.push(
                                       context,
                                       ZenPageRoute(
                                         builder: (_) => ArtistScreen(
-                                          artistName: related[i].key,
+                                          artistName: related[i].name,
                                           browseId:
-                                              related[i].value.id.isNotEmpty
-                                              ? related[i].value.id
+                                              (related[i].browseId != null &&
+                                                  related[i]
+                                                      .browseId!
+                                                      .isNotEmpty)
+                                              ? related[i].browseId
                                               : null,
                                           imageUrl:
-                                              related[i]
-                                                  .value
-                                                  .coverUrl
-                                                  .isNotEmpty
-                                              ? related[i].value.coverUrl
+                                              related[i].imageUrl.isNotEmpty
+                                              ? related[i].imageUrl
                                               : null,
                                         ),
                                       ),
@@ -2421,13 +2698,18 @@ class _ArtistScreenState extends State<ArtistScreen>
                                 ),
                               ],
 
-                              const _SecHeader('About'),
-                              _AboutCard(
-                                imageUrl: bannerImg,
-                                statValue: _statValue,
-                                statLabel: _statLabel,
-                                bio: bio,
-                              ),
+                              if (bio.text.isNotEmpty ||
+                                  _statValue.isNotEmpty) ...[
+                                const _SecHeader('About'),
+                                _AboutCard(
+                                  imageUrl: bannerImg.isNotEmpty
+                                      ? bannerImg
+                                      : (img.isNotEmpty ? img : ''),
+                                  statValue: _statValue,
+                                  statLabel: _statLabel,
+                                  bio: bio,
+                                ),
+                              ],
                             ],
                             const SizedBox(height: 140),
                           ],
@@ -2503,26 +2785,38 @@ class _ArtistScreenState extends State<ArtistScreen>
   }
 
   /// Full-bleed image: slow drift + tilt parallax, liquid edge into the tint.
-  Widget _fullArt(Color base, double heroH, String banner, String avatar) {
+  Widget _fullArt(
+    Color base,
+    double heroH,
+    double heroImgH,
+    String banner,
+    String avatar,
+  ) {
     final media = RepaintBoundary(
-      child: CachedNetworkImage(
-        imageUrl: banner,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
+      child: Transform.scale(
+        scaleX: 1.0, // strictly 1.0: zero horizontal zoom or side-crop
+        scaleY: 1.0, // strictly 1.0: zero top/bottom cut
         alignment: Alignment.center,
-        fadeInDuration: const Duration(milliseconds: 350),
-        placeholder: (c, u) => const ColoredBox(color: Colors.black),
-        errorWidget: (c, u, e) => banner != avatar && avatar.isNotEmpty
-            ? CachedNetworkImage(
-                imageUrl: avatar,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                alignment: Alignment.center,
-                errorWidget: (_, _, _) => const ColoredBox(color: Colors.black),
-              )
-            : const ColoredBox(color: Colors.black),
+        child: CachedNetworkImage(
+          imageUrl: banner,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: heroImgH,
+          alignment: Alignment.topCenter,
+          fadeInDuration: const Duration(milliseconds: 250),
+          placeholder: (c, u) => const ColoredBox(color: Colors.black),
+          errorWidget: (c, u, e) => banner != avatar && avatar.isNotEmpty
+              ? CachedNetworkImage(
+                  imageUrl: avatar,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: heroImgH,
+                  alignment: Alignment.topCenter,
+                  errorWidget: (_, _, _) =>
+                      const ColoredBox(color: Colors.black),
+                )
+              : const ColoredBox(color: Colors.black),
+        ),
       ),
     );
 
@@ -2532,76 +2826,67 @@ class _ArtistScreenState extends State<ArtistScreen>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          AnimatedBuilder(
-            animation: Listenable.merge([_live, _tilt]),
-            child: media,
-            builder: (_, child) {
-              final a = _live.value * math.pi;
-              final t = _tilt.value;
-              final d = !_animatedCover;
-              final dx = (d ? math.cos(a) * 4 : 0.0) - t.dx * 6;
-              final dy = (d ? math.cos(2 * a) * 3 : 0.0) + t.dy * 4;
-              return Transform.translate(offset: Offset(dx, dy), child: child);
-            },
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: heroImgH,
+            child: AnimatedBuilder(
+              animation: Listenable.merge([_live, _tilt]),
+              child: media,
+              builder: (_, child) {
+                final a = _live.value * math.pi;
+                final t = _tilt.value;
+                final d = !_animatedCover;
+                final dx = (d ? math.cos(a) * 4 : 0.0) - t.dx * 6;
+                final dy = (d ? math.cos(2 * a) * 2 : 0.0) + t.dy * 3;
+                return Transform.translate(
+                  offset: Offset(dx, dy),
+                  child: child,
+                );
+              },
+            ),
           ),
           // status-bar scrim
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.35),
-                  Colors.transparent,
-                ],
-                stops: const [0.0, 0.2],
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 80,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.35),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 1.0],
+                ),
               ),
             ),
           ),
-          // liquid edge
-          AnimatedBuilder(
-            animation: Listenable.merge([_live, _glow]),
-            builder: (context, child) {
-              final a = _live.value * math.pi;
-              final c = math.cos(a), c2 = math.cos(2 * a);
-              final b = _breathe(base);
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        center: Alignment(0.8 * c, 0.95 + 0.06 * c2),
-                        radius: 0.8,
-                        colors: [
-                          b.withValues(alpha: 0.55),
-                          b.withValues(alpha: 0),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Lengthy, smooth bleeding fading out directly into default black
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.transparent,
-                          b.withValues(alpha: 0.35),
-                          Colors.black.withValues(alpha: 0.75),
-                          Colors.black.withValues(alpha: 0.95),
-                          Colors.black,
-                          Colors.black,
-                        ],
-                        stops: const [0.0, 0.22, 0.44, 0.65, 0.82, 0.92, 1.0],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
+          // Subtle soft feather at the bottom of the image into page background
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 16.0,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.45),
+                    Colors.black,
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -2610,7 +2895,13 @@ class _ArtistScreenState extends State<ArtistScreen>
 
   /// Scrolling gradually blurs the image, pushes it back (parallax + soft
   /// zoom) and dissolves it into the backdrop. Pulling down stretches it.
-  Widget _heroArt(Color base, double heroH, String banner, String avatar) {
+  Widget _heroArt(
+    Color base,
+    double heroH,
+    double heroImgH,
+    String banner,
+    String avatar,
+  ) {
     return Positioned(
       top: 0,
       left: 0,
@@ -2622,15 +2913,15 @@ class _ArtistScreenState extends State<ArtistScreen>
           child: AnimatedBuilder(
             animation: _sc,
             child: RepaintBoundary(
-              child: _fullArt(base, heroH, banner, avatar),
+              child: _fullArt(base, heroH, heroImgH, banner, avatar),
             ),
             builder: (_, child) {
               final o = _offset;
-              final p = (o / (heroH * 0.7)).clamp(0.0, 1.0).toDouble();
+              final p = (o / (heroImgH * 0.7)).clamp(0.0, 1.0).toDouble();
               final e = Curves.easeInOut.transform(p);
               final sigma = e * 28;
               final over = o < 0 ? -o : 0.0;
-              final scale = 1.0 + (over > 0 ? over / (heroH * 1.5) : 0.0);
+              final scale = 1.0 + (over > 0 ? over / (heroImgH * 1.5) : 0.0);
 
               Widget w = child!;
               if (sigma > 0.4) {
@@ -2654,7 +2945,7 @@ class _ArtistScreenState extends State<ArtistScreen>
               );
 
               // Smoothly cover with solid black only when scrolling past the hero into content, so image stays 100% crisp at rest
-              final blackCover = ((o - (heroH * 0.35)) / (heroH * 0.45))
+              final blackCover = ((o - (heroImgH * 0.4)) / (heroImgH * 0.5))
                   .clamp(0.0, 1.0)
                   .toDouble();
               if (blackCover > 0.0) {

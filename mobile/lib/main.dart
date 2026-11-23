@@ -17,6 +17,7 @@ import 'services/country_service.dart';
 import 'services/user_preferences_service.dart';
 import 'services/listening_history_service.dart';
 import 'services/listening_tracker_service.dart';
+import 'services/artist_service.dart';
 import 'services/room_deep_links.dart';
 import 'services/settings_service.dart';
 import 'services/cache_migration.dart';
@@ -41,6 +42,7 @@ void main() async {
   await ListeningHistoryService.instance.init();
   await SettingsState.instance.initialize();
   await ListeningTrackerService.instance.initialize();
+  await ArtistService.instance.init();
   final authState = AuthState();
   await authState.ensureLoaded();
   CatalogDataSource.initialize(); // non-blocking background initialization

@@ -125,10 +125,16 @@ class SpringPress extends StatefulWidget {
 
 class _SpringPressState extends State<SpringPress>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController.unbounded(
-    vsync: this,
-    value: 1,
-  );
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController.unbounded(
+      vsync: this,
+      value: 1,
+    );
+  }
 
   void _to(double v) =>
       _c.animateWith(SpringSimulation(_kPressSpring, _c.value, v, 0));
@@ -267,8 +273,8 @@ class _Img extends StatelessWidget {
         }
         return Container(
           color: AppColors.surface2,
-          child: const Icon(
-            Icons.music_note_rounded,
+          child: Icon(
+            circular ? CupertinoIcons.person_fill : Icons.music_note_rounded,
             color: AppColors.textTertiary,
           ),
         );
@@ -277,6 +283,77 @@ class _Img extends StatelessWidget {
     if (circular) return ClipOval(child: img);
     if (radius <= 0) return img;
     return ClipRRect(borderRadius: BorderRadius.circular(radius), child: img);
+  }
+}
+
+/// Dynamic artist avatar that checks cache and asynchronously resolves authentic InnerTube image
+class _ArtistAvatarDynamic extends StatefulWidget {
+  const _ArtistAvatarDynamic({
+    required this.artistName,
+    this.initialUrl = '',
+    this.size = 56,
+  });
+  final String artistName;
+  final String initialUrl;
+  final double size;
+
+  @override
+  State<_ArtistAvatarDynamic> createState() => _ArtistAvatarDynamicState();
+}
+
+class _ArtistAvatarDynamicState extends State<_ArtistAvatarDynamic> {
+  String _url = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ArtistAvatarDynamic old) {
+    super.didUpdateWidget(old);
+    if (old.artistName != widget.artistName ||
+        old.initialUrl != widget.initialUrl) {
+      _resolve();
+    }
+  }
+
+  void _resolve() {
+    if (widget.initialUrl.isNotEmpty) {
+      _url = widget.initialUrl;
+      return;
+    }
+    final cached = ArtistService.getCachedAvatar(widget.artistName);
+    if (cached != null && cached.isNotEmpty) {
+      _url = cached;
+      return;
+    }
+    ArtistService.resolveArtistAvatar(widget.artistName).then((resolved) {
+      if (mounted && resolved.isNotEmpty) {
+        setState(() => _url = resolved);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_url.isNotEmpty) {
+      return _Img(_url, circular: true, cacheWidth: 280);
+    }
+    return Container(
+      width: widget.size,
+      height: widget.size,
+      decoration: const BoxDecoration(
+        color: AppColors.surface2,
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(
+        CupertinoIcons.person_fill,
+        color: AppColors.textTertiary,
+        size: 22,
+      ),
+    );
   }
 }
 
@@ -828,10 +905,7 @@ class _CoverCard extends StatelessWidget {
                               shape: BoxShape.circle,
                             ),
                             child: Center(
-                              child: _EqBars(
-                                playing: playing,
-                                size: 30.0,
-                              ),
+                              child: _EqBars(playing: playing, size: 30.0),
                             ),
                           ),
                         ),
@@ -2729,12 +2803,19 @@ class _SheetRow extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      _Img(
-                        entry.cover,
-                        radius: 5,
-                        circular: entry.circular,
-                        cacheWidth: 220,
-                      ),
+                      if (entry.circular)
+                        _ArtistAvatarDynamic(
+                          artistName: entry.title,
+                          initialUrl: entry.cover,
+                          size: 56,
+                        )
+                      else
+                        _Img(
+                          entry.cover,
+                          radius: 5,
+                          circular: entry.circular,
+                          cacheWidth: 220,
+                        ),
                       if (current)
                         Container(
                           decoration: BoxDecoration(
@@ -3097,31 +3178,38 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // 1. User favorite artists (already have high-res photo)
             for (final fa in prefs.favoriteArtists) {
-              final lower = fa.name.trim().toLowerCase();
-              if (lower.isNotEmpty && seenArtists.add(lower)) {
-                personalizedArtists.add((
-                  name: fa.name,
-                  subs: 'Favorite Artist',
-                  image: fa.image,
-                ));
+              final split = MediaNormalizer.splitArtistNames(fa.name);
+              for (final name in split) {
+                final lower = name.trim().toLowerCase();
+                if (lower.isNotEmpty && seenArtists.add(lower)) {
+                  personalizedArtists.add((
+                    name: name,
+                    subs: 'Favorite Artist',
+                    image: resolveArtistImg(name).isNotEmpty
+                        ? resolveArtistImg(name)
+                        : fa.image,
+                  ));
+                }
               }
             }
 
             // 2. From user's actual listening history (proven affinity)
             final topHistory = ListeningHistoryService.instance.getTopArtists(
-              limit: 6,
+              limit: 10,
             );
             for (final h in topHistory) {
-              final name = h.name.trim();
-              final lower = name.toLowerCase();
-              if (name.isNotEmpty &&
-                  lower != 'unknown artist' &&
-                  seenArtists.add(lower)) {
-                personalizedArtists.add((
-                  name: name,
-                  subs: '${h.plays} plays • Top Artist',
-                  image: resolveArtistImg(name),
-                ));
+              final split = MediaNormalizer.splitArtistNames(h.name);
+              for (final name in split) {
+                final lower = name.trim().toLowerCase();
+                if (name.isNotEmpty &&
+                    lower != 'unknown artist' &&
+                    seenArtists.add(lower)) {
+                  personalizedArtists.add((
+                    name: name,
+                    subs: '${h.plays} plays • Top Artist',
+                    image: resolveArtistImg(name),
+                  ));
+                }
               }
             }
 
@@ -3130,14 +3218,17 @@ class _HomeScreenState extends State<HomeScreen> {
               final curated = UserPreferencesService.curatedArtistsForLanguages(
                 userLangs,
               );
-              for (final name in curated.take(5)) {
-                final lower = name.trim().toLowerCase();
-                if (lower.isNotEmpty && seenArtists.add(lower)) {
-                  personalizedArtists.add((
-                    name: name,
-                    subs: 'Top Artist • ${userLangs.first}',
-                    image: resolveArtistImg(name),
-                  ));
+              for (final raw in curated.take(5)) {
+                final split = MediaNormalizer.splitArtistNames(raw);
+                for (final name in split) {
+                  final lower = name.trim().toLowerCase();
+                  if (lower.isNotEmpty && seenArtists.add(lower)) {
+                    personalizedArtists.add((
+                      name: name,
+                      subs: 'Top Artist • ${userLangs.first}',
+                      image: resolveArtistImg(name),
+                    ));
+                  }
                 }
               }
             }
@@ -3145,24 +3236,46 @@ class _HomeScreenState extends State<HomeScreen> {
             // 4. Regional chart artists (only as controlled discovery fill-in)
             if (personalizedArtists.length < 8) {
               for (final a in chartData.artists) {
-                final lower = a.name.trim().toLowerCase();
-                if (lower.isNotEmpty && seenArtists.add(lower)) {
-                  personalizedArtists.add((
-                    name: a.name,
-                    subs: a.subs.isNotEmpty
-                        ? a.subs
-                        : 'Top Artist • ${country.name}',
-                    image: a.image,
-                  ));
+                final split = MediaNormalizer.splitArtistNames(a.name);
+                for (final name in split) {
+                  final lower = name.trim().toLowerCase();
+                  if (lower.isNotEmpty && seenArtists.add(lower)) {
+                    personalizedArtists.add((
+                      name: name,
+                      subs: a.subs.isNotEmpty
+                          ? a.subs
+                          : 'Top Artist • ${country.name}',
+                      image: a.image.isNotEmpty
+                          ? a.image
+                          : resolveArtistImg(name),
+                    ));
+                  }
+                  if (personalizedArtists.length >= 10) break;
                 }
                 if (personalizedArtists.length >= 10) break;
               }
             }
 
-            // Pre-resolve missing authentic artist avatars in background
+            // Pre-resolve missing authentic artist avatars in background and update UI as they arrive
             for (final a in personalizedArtists) {
               if (a.image.isEmpty) {
-                ArtistService.resolveArtistAvatar(a.name);
+                ArtistService.resolveArtistAvatar(a.name).then((url) {
+                  if (mounted && url.isNotEmpty) {
+                    setState(() {
+                      final idx = _chartArtists.indexWhere(
+                        (x) => x.name.toLowerCase() == a.name.toLowerCase(),
+                      );
+                      if (idx != -1) {
+                        final old = _chartArtists[idx];
+                        _chartArtists[idx] = (
+                          name: old.name,
+                          subs: old.subs,
+                          image: url,
+                        );
+                      }
+                    });
+                  }
+                });
               }
             }
 
@@ -3905,13 +4018,17 @@ class _HomeScreenState extends State<HomeScreen> {
                                     _ListEntry(
                                       title: a.name,
                                       subtitle: 'Artist',
-                                      cover: a.image,
+                                      cover: a.image.isNotEmpty
+                                          ? a.image
+                                          : (ArtistService.getCachedAvatar(a.name) ?? ''),
                                       circular: true,
                                       closeOnTap: true,
                                       onTap: () => _open(
                                         ArtistScreen(
                                           artistName: a.name,
-                                          imageUrl: a.image,
+                                          imageUrl: a.image.isNotEmpty
+                                              ? a.image
+                                              : ArtistService.getCachedAvatar(a.name),
                                         ),
                                       ),
                                     ),

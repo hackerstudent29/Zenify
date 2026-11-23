@@ -179,6 +179,30 @@ class AtlasSong {
   final int durationSeconds;
 }
 
+/// Charts data for a country (tracks and chart artists).
+class AtlasCountryCharts {
+  const AtlasCountryCharts({
+    required this.tracks,
+    required this.artists,
+  });
+
+  final List<AtlasSong> tracks;
+  final List<AtlasChartArtist> artists;
+}
+
+/// Playlist data for a city.
+class AtlasCityPlaylist {
+  const AtlasCityPlaylist({
+    required this.tracks,
+    required this.playlistTitle,
+    this.isVerified = false,
+  });
+
+  final List<AtlasSong> tracks;
+  final String playlistTitle;
+  final bool isVerified;
+}
+
 class AtlasChartArtist {
   const AtlasChartArtist({
     required this.name,
