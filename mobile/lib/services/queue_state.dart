@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/playback_context.dart';
 import '../models/track.dart';
+import 'download_service.dart';
 import 'smart_queue_engine.dart';
 
 typedef AutoplayProvider = Future<List<Track>> Function(
@@ -74,6 +75,8 @@ class QueueState extends ChangeNotifier {
   bool _autoplay = true;
   bool _autoplayLoading = false;
   bool _collectionLocked = false;
+  final Set<String> _sessionAutoplayIds = <String>{};
+  final Set<String> _sessionAutoplaySignatures = <String>{};
 
   // selection (edit) mode
   bool _selecting = false;
@@ -166,7 +169,12 @@ class QueueState extends ChangeNotifier {
     }
 
     if (_shuffle) {
-      final pool = _buildPoolForContext(context.tracks, excludeCurrent: true);
+      // Exclude current track AND already played tracks in _history!
+      final playedKeys = _history.map((e) => keyOf(e.track)).toSet();
+      final sourceTracks = context.tracks
+          .where((t) => !playedKeys.contains(keyOf(t)))
+          .toList();
+      final pool = _buildPoolForContext(sourceTracks, excludeCurrent: true);
       _shufflePool(pool);
       _upNext
         ..clear()
@@ -176,6 +184,9 @@ class QueueState extends ChangeNotifier {
         ..clear()
         ..addAll(upcoming);
     }
+
+    _sessionAutoplayIds.clear();
+    _sessionAutoplaySignatures.clear();
 
     _undoSnapshot = null;
     _selecting = false;
@@ -353,7 +364,14 @@ class QueueState extends ChangeNotifier {
       final manualPins = _upNext.where((e) => e.isManualPin).toList();
       _originalUpNext = List.of(_upNext);
 
-      final sourceTracks = _context?.tracks ?? _upNext.map((e) => e.track).toList();
+      // Only pool unplayed tracks (NEVER pull from _history!)
+      final playedKeys = _history.map((e) => keyOf(e.track)).toSet();
+      final sourceTracks = _context != null
+          ? _context!.tracks
+              .where((t) => !playedKeys.contains(keyOf(t)))
+              .toList()
+          : _upNext.map((e) => e.track).toList();
+
       final pool = _buildPoolForContext(sourceTracks, excludeCurrent: true);
       _shufflePool(pool);
 
@@ -578,13 +596,51 @@ class QueueState extends ChangeNotifier {
   // ─────────────────────────────── Editing ──────────────────────────────
 
   void reorder(int oldIndex, int newIndex) {
-    final end = _manualEnd;
+    final end = _upNext.length;
     if (oldIndex < 0 || oldIndex >= end) return;
     if (newIndex > oldIndex) newIndex -= 1;
     newIndex = newIndex.clamp(0, end - 1);
     if (oldIndex == newIndex) return;
     final e = _upNext.removeAt(oldIndex);
-    _upNext.insert(newIndex, e.copyWith(isManualPin: true));
+    _upNext.insert(newIndex, e);
+    notifyListeners();
+  }
+
+  void reorderInSection(
+    QueueEntry entry,
+    int oldSecIndex,
+    int newSecIndex,
+    List<QueueEntry> section,
+  ) {
+    if (oldSecIndex < 0 || oldSecIndex >= section.length) return;
+    final oldGlobal = indexOf(entry);
+    if (oldGlobal < 0) return;
+
+    final secCopy = List<QueueEntry>.from(section);
+    final item = secCopy.removeAt(oldSecIndex);
+    var targetSec = newSecIndex;
+    if (targetSec > oldSecIndex) targetSec -= 1;
+    targetSec = targetSec.clamp(0, secCopy.length);
+    secCopy.insert(targetSec, item);
+
+    // Remove from _upNext
+    _upNext.removeAt(oldGlobal);
+
+    // Find insertion index in _upNext based on neighbors in secCopy
+    int insertGlobal;
+    if (secCopy.length == 1) {
+      insertGlobal = oldGlobal.clamp(0, _upNext.length);
+    } else if (targetSec == 0) {
+      final nextNeighbor = secCopy[1];
+      final idx = indexOf(nextNeighbor);
+      insertGlobal = idx >= 0 ? idx : 0;
+    } else {
+      final prevNeighbor = secCopy[targetSec - 1];
+      final idx = indexOf(prevNeighbor);
+      insertGlobal = idx >= 0 ? idx + 1 : _upNext.length;
+    }
+
+    _upNext.insert(insertGlobal.clamp(0, _upNext.length), item);
     notifyListeners();
   }
 
@@ -685,21 +741,40 @@ class QueueState extends ChangeNotifier {
 
   // ─────────────────────────────── Autoplay ─────────────────────────────
 
-  void toggleAutoplay() {
+  void toggleAutoplay({bool refreshIfOn = false}) {
+    if (_autoplay && refreshIfOn) {
+      // User tapped infinite pill again while enabled: fetch a fresh, DIFFERENT set with same vibe & language
+      _upNext.removeWhere((e) => e.isAutoplay);
+      _collectionLocked = false;
+      ensureAutoplay(force: true);
+      notifyListeners();
+      return;
+    }
     _autoplay = !_autoplay;
-    if (!_autoplay) {
+    if (_autoplay) {
+      _collectionLocked = false;
+      _upNext.removeWhere((e) => e.isAutoplay);
+      ensureAutoplay(force: true);
+    } else {
       _upNext.removeWhere((e) => e.isAutoplay);
     }
     notifyListeners();
-    if (_autoplay) ensureAutoplay();
   }
 
-  Future<void> ensureAutoplay() async {
+  Future<void> ensureAutoplay({bool force = false}) async {
     final provider = autoplayProvider;
     final seed = _current;
-    if (!_autoplay || _collectionLocked || provider == null || seed == null || _autoplayLoading) return;
+    if (!_autoplay || provider == null || seed == null || _autoplayLoading) return;
+
+    // Do NOT trigger online autoplay when listening to offline/downloaded songs
+    final isOffline = DownloadService.instance.isDownloaded(seed.id) ||
+        DownloadService.instance.getLocalAudioPath(seed.id) != null ||
+        _context?.type == PlaybackContextType.library;
+    if (isOffline) return;
+
+    if (!force && _collectionLocked && _upNext.where((e) => !e.isAutoplay).length > 2) return;
     final autoCount = _upNext.where((e) => e.isAutoplay).length;
-    if (_upNext.length >= _autoplayBatch || autoCount >= 6) return;
+    if (!force && (_upNext.length >= _autoplayBatch || autoCount >= 6)) return;
 
     _autoplayLoading = true;
     notifyListeners();
@@ -707,6 +782,7 @@ class QueueState extends ChangeNotifier {
       final excludeIds = <String>{
         keyOf(seed),
         seed.id.replaceFirst('yt-', '').trim(),
+        ..._sessionAutoplayIds,
         ..._upNext.expand((e) => [
           keyOf(e.track),
           e.track.id.replaceFirst('yt-', '').trim(),
@@ -719,6 +795,7 @@ class QueueState extends ChangeNotifier {
 
       final excludeSignatures = <String>{
         SmartQueueEngine.normalizeSignature(seed.title, seed.artist),
+        ..._sessionAutoplaySignatures,
         ..._upNext.map((e) => SmartQueueEngine.normalizeSignature(e.title, e.artist)),
         ..._history.reversed.take(SmartQueueWeights.duplicateHistoryWindow).map(
           (e) => SmartQueueEngine.normalizeSignature(e.title, e.artist),
@@ -726,7 +803,7 @@ class QueueState extends ChangeNotifier {
       }..remove('');
 
       final results = await provider(seed, excludeIds, excludeSignatures);
-      if (!_autoplay || _collectionLocked) return;
+      if (!_autoplay) return;
 
       final fresh = <Track>[];
       for (final t in results) {
@@ -745,6 +822,12 @@ class QueueState extends ChangeNotifier {
       }
 
       if (fresh.isNotEmpty) {
+        for (final t in fresh) {
+          _sessionAutoplayIds.add(t.id);
+          _sessionAutoplayIds.add(t.id.replaceFirst('yt-', '').trim());
+          final sig = SmartQueueEngine.normalizeSignature(t.title, t.artist);
+          if (sig.isNotEmpty) _sessionAutoplaySignatures.add(sig);
+        }
         _upNext.addAll(fresh.map((t) => _wrap(t, auto: true)));
       }
     } catch (e) {

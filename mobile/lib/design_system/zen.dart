@@ -210,28 +210,36 @@ class GlassPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSquare = borderRadius == BorderRadius.zero;
+    final decoratedBox = DecoratedBox(
+      decoration: BoxDecoration(
+        color: tint ?? const Color(0x99161619),
+        gradient: highlight
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.09),
+                  Colors.white.withValues(alpha: 0.02),
+                ],
+              )
+            : null,
+        borderRadius: isSquare ? null : borderRadius,
+        border: border ?? Border.all(color: Zen.hairline, width: 0.5),
+      ),
+      child: child,
+    );
+
+    if (blur <= 0) {
+      return isSquare
+          ? decoratedBox
+          : ClipRRect(borderRadius: borderRadius, child: decoratedBox);
+    }
+
     return ClipRRect(
       borderRadius: borderRadius,
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: tint ?? const Color(0x99161619),
-            gradient: highlight
-                ? LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white.withValues(alpha: 0.09),
-                      Colors.white.withValues(alpha: 0.02),
-                    ],
-                  )
-                : null,
-            borderRadius: isSquare ? null : borderRadius,
-            border: border ?? Border.all(color: Zen.hairline, width: 0.5),
-          ),
-          child: child,
-        ),
+        child: decoratedBox,
       ),
     );
   }

@@ -130,10 +130,7 @@ class _SpringPressState extends State<SpringPress>
   @override
   void initState() {
     super.initState();
-    _c = AnimationController.unbounded(
-      vsync: this,
-      value: 1,
-    );
+    _c = AnimationController.unbounded(vsync: this, value: 1);
   }
 
   void _to(double v) =>
@@ -595,7 +592,7 @@ class _Hero extends StatefulWidget {
   State<_Hero> createState() => _HeroState();
 }
 
-class _HeroState extends State<_Hero> {
+class _HeroState extends State<_Hero> with WidgetsBindingObserver {
   final _pc = PageController(viewportFraction: 0.72);
   int _cur = 0;
   Timer? _autoTimer;
@@ -604,7 +601,18 @@ class _HeroState extends State<_Hero> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _startAutoLoop();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startAutoLoop();
+    } else {
+      _autoTimer?.cancel();
+      _resumeTimer?.cancel();
+    }
   }
 
   void _startAutoLoop() {
@@ -631,6 +639,7 @@ class _HeroState extends State<_Hero> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _autoTimer?.cancel();
     _resumeTimer?.cancel();
     _pc.dispose();
@@ -655,7 +664,8 @@ class _HeroState extends State<_Hero> {
     final items = widget.items;
     final w = MediaQuery.sizeOf(context).width;
     final cardW = w * 0.72 - 14;
-    final cardH = cardW + 90; // square artwork + 90px caption window
+    const captionH = 106.0;
+    final cardH = cardW + captionH; // square artwork + 106px caption window
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -707,118 +717,131 @@ class _HeroState extends State<_Hero> {
                           scale: 0.98,
                           onTap: () => _tapCard(i),
                           child: Container(
+                            height: cardH,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF18181B),
                               borderRadius: BorderRadius.circular(18),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.42),
-                                  blurRadius: 18,
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                  blurRadius: 20,
                                   offset: const Offset(0, 8),
                                 ),
                               ],
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(18),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
+                              child: Stack(
                                 children: [
-                                  // Top: Square artwork
-                                  AspectRatio(
-                                    aspectRatio: 1.0,
-                                    child: Stack(
-                                      fit: StackFit.expand,
-                                      children: [
-                                        _Img(
-                                          t.coverUrl,
-                                          radius: 0,
-                                          cacheWidth: 800,
+                                  // 1. Full-bleed background artwork that seamlessly spans the entire card
+                                  Positioned.fill(
+                                    child: _Img(
+                                      t.coverUrl,
+                                      radius: 0,
+                                      cacheWidth: 800,
+                                    ),
+                                  ),
+
+                                  // 2. Apple Music frosted glass bar at bottom directly sampling and blurring the underlying artwork
+                                  Positioned(
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    height: captionH,
+                                    child: ClipRRect(
+                                      borderRadius: const BorderRadius.vertical(
+                                        bottom: Radius.circular(18),
+                                      ),
+                                      child: BackdropFilter(
+                                        filter: ui.ImageFilter.blur(
+                                          sigmaX: 28,
+                                          sigmaY: 28,
                                         ),
-                                        Positioned(
-                                          left: 0,
-                                          right: 0,
-                                          bottom: 0,
-                                          height: 36,
-                                          child: DecoratedBox(
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                begin: Alignment.topCenter,
-                                                end: Alignment.bottomCenter,
-                                                colors: [
-                                                  Colors.transparent,
-                                                  const Color(
-                                                    0xFF18181B,
-                                                  ).withValues(alpha: 0.8),
-                                                ],
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topCenter,
+                                              end: Alignment.bottomCenter,
+                                              colors: [
+                                                Colors.black.withValues(
+                                                  alpha: 0.16,
+                                                ),
+                                                Colors.black.withValues(
+                                                  alpha: 0.52,
+                                                ),
+                                              ],
+                                            ),
+                                            border: Border(
+                                              top: BorderSide(
+                                                color: Colors.white.withValues(
+                                                  alpha: 0.22,
+                                                ),
+                                                width: 0.8,
                                               ),
                                             ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  // Bottom: Song details window
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.fromLTRB(
-                                      14,
-                                      8,
-                                      14,
-                                      12,
-                                    ),
-                                    color: const Color(0xFF18181B),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          it.tag.isNotEmpty
-                                              ? it.tag
-                                              : 'Recently Added',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontFamily: 'SF Pro Text',
-                                            color: AppColors.textSecondary,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                            letterSpacing: 0.1,
+                                          padding: const EdgeInsets.fromLTRB(
+                                            14,
+                                            8,
+                                            14,
+                                            10,
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                it.tag.isNotEmpty
+                                                    ? it.tag.toUpperCase()
+                                                    : 'RECENTLY ADDED',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontFamily: 'SF Pro Text',
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.78),
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: 0.6,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                MediaNormalizer
+                                                    .cleanCompactTitle(
+                                                  t.title,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontFamily: 'SF Pro Display',
+                                                  color: Colors.white,
+                                                  fontSize: 15.5,
+                                                  fontWeight: FontWeight.w600,
+                                                  letterSpacing: -0.3,
+                                                  height: 1.18,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                MediaNormalizer.formatArtists(
+                                                  t.artist,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontFamily: 'SF Pro Text',
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.85),
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w400,
+                                                  letterSpacing: -0.1,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          MediaNormalizer.cleanCompactTitle(
-                                            t.title,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontFamily: 'SF Pro Display',
-                                            color: Colors.white,
-                                            fontSize: 15.5,
-                                            fontWeight: FontWeight.w600,
-                                            letterSpacing: -0.3,
-                                            height: 1.18,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          MediaNormalizer.formatArtists(
-                                            t.artist,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontFamily: 'SF Pro Text',
-                                            color: AppColors.textSecondary,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w400,
-                                            letterSpacing: -0.1,
-                                          ),
-                                        ),
-                                      ],
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -961,6 +984,135 @@ class _CoverCard extends StatelessWidget {
                 letterSpacing: -0.1,
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 16:9 widescreen video card for home screen (artwork, clean title, and artist).
+class _HomeVideoCard extends StatelessWidget {
+  const _HomeVideoCard({
+    required this.track,
+    required this.onTap,
+    this.current = false,
+    this.playing = false,
+  });
+
+  final Track track;
+  final VoidCallback onTap;
+  final bool current, playing;
+
+  @override
+  Widget build(BuildContext context) {
+    return SpringPress(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(_kCardR),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(_kCardR),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _Img(track.coverUrl, radius: _kCardR, cacheWidth: 720),
+                    if (current)
+                      ColoredBox(
+                        color: Colors.black.withValues(alpha: 0.44),
+                        child: Center(
+                          child: Container(
+                            width: 52.0,
+                            height: 52.0,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.52),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: _EqBars(playing: playing, size: 30.0),
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Positioned(
+                        right: 8,
+                        bottom: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.68),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.play_arrow_rounded,
+                                color: Colors.white,
+                                size: 12,
+                              ),
+                              SizedBox(width: 2),
+                              Text(
+                                'VIDEO',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            MediaNormalizer.cleanCompactTitle(track.title),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: 'SF Pro Display',
+              color: current ? AppColors.accent : Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            MediaNormalizer.formatArtists(track.artist),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: 'SF Pro Text',
+              color: AppColors.textSecondary,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w400,
+              letterSpacing: -0.1,
+            ),
+          ),
         ],
       ),
     );
@@ -2788,6 +2940,9 @@ class _SheetRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isVid = entry.track?.isVideo == true;
+    final thumbW = isVid ? 74.0 : 56.0;
+    final thumbH = isVid ? 42.0 : 56.0;
     return SpringPress(
       scale: 0.985,
       onTap: onTap,
@@ -2798,8 +2953,8 @@ class _SheetRow extends StatelessWidget {
             child: Row(
               children: [
                 SizedBox(
-                  width: 56,
-                  height: 56,
+                  width: thumbW,
+                  height: thumbH,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
@@ -2824,6 +2979,23 @@ class _SheetRow extends StatelessWidget {
                           ),
                           alignment: Alignment.center,
                           child: _EqBars(playing: playing, height: 18),
+                        ),
+                      if (isVid && !current)
+                        Positioned(
+                          right: 4,
+                          bottom: 4,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: const Icon(
+                              Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 10,
+                            ),
+                          ),
                         ),
                     ],
                   ),
@@ -2910,6 +3082,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // Personalized telemetry & shelves
   List<Track> _recentHistory = [];
   List<Track> _rediscover = [];
+  List<Track> _watchAgainVideos = [];
+  List<Track> _rediscoverVideos = [];
   List<Track> _quickPicks = [];
   List<Track> _timeOfDayTracks = [];
   String _timeOfDayGreeting = 'Good day';
@@ -2924,6 +3098,13 @@ class _HomeScreenState extends State<HomeScreen> {
   List<({String name, String subs, String image})> _chartArtists = [];
   List<Track> _newReleases = [];
   List<Track> _moodTracks = [];
+  List<Track> _homeVideos = [];
+
+  static bool _isAudioTrack(Track t) =>
+      !t.isVideo &&
+      !Track.detectIsVideo(t.title, t.album) &&
+      t.album.toLowerCase() != 'music video' &&
+      t.album.toLowerCase() != 'video';
 
   @override
   void initState() {
@@ -2936,20 +3117,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _onHistoryChanged,
     );
     _loadAllHomeData();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkAppUpdate();
-    });
-  }
-
-  Future<void> _checkAppUpdate() async {
-    await Future.delayed(const Duration(milliseconds: 1800));
-    if (!mounted) return;
-    final info = await UpdateService.instance.checkForUpdate(silent: true);
-    if (info != null && info.hasUpdate && mounted) {
-      if (info.isForceUpdate || !UpdateService.instance.hasDismissedPrompt) {
-        UpdateService.instance.showUpdateSheet(context, info);
-      }
-    }
   }
 
   void _onCountryChanged() {
@@ -2973,6 +3140,10 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _recentHistory = ListeningHistoryService.instance.getRecentTracks();
         _rediscover = ListeningHistoryService.instance.getRediscoverTracks();
+        _watchAgainVideos =
+            ListeningHistoryService.instance.getWatchAgainVideos();
+        _rediscoverVideos =
+            ListeningHistoryService.instance.getRediscoverVideos();
         final userArtists = _effectiveArtists;
         final fav =
             ListeningHistoryService.instance.getFavoriteArtist() ??
@@ -3020,6 +3191,8 @@ class _HomeScreenState extends State<HomeScreen> {
       // 1. Load User Listening Telemetry (with saved onboarding tastes as Day-1 seed)
       _recentHistory = ListeningHistoryService.instance.getRecentTracks();
       _rediscover = ListeningHistoryService.instance.getRediscoverTracks();
+      _watchAgainVideos = ListeningHistoryService.instance.getWatchAgainVideos();
+      _rediscoverVideos = ListeningHistoryService.instance.getRediscoverVideos();
       _favoriteArtist =
           ListeningHistoryService.instance.getFavoriteArtist() ??
           (userArtists.isNotEmpty ? userArtists.first : null);
@@ -3039,7 +3212,9 @@ class _HomeScreenState extends State<HomeScreen> {
           .getTimeOfDayRecommendations()
           .then((tracks) {
             if (mounted && tracks.isNotEmpty) {
-              setState(() => _timeOfDayTracks = tracks);
+              setState(
+                () => _timeOfDayTracks = tracks.where(_isAudioTrack).toList(),
+              );
             }
           })
           .catchError((_) {});
@@ -3051,7 +3226,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .then((tracks) {
             if (mounted && tracks.isNotEmpty) {
               setState(() {
-                _quickPicks = tracks;
+                _quickPicks = tracks.where(_isAudioTrack).toList();
                 _loading = false;
               });
             }
@@ -3064,7 +3239,11 @@ class _HomeScreenState extends State<HomeScreen> {
             .getFavoriteArtistTracks(_favoriteArtist!)
             .then((tracks) {
               if (mounted && tracks.isNotEmpty) {
-                setState(() => _favoriteArtistTracks = tracks);
+                setState(
+                  () => _favoriteArtistTracks = tracks
+                      .where(_isAudioTrack)
+                      .toList(),
+                );
               }
             })
             .catchError((_) {});
@@ -3076,7 +3255,11 @@ class _HomeScreenState extends State<HomeScreen> {
             .getFavoriteArtistTracks(_secondFavoriteArtist!)
             .then((tracks) {
               if (mounted && tracks.isNotEmpty) {
-                setState(() => _secondFavoriteArtistTracks = tracks);
+                setState(
+                  () => _secondFavoriteArtistTracks = tracks
+                      .where(_isAudioTrack)
+                      .toList(),
+                );
               }
             })
             .catchError((_) {});
@@ -3088,7 +3271,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .then((tracks) {
             if (mounted && tracks.isNotEmpty) {
               setState(() {
-                _newReleases = tracks;
+                _newReleases = tracks.where(_isAudioTrack).toList();
                 _loading = false;
               });
             }
@@ -3288,13 +3471,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
             setState(() {
               if (combinedChartTracks.isNotEmpty) {
-                _chartTracks = combinedChartTracks.take(16).toList();
+                _chartTracks = combinedChartTracks
+                    .where(_isAudioTrack)
+                    .take(16)
+                    .toList();
               }
               if (personalizedArtists.isNotEmpty) {
                 _chartArtists = personalizedArtists;
               }
               _loading = false;
             });
+          })
+          .catchError((_) {});
+
+      // 9. Dedicated Music Videos Shelf
+      final vidQuery = primaryLang.isNotEmpty
+          ? '$primaryLang music video songs'
+          : '${country.name} top music video songs';
+      InnerTubeService.instance
+          .searchVideos(vidQuery)
+          .then((videos) {
+            if (mounted && videos.isNotEmpty) {
+              setState(() {
+                _homeVideos = videos
+                    .map((v) => v.copyWith(isVideo: true))
+                    .take(12)
+                    .toList();
+              });
+            }
           })
           .catchError((_) {});
 
@@ -3313,7 +3517,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final tracks = await InnerTubeService.instance.search('$artistName hits');
       if (mounted) {
         setState(() {
-          _favoriteArtistTracks = tracks.take(8).toList();
+          _favoriteArtistTracks = tracks.where(_isAudioTrack).take(8).toList();
         });
       }
     } catch (_) {}
@@ -3324,7 +3528,10 @@ class _HomeScreenState extends State<HomeScreen> {
       final tracks = await InnerTubeService.instance.search('$artistName hits');
       if (mounted) {
         setState(() {
-          _secondFavoriteArtistTracks = tracks.take(8).toList();
+          _secondFavoriteArtistTracks = tracks
+              .where(_isAudioTrack)
+              .take(8)
+              .toList();
         });
       }
     } catch (_) {}
@@ -3358,7 +3565,7 @@ class _HomeScreenState extends State<HomeScreen> {
         .then((tracks) {
           if (mounted && _mood == index) {
             setState(() {
-              _moodTracks = tracks.take(16).toList();
+              _moodTracks = tracks.where(_isAudioTrack).take(16).toList();
               _loadingMood = false;
             });
           }
@@ -3463,7 +3670,9 @@ class _HomeScreenState extends State<HomeScreen> {
     for (var i = 0; i < list.length; i++)
       _ListEntry(
         title: MediaNormalizer.cleanCompactTitle(list[i].title),
-        subtitle: 'Song • ${MediaNormalizer.formatArtists(list[i].artist)}',
+        subtitle: list[i].isVideo
+            ? 'Music Video • ${MediaNormalizer.formatArtists(list[i].artist)}'
+            : 'Song • ${MediaNormalizer.formatArtists(list[i].artist)}',
         cover: list[i].coverUrl,
         track: list[i],
         onTap: () => play(list, i),
@@ -3525,48 +3734,58 @@ class _HomeScreenState extends State<HomeScreen> {
     final artistSize = artistExt - 14;
     final mixExt = w * 0.56;
     final mixSize = mixExt - 14;
+    final videoExt = (w * 0.72).clamp(250.0, 350.0);
+    final videoH = (videoExt * 9 / 16) + 60;
 
-    // Real dynamic datasets
-    final listenAgain = _recentHistory.isNotEmpty
-        ? _recentHistory
-        : (_quickPicks.isNotEmpty
-              ? _quickPicks.take(10).toList()
-              : _chartTracks.take(10).toList());
+    // Real dynamic audio-only datasets (strictly filtered from video songs)
+    final audioHistory = _recentHistory.where(_isAudioTrack).toList();
+    final audioRediscover = _rediscover.where(_isAudioTrack).toList();
+    final audioQuickPicks = _quickPicks.where(_isAudioTrack).toList();
+    final audioChartTracks = _chartTracks.where(_isAudioTrack).toList();
+    final audioNewReleases = _newReleases.where(_isAudioTrack).toList();
 
-    final quick = _quickPicks.isNotEmpty
-        ? _quickPicks.take(12).toList()
-        : _chartTracks.take(12).toList();
-    final charts = _chartTracks.isNotEmpty
-        ? _chartTracks.take(12).toList()
+    final listenAgain = audioHistory.take(12).toList();
+    final watchAgain = _watchAgainVideos.take(12).toList();
+    final videoRediscover = _rediscoverVideos.take(12).toList();
+
+    final quick = audioQuickPicks.isNotEmpty
+        ? audioQuickPicks.take(12).toList()
+        : audioChartTracks.take(12).toList();
+    final charts = audioChartTracks.isNotEmpty
+        ? audioChartTracks.take(12).toList()
         : const <Track>[];
-    final fresh = _newReleases.isNotEmpty
-        ? _newReleases.take(9).toList()
+    final fresh = audioNewReleases.isNotEmpty
+        ? audioNewReleases.take(9).toList()
         : const <Track>[];
 
-    // Albums for you (extracted from real dynamic releases & quickpicks)
+    // Albums for you (extracted from real dynamic releases & quickpicks, audio-only)
     final albumMap = <String, Track>{};
     for (final t in [
-      ..._newReleases,
-      ..._quickPicks,
-      ..._chartTracks,
-      ..._recentHistory,
+      ...audioNewReleases,
+      ...audioQuickPicks,
+      ...audioChartTracks,
+      ...audioHistory,
     ]) {
       final alb = MediaNormalizer.cleanTitle(t.album);
       if (alb.isNotEmpty &&
           alb.toLowerCase() != 'single' &&
+          alb.toLowerCase() != 'music video' &&
+          alb.toLowerCase() != 'video' &&
+          !Track.detectIsVideo(alb, alb) &&
           !MediaNormalizer.isMetadataNoise(alb)) {
         albumMap.putIfAbsent(alb, () => t);
       }
     }
     final albums = albumMap.values.take(10).toList();
 
-    // Hero items (mixed from real data, de-duplicated)
+    // Hero items (mixed from real audio data, de-duplicated, strictly NO video songs)
     final heroItems = <_HeroItem>[];
     final seen = <String>{};
     void addHero(Iterable<Track> ts, String tag, int n) {
       var c = 0;
       for (final t in ts) {
         if (c >= n) break;
+        if (!_isAudioTrack(t)) continue;
         if (seen.add(t.id)) {
           heroItems.add(_HeroItem(t, tag));
           c++;
@@ -3574,7 +3793,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    addHero(_recentHistory, 'Jump back in', 1);
+    addHero(audioHistory, 'Jump back in', 1);
     addHero(quick, 'Made for you', 2);
     addHero(fresh, 'New release', 2);
     addHero(charts, 'Trending in ${country.name}', 2);
@@ -3830,11 +4049,18 @@ class _HomeScreenState extends State<HomeScreen> {
                               player: player,
                               onTapItem: (i) {
                                 final t = heroTracks[i];
-                                final albumName =
-                                    t.album.isNotEmpty &&
-                                        t.album.toLowerCase() != 'single'
-                                    ? MediaNormalizer.cleanTitle(t.album)
-                                    : MediaNormalizer.cleanTitle(t.title);
+                                final isVid =
+                                    t.isVideo ||
+                                    Track.detectIsVideo(t.title, t.album) ||
+                                    t.album.toLowerCase() == 'music video';
+                                final albumName = isVid
+                                    ? MediaNormalizer.cleanTitle(t.title)
+                                    : (t.album.isNotEmpty &&
+                                              t.album.toLowerCase() != 'single'
+                                          ? MediaNormalizer.cleanTitle(t.album)
+                                          : MediaNormalizer.cleanTitle(
+                                              t.title,
+                                            ));
                                 _open(
                                   AlbumScreen(
                                     albumTitle: albumName,
@@ -3842,6 +4068,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                       t.artist,
                                     ),
                                     coverUrl: t.coverUrl,
+                                    initialTracks: [
+                                      t.copyWith(
+                                        isVideo: isVid ? true : t.isVideo,
+                                      ),
+                                    ],
+                                    isVideo: isVid,
                                   ),
                                 );
                               },
@@ -3930,8 +4162,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // 3. Listen again
-                    if (listenAgain.isNotEmpty && _recentHistory.isNotEmpty)
+                    // 3. Listen again (audio only)
+                    if (listenAgain.isNotEmpty)
                       _sec(
                         'again',
                         Column(
@@ -3959,6 +4191,41 @@ class _HomeScreenState extends State<HomeScreen> {
                                   current: cur,
                                   playing: cur && player.isPlaying,
                                   onTap: () => play(listenAgain, i),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Dedicated "Watch again" (Music videos from listening history)
+                    if (watchAgain.isNotEmpty)
+                      _sec(
+                        'watch-again',
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SecHeader(
+                              title: 'Watch again',
+                              overline: 'Recent Music Videos',
+                              onMore: () => _openSection(
+                                title: 'Watch again',
+                                overline: 'Recent Music Videos',
+                                entries: _trackEntries(watchAgain),
+                              ),
+                            ),
+                            _Shelf(
+                              height: videoH,
+                              itemExtent: videoExt,
+                              count: watchAgain.length,
+                              builder: (c, i) {
+                                final t = watchAgain[i];
+                                final cur = player.currentTrack?.id == t.id;
+                                return _HomeVideoCard(
+                                  track: t,
+                                  current: cur,
+                                  playing: cur && player.isPlaying,
+                                  onTap: () => play(watchAgain, i),
                                 );
                               },
                             ),
@@ -4020,7 +4287,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                       subtitle: 'Artist',
                                       cover: a.image.isNotEmpty
                                           ? a.image
-                                          : (ArtistService.getCachedAvatar(a.name) ?? ''),
+                                          : (ArtistService.getCachedAvatar(
+                                                  a.name,
+                                                ) ??
+                                                ''),
                                       circular: true,
                                       closeOnTap: true,
                                       onTap: () => _open(
@@ -4028,7 +4298,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                           artistName: a.name,
                                           imageUrl: a.image.isNotEmpty
                                               ? a.image
-                                              : ArtistService.getCachedAvatar(a.name),
+                                              : ArtistService.getCachedAvatar(
+                                                  a.name,
+                                                ),
                                         ),
                                       ),
                                     ),
@@ -4050,6 +4322,52 @@ class _HomeScreenState extends State<HomeScreen> {
                                       imageUrl: a.image,
                                     ),
                                   ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Dedicated Music Videos Shelf
+                    if (_homeVideos.isNotEmpty)
+                      _sec(
+                        'music-videos',
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SecHeader(
+                              title: 'Music Videos',
+                              onMore: () => _openSection(
+                                title: 'Music Videos',
+                                overline: 'Official Releases',
+                                entries: [
+                                  for (var i = 0; i < _homeVideos.length; i++)
+                                    _ListEntry(
+                                      title: MediaNormalizer.cleanCompactTitle(
+                                        _homeVideos[i].title,
+                                      ),
+                                      subtitle:
+                                          'Music Video • ${MediaNormalizer.formatArtists(_homeVideos[i].artist)}',
+                                      cover: _homeVideos[i].coverUrl,
+                                      track: _homeVideos[i],
+                                      onTap: () => play(_homeVideos, i),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            _Shelf(
+                              height: videoH,
+                              itemExtent: videoExt,
+                              count: _homeVideos.length,
+                              builder: (c, i) {
+                                final t = _homeVideos[i];
+                                final cur = player.currentTrack?.id == t.id;
+                                return _HomeVideoCard(
+                                  track: t,
+                                  current: cur,
+                                  playing: cur && player.isPlaying,
+                                  onTap: () => play(_homeVideos, i),
                                 );
                               },
                             ),
@@ -4162,8 +4480,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // 9. Rediscover favorites
-                    if (_rediscover.isNotEmpty)
+                    // 9. Rediscover favorites (strictly audio songs in square cards)
+                    if (audioRediscover.isNotEmpty)
                       _sec(
                         'rediscover',
                         Column(
@@ -4173,15 +4491,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               title: 'Rediscover your favorites',
                               onMore: () => _openSection(
                                 title: 'Rediscover your favorites',
-                                entries: _trackEntries(_rediscover),
+                                entries: _trackEntries(audioRediscover),
                               ),
                             ),
                             _Shelf(
                               height: cw + 60,
                               itemExtent: ext,
-                              count: _rediscover.length,
+                              count: audioRediscover.length,
                               builder: (c, i) {
-                                final t = _rediscover[i];
+                                final t = audioRediscover[i];
                                 final cur = player.currentTrack?.id == t.id;
                                 return _CoverCard(
                                   url: t.coverUrl,
@@ -4190,7 +4508,42 @@ class _HomeScreenState extends State<HomeScreen> {
                                   artists: t.resolvedArtists,
                                   current: cur,
                                   playing: cur && player.isPlaying,
-                                  onTap: () => play(_rediscover, i),
+                                  onTap: () => play(audioRediscover, i),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Dedicated "Rediscover music videos" (video classics from history in 16:9 cards)
+                    if (videoRediscover.isNotEmpty)
+                      _sec(
+                        'rediscover-videos',
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SecHeader(
+                              title: 'Rediscover music videos',
+                              overline: 'Visual Classics',
+                              onMore: () => _openSection(
+                                title: 'Rediscover music videos',
+                                overline: 'Visual Classics',
+                                entries: _trackEntries(videoRediscover),
+                              ),
+                            ),
+                            _Shelf(
+                              height: videoH,
+                              itemExtent: videoExt,
+                              count: videoRediscover.length,
+                              builder: (c, i) {
+                                final t = videoRediscover[i];
+                                final cur = player.currentTrack?.id == t.id;
+                                return _HomeVideoCard(
+                                  track: t,
+                                  current: cur,
+                                  playing: cur && player.isPlaying,
+                                  onTap: () => play(videoRediscover, i),
                                 );
                               },
                             ),

@@ -44,6 +44,9 @@ class AudioPlayer implements FxEngine {
   final _videoSizeC = StreamController<({int width, int height})>.broadcast();
   final _videoSizeHintC = StreamController<({int width, int height})>.broadcast();
   final _videoUnavailableC = StreamController<void>.broadcast();
+  final _videoTextureIdC = StreamController<int>.broadcast();
+  final _xfDueC = StreamController<void>.broadcast();
+  final _xfC = StreamController<({String phase, int ms})>.broadcast();
 
   Stream<PlayerState> get onPlayerStateChanged => _stateC.stream;
   Stream<bool> get onBufferingChanged => _bufferingC.stream;
@@ -55,11 +58,18 @@ class AudioPlayer implements FxEngine {
   Stream<({int width, int height})> get onVideoSizeChanged => _videoSizeC.stream;
   Stream<({int width, int height})> get onVideoSizeHint => _videoSizeHintC.stream;
   Stream<void> get onVideoUnavailable => _videoUnavailableC.stream;
+  Stream<int> get onVideoTextureId => _videoTextureIdC.stream;
+  Stream<void> get onCrossfadeDue => _xfDueC.stream;
+  Stream<({String phase, int ms})> get onCrossfade => _xfC.stream;
   PlayerState get state => _state;
 
   void _onEvent(dynamic e) {
     if (e is! Map) return;
     switch (e['type']) {
+      case 'crossfadeDue':
+        _xfDueC.add(null);
+      case 'crossfade':
+        _xfC.add((phase: e['phase'] as String? ?? 'end', ms: (e['ms'] as num?)?.toInt() ?? 0));
       case 'autoTransition':
         final id = e['mediaId'] as String? ?? '';
         _autoTransitionC.add(id);
@@ -103,6 +113,11 @@ class AudioPlayer implements FxEngine {
         _videoSizeHintC.add((width: w, height: h));
       case 'videoUnavailable':
         _videoUnavailableC.add(null);
+      case 'videoTextureId':
+        final tid = (e['id'] as num?)?.toInt();
+        if (tid != null) {
+          _videoTextureIdC.add(tid);
+        }
     }
   }
 
@@ -122,6 +137,8 @@ class AudioPlayer implements FxEngine {
     int? startMs,
     double? loudnessDb,
     bool isVideo = false,
+    int crossfadeMs = 0,
+    String? crossfadeStyle,
   }) {
     final args = <String, dynamic>{
       'mediaId': mediaId.replaceFirst('yt-', '').trim(),
@@ -130,9 +147,13 @@ class AudioPlayer implements FxEngine {
       'artworkUrl': artworkUrl ?? '',
       'startMs': startMs,
       'isVideo': isVideo,
+      'crossfadeMs': crossfadeMs,
     };
     if (loudnessDb != null) {
       args['loudnessDb'] = loudnessDb;
+    }
+    if (crossfadeStyle != null && crossfadeStyle.isNotEmpty) {
+      args['crossfadeStyle'] = crossfadeStyle;
     }
     return _call('play', args);
   }
@@ -140,12 +161,42 @@ class AudioPlayer implements FxEngine {
   Future<void> setLoudnessDb(double? db) =>
       _call('setLoudnessDb', {'loudnessDb': db});
 
+  Future<void> setNormalizeVolume(bool enabled) =>
+      _call('setNormalizeVolume', {'enabled': enabled});
+
+  Future<void> setMono(bool mono) =>
+      _call('setMono', {'mono': mono});
+
+  Future<bool> isWifiConnected() async {
+    try {
+      final res = await _method.invokeMethod<bool>('isWifiConnected');
+      return res ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
   Future<void> setAudioQuality(String quality) =>
       _call('setAudioQuality', {'quality': quality});
 
   static Future<void> setGlobalAudioQuality(String quality) async {
     try {
       await _method.invokeMethod('setAudioQuality', {'quality': quality});
+    } catch (_) {}
+  }
+
+  static Future<void> setGlobalVideoQuality(String quality) async {
+    try {
+      await _method.invokeMethod('setVideoQuality', {'quality': quality});
+    } catch (_) {}
+  }
+
+  Future<void> setCrossfade(int ms, String style) =>
+      _call('setCrossfade', {'ms': ms, 'style': style});
+
+  static Future<void> setGlobalCrossfade(int ms, String style) async {
+    try {
+      await _method.invokeMethod('setCrossfade', {'ms': ms, 'style': style});
     } catch (_) {}
   }
 
@@ -185,6 +236,8 @@ class AudioPlayer implements FxEngine {
     int? startMs,
     double? loudnessDb,
     bool isVideo = false,
+    int crossfadeMs = 0,
+    String? crossfadeStyle,
   }) =>
       _call('play', {
         'url': url,
@@ -197,6 +250,8 @@ class AudioPlayer implements FxEngine {
         'startMs': ?startMs,
         'loudnessDb': ?loudnessDb,
         'isVideo': isVideo,
+        'crossfadeMs': crossfadeMs,
+        'crossfadeStyle': ?crossfadeStyle,
       });
 
   Future<void> prefetch(List<String> mediaIds) =>
@@ -243,6 +298,8 @@ class AudioPlayer implements FxEngine {
       _videoSizeC,
       _videoSizeHintC,
       _videoUnavailableC,
+      _xfDueC,
+      _xfC,
     ]) {
       await c.close();
     }
@@ -273,3 +330,32 @@ class AudioPlayer implements FxEngine {
       .receiveBroadcastStream()
       .map((e) => (e as List).map((x) => (x as num).toDouble()).toList());
 }
+
+/// Global ZenPlayer platform helper for checking connectivity, volume normalization, and mono audio.
+class ZenPlayer {
+  ZenPlayer._();
+  static final ZenPlayer instance = ZenPlayer._();
+  static const MethodChannel _ch = MethodChannel('zenify/audio');
+
+  Future<bool> isWifiConnected() async {
+    try {
+      final res = await _ch.invokeMethod<bool>('isWifiConnected');
+      return res ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> setNormalizeVolume(bool enabled) async {
+    try {
+      await _ch.invokeMethod<void>('setNormalizeVolume', {'enabled': enabled});
+    } catch (_) {}
+  }
+
+  Future<void> setMono(bool mono) async {
+    try {
+      await _ch.invokeMethod<void>('setMono', {'mono': mono});
+    } catch (_) {}
+  }
+}
+

@@ -1,27 +1,28 @@
 {
-  "version": 2032,
+  "version": 2035,
   "streamMode": "device",
   "minAppVersion": "1.0.12",
-  "latestAppVersion": "1.1.19",
+  "latestAppVersion": "1.1.21",
   "isForceUpdate": false,
-  "releaseDate": "November 21, 2026",
-  "releaseTime": "08:35 PM IST",
-  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.19/zenify-v1.1.19.apk",
+  "releaseDate": "November 24, 2026",
+  "releaseTime": "10:30 PM IST",
+  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk",
   "features": [
-    "Interactive Sound Atlas: Explore regional and global music cultures via 3D interactive globe, curated city and country charts, and Sound Passport",
-    "Apple Music Styled Sound Atlas UI: Integrated fluid iOS navigation, zero-delay single tap globe interactions, and rich musical identity badges",
-    "Optimized Search & Personalization Engine: Multi-factor ranking, category-specific retrieval, and unified listening insights"
+    "Strict YouTube Music Search Parity: Full unrestricted access to official songs, video songs, albums, verified artists, and playlists",
+    "16:9 Landscape Video Previews: Landscape thumbnail rendering in search history and queue panels for video songs",
+    "Instant Search History Playback: 1-tap playback from search history without re-search delays",
+    "Ultra-Fast Parallel Lyrics Resolver: Sub-300ms parallel lyrics fetching with LRCLIB, lrc.red, and instant video song bypass"
   ],
   "fixes": [
-    "Fixed Flutter Impeller SetInheritedOpacity validation breaks and GPU frame drops on Android 14 / ColorOS",
-    "Optimized mini-player render tree with zero-overhead offstage visibility and album art rendering",
-    "Fixed language server analyzer diagnostics, record types, and updated deprecated Flutter members",
-    "Cleaned and organized project structure"
+    "Restored pure YouTube Music search results across songs, videos, albums, and playlists",
+    "Bypassed lyrical retrieval for video songs to eliminate unnecessary network latency",
+    "Fixed search history item tapping to directly play media or navigate to the target artist/album page"
   ],
   "improvements": [
-    "Compressed release build size with ProGuard and ABI-split optimization",
-    "Enhanced memory management and battery efficiency"
+    "Landscape 16:9 aspect ratio previews for video songs in queue and search history",
+    "LRCLIB ultra-fast lyrics integration with cache version 12 and auto-cleanup",
+    "Optimized package footprint and memory efficiency"
   ],
-  "releaseNotes": "• Interactive Sound Atlas: 3D globe, city & country charts, musical journeys & battles\n• Sound Passport with stamped cities and milestones\n• Compressed APK release with ultra-fast startup",
-  "message": "Update to v1.1.19 for the brand new Interactive Sound Atlas, Sound Passport, and optimized audio performance"
+  "releaseNotes": "• Strict YouTube Music search parity (unrestricted songs, videos, albums, playlists)\n• 16:9 landscape video previews in search history & queue\n• Ultra-fast parallel lyrics resolver with video skip",
+  "message": "Update to v1.1.21 for pure YouTube Music search parity, landscape video previews, and ultra-fast lyrics fetching"
 }

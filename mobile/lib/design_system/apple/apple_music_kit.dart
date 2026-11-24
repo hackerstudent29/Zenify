@@ -7,8 +7,11 @@ import 'package:flutter/services.dart';
 
 import '../../services/dock_visibility.dart';
 import '../../services/settings_service.dart';
+import '../widgets/dynamic_island_header.dart';
 import '../widgets/glass_surface.dart';
 import '../widgets/zen_dropdown.dart';
+
+export '../widgets/dynamic_island_header.dart' show DynamicIslandActionButton, IslandTitleFade;
 
 // ═════════════════════════════════════════════════════════════════════════════
 // TOKENS
@@ -150,20 +153,11 @@ class _AMPageState extends State<AMPage> with HideDocksMixin<AMPage> {
   @override
   bool get hideMiniPlayerWhileActive => true;
 
-  static const _barH = 56.0;
   final _scroll = ScrollController();
-  final _offset = ValueNotifier<double>(0);
-
-  @override
-  void initState() {
-    super.initState();
-    _scroll.addListener(() => _offset.value = _scroll.hasClients ? _scroll.offset : 0);
-  }
 
   @override
   void dispose() {
     _scroll.dispose();
-    _offset.dispose();
     super.dispose();
   }
 
@@ -177,58 +171,29 @@ class _AMPageState extends State<AMPage> with HideDocksMixin<AMPage> {
           ListView(
             controller: _scroll,
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-            padding: EdgeInsets.fromLTRB(16, pad.top + _barH + 6, 16, pad.bottom + 48),
+            padding: EdgeInsets.fromLTRB(16, pad.top + 58, 16, pad.bottom + 48),
             children: [
               for (var i = 0; i < widget.children.length; i++)
                 AMReveal(index: i, child: widget.children[i]),
             ],
           ),
-          Positioned(top: 0, left: 0, right: 0, child: _bar(pad.top)),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: DynamicIslandHeader(
+              title: widget.title,
+              showBack: true,
+              isDockPage: false,
+              showProfile: false,
+              alwaysShowTitle: true,
+              scrollController: _scroll,
+              onBack: widget.onBack ?? () => Navigator.of(context).maybePop(),
+              trailing: widget.trailing,
+            ),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _bar(double top) {
-    return ValueListenableBuilder<double>(
-      valueListenable: _offset,
-      builder: (context, o, _) {
-        final p = (o / 14).clamp(0.0, 1.0);
-        final content = SizedBox(
-          height: top + _barH,
-          child: Padding(
-            padding: EdgeInsets.only(top: top, left: 16, right: 16),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: AMNavButton(
-                    icon: CupertinoIcons.arrow_left,
-                    onTap: widget.onBack ?? () => Navigator.of(context).maybePop(),
-                  ),
-                ),
-                Text(widget.title, style: AM.navTitle),
-                if (widget.trailing != null)
-                  Align(alignment: Alignment.centerRight, child: widget.trailing),
-              ],
-            ),
-          ),
-        );
-        if (p < 0.02) return content;
-        return ClipRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 24 * p, sigmaY: 24 * p),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: AM.bg.withValues(alpha: 0.7 * p),
-                border: Border(bottom: BorderSide(color: AM.sep.withValues(alpha: p), width: 0.5)),
-              ),
-              child: content,
-            ),
-          ),
-        );
-      },
     );
   }
 }
@@ -778,79 +743,102 @@ class _AMSheetFrameState extends State<AMSheetFrame> with HideDocksMixin {
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
       padding: EdgeInsets.only(bottom: inset),
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          height: h,
-          clipBehavior: Clip.antiAlias,
-          decoration: const BoxDecoration(
-            color: AM.bg,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-            border: Border(top: BorderSide(color: AM.sep, width: 0.5)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 36,
-                height: 5,
-                decoration: BoxDecoration(color: AM.cardHi, borderRadius: BorderRadius.circular(3)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            height: h,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: const Color(0xF21C1C1E),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              border: Border(
+                top: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 0.6,
+                ),
               ),
-              SizedBox(
-                height: 52,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    if (widget.leadingLabel != null)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: CupertinoButton(
-                          padding: const EdgeInsets.symmetric(horizontal: 18),
-                          onPressed: close,
-                          child: Text(
-                            widget.leadingLabel!,
-                            style: const TextStyle(
-                              fontFamily: AM.font,
-                              color: AM.rose,
-                              fontSize: 17,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: 36,
+                  offset: const Offset(0, -6),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 36,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(2.5),
+                  ),
+                ),
+                SizedBox(
+                  height: 52,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      if (widget.leadingLabel != null)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: CupertinoButton(
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            onPressed: close,
+                            child: Text(
+                              widget.leadingLabel!,
+                              style: const TextStyle(
+                                fontFamily: AM.font,
+                                color: AM.rose,
+                                fontSize: 17,
+                              ),
                             ),
                           ),
                         ),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(widget.title, style: AM.navTitle),
+                          if (widget.subtitle != null)
+                            Text(widget.subtitle!, style: AM.sub.copyWith(fontSize: 12)),
+                        ],
                       ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(widget.title, style: AM.navTitle),
-                        if (widget.subtitle != null)
-                          Text(widget.subtitle!, style: AM.sub.copyWith(fontSize: 12)),
-                      ],
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: widget.actionLoading
-                          ? const Padding(
-                              padding: EdgeInsets.only(right: 20),
-                              child: CupertinoActivityIndicator(),
-                            )
-                          : CupertinoButton(
-                              padding: const EdgeInsets.symmetric(horizontal: 18),
-                              onPressed: widget.actionEnabled ? (widget.onAction ?? close) : null,
-                              child: Text(
-                                widget.actionLabel,
-                                style: TextStyle(
-                                  fontFamily: AM.font,
-                                  color: widget.actionEnabled ? AM.rose : AM.label3,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w600,
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: widget.actionLoading
+                            ? const Padding(
+                                padding: EdgeInsets.only(right: 20),
+                                child: CupertinoActivityIndicator(),
+                              )
+                            : CupertinoButton(
+                                padding: const EdgeInsets.symmetric(horizontal: 18),
+                                onPressed: widget.actionEnabled ? (widget.onAction ?? close) : null,
+                                child: Text(
+                                  widget.actionLabel,
+                                  style: TextStyle(
+                                    fontFamily: AM.font,
+                                    color: widget.actionEnabled ? AM.rose : AM.label3,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                            ),
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Expanded(child: widget.body),
-            ],
+                const Divider(
+                  height: 0.5,
+                  thickness: 0.5,
+                  color: Color(0xFF38383A),
+                ),
+                Expanded(child: widget.body),
+              ],
+            ),
           ),
         ),
       ),

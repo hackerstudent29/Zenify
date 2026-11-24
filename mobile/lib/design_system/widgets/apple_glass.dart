@@ -47,9 +47,9 @@ class GlassTints {
 }
 
 class LiquidGlassConfig {
-  GlassMode mode = GlassMode.glass;
-  String solidId = 'grey';
-  GlassTone tone = GlassTone.clear;
+  GlassMode mode = GlassMode.solid;
+  String solidId = 'black';
+  GlassTone tone = GlassTone.dark;
   String tintId = 'none';
   double tintStrength = .4;
 

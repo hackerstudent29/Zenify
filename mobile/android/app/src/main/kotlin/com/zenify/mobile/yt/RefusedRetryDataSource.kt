@@ -46,12 +46,19 @@ class RefusedRetryDataSource(
         try {
             return initialSource.open(dataSpec)
         } catch (e: Exception) {
-            val is403 = (e as? HttpDataSource.InvalidResponseCodeException)?.responseCode == 403 ||
-                    e.message?.contains("403") == true
-            if (is403 && !retried) {
+            val isRetryable = !retried && (
+                (e as? HttpDataSource.InvalidResponseCodeException)?.responseCode in listOf(400, 403, 410, 500, 502, 503) ||
+                e is java.net.SocketTimeoutException ||
+                e is java.net.ConnectException ||
+                e is java.net.UnknownHostException ||
+                e.message?.contains("403") == true ||
+                e.message?.contains("resolve failed") == true ||
+                e.message?.contains("timeout") == true
+            )
+            if (isRetryable) {
                 retried = true
                 val videoId = extractVideoId(dataSpec)
-                Log.w(TAG, "HTTP 403 on open for videoId=$videoId; retrying with fresh client stream...")
+                Log.w(TAG, "Retryable stream open error (${e.message}) for videoId=$videoId; retrying with fresh client stream...")
                 if (videoId != null) {
                     val failedUrl = (e as? HttpDataSource.InvalidResponseCodeException)?.dataSpec?.uri?.toString() ?: dataSpec.uri.toString()
                     onRefused(videoId, failedUrl)

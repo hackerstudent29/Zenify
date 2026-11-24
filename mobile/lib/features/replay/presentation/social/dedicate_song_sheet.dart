@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../services/dock_visibility.dart';
 import '../../domain/models/gift_models.dart';
 import '../../domain/replay_aggregate.dart';
 import '../../domain/services/gift_service.dart';
@@ -22,13 +23,16 @@ class DedicateSongSheet extends StatefulWidget {
     required SongStat song,
     ValueChanged<GiftSong>? onGiftCreated,
   }) {
-    return showModalBottomSheet<GiftSong>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => DedicateSongSheet(
-        song: song,
-        onGiftCreated: onGiftCreated,
+    return DockVisibility.runModal(
+      () => showModalBottomSheet<GiftSong>(
+        context: context,
+        useRootNavigator: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => DedicateSongSheet(
+          song: song,
+          onGiftCreated: onGiftCreated,
+        ),
       ),
     );
   }

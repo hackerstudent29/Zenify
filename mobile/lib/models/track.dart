@@ -17,6 +17,7 @@ class Track {
   final List<ArtistRef> artists;
   final bool isVideo;
   final String? albumBrowseId;
+  final String? year;
 
   Track({
     required this.id,
@@ -30,14 +31,70 @@ class Track {
     this.hasLyrics = true,
     this.source = 'youtube',
     this.artists = const [],
-    this.isVideo = false,
+    bool isVideo = false,
     this.albumBrowseId,
+    this.year,
   })  : language = (language.trim().isNotEmpty
             ? language.toLowerCase().trim()
             : (detectLanguage(title, artist, album) ?? '')),
+        isVideo = isVideo || detectIsVideo(title, album, coverUrl: coverUrl),
         title = MediaNormalizer.cleanTitle(title),
         artist = MediaNormalizer.cleanArtistName(artist),
-        album = MediaNormalizer.cleanAlbumTitle(album);
+        album = (isVideo || detectIsVideo(title, album, coverUrl: coverUrl)) &&
+                (album.isEmpty || album.toLowerCase() == 'single')
+            ? 'Music Video'
+            : MediaNormalizer.cleanAlbumTitle(album);
+
+  static bool detectIsVideo(
+    String rawTitle,
+    String rawAlbum, {
+    String? coverUrl,
+  }) {
+    final a = rawAlbum.toLowerCase().trim();
+    if (a == 'music video' ||
+        a == 'video' ||
+        a.contains('music video') ||
+        a.contains('official video')) {
+      return true;
+    }
+    final t = rawTitle.toLowerCase();
+    if (t.contains('video song') ||
+        t.contains('song video') ||
+        t.contains('music video') ||
+        t.contains('official video') ||
+        t.contains('official music video') ||
+        t.contains('full video') ||
+        t.contains('4k video') ||
+        t.contains('hd video') ||
+        t.contains('lyric video') ||
+        t.contains('lyrical video') ||
+        t.contains('visualizer') ||
+        t.contains('performance video') ||
+        t.contains('dance video') ||
+        t.contains('vertical video') ||
+        t.contains('(video)') ||
+        t.contains('[video]') ||
+        t.contains('| video') ||
+        t.contains('- video') ||
+        t.contains('video |') ||
+        t.contains('video -') ||
+        t.contains('பாடல்') ||
+        t.contains('வீடியோ') ||
+        t.contains('गाने') ||
+        t.contains('वीडियो')) {
+      return true;
+    }
+    if (coverUrl != null &&
+        (coverUrl.contains('/vi/') ||
+            coverUrl.contains('ytimg.com/vi') ||
+            coverUrl.contains('maxresdefault') ||
+            coverUrl.contains('hqdefault') ||
+            coverUrl.contains('mqdefault') ||
+            coverUrl.contains('sddefault'))) {
+      return true;
+    }
+    return false;
+  }
 
   factory Track.empty() => Track(
         id: '',
@@ -395,6 +452,7 @@ class Track {
       artists: parsedArtists,
       isVideo: json['isVideo'] == true,
       albumBrowseId: albumBrowseId,
+      year: (json['year'] ?? json['releaseDate'] ?? json['date'])?.toString(),
     );
   }
 
@@ -413,6 +471,7 @@ class Track {
       'artists': artists.map((a) => a.toJson()).toList(),
       if (isVideo) 'isVideo': true,
       if (albumBrowseId != null) 'albumBrowseId': albumBrowseId,
+      if (year != null && year!.isNotEmpty) 'year': year,
     };
   }
 
@@ -430,6 +489,7 @@ class Track {
     List<ArtistRef>? artists,
     bool? isVideo,
     String? albumBrowseId,
+    String? year,
   }) {
     return Track(
       id: id ?? this.id,
@@ -445,6 +505,7 @@ class Track {
       artists: artists ?? this.artists,
       isVideo: isVideo ?? this.isVideo,
       albumBrowseId: albumBrowseId ?? this.albumBrowseId,
+      year: year ?? this.year,
     );
   }
 

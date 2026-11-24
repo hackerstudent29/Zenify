@@ -15,11 +15,11 @@ import 'innertube_service.dart';
 
 /// Configurable weights and constants for the Smart Queue Ranking Engine.
 class SmartQueueWeights {
-  static const double recEngineRankWeight = 40.0;
-  static const double moodVibeWeight = 25.0;
+  static const double moodVibeWeight = 40.0;        // Primary: must match the same vibe
+  static const double tempoEnergyWeight = 20.0;     // Tempo proximity
   static const double artistAffinityWeight = 15.0;
   static const double albumAffinityWeight = 10.0;
-  static const double tempoEnergyWeight = 10.0;
+  static const double recEngineRankWeight = 15.0;
 
   /// Maximum consecutive songs permitted from the same artist in the autoplay queue.
   static const int maxConsecutiveArtist = 2;
@@ -31,7 +31,7 @@ class SmartQueueWeights {
   static const int refillThreshold = 3;
 
   /// Maximum number of recent history tracks screened for duplicate prevention.
-  static const int duplicateHistoryWindow = 50;
+  static const int duplicateHistoryWindow = 100;
 }
 
 class SmartQueueEngine {
@@ -175,11 +175,68 @@ class SmartQueueEngine {
     return moodScore + artistScore + albumScore + recRankScore + tempoScore;
   }
 
+  /// Detects whether a track is a background score, theme music, dialogue, teaser snippet,
+  /// or short instrumental cue.
+  static bool isThemeOrBgm(Track track) {
+    final title = track.title.toLowerCase();
+    final album = track.album.toLowerCase();
+
+    // 1. Duration check: snippets, cues, promos under 90s (1.5 min)
+    if (track.durationSeconds > 0 && track.durationSeconds < 90) {
+      return true;
+    }
+
+    // 2. Exact keyword / token matching for themes, bgms, scores, dialogs
+    const bgmKeywords = [
+      'bgm', 'theme', 'original score', 'background score', 'ost',
+      'soundtrack version', 'theme music', 'motion poster', 'teaser',
+      'trailer', 'dialogue', 'punch dialogue', 'ringtone', 'title card',
+      'interval bgm', 'climax bgm', 'entry bgm', 'intro bgm', 'outro bgm',
+      'interval theme', 'climax theme', 'entry theme', 'intro theme',
+      'outro theme', 'whistle theme', 'score theme', 'theme song',
+      'mass theme', 'theme track', 'theme instrumental', 'bgm score',
+      'theme bit', 'theme music track', 'promo cut', 'theme cut'
+    ];
+
+    for (final kw in bgmKeywords) {
+      final reg = RegExp(r'(^|[^\w])' + RegExp.escape(kw) + r'([^\w]|$)', caseSensitive: false);
+      if (reg.hasMatch(title) || reg.hasMatch(album)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Checks if a track contains script characters or tags belonging to languages other than expectedLang.
+  static bool _hasOtherLanguageIndicators(Track track, String expectedLang) {
+    final raw = '${track.title} ${track.artist} ${track.album}'.toLowerCase();
+
+    // Unicode script checks
+    for (final rune in raw.runes) {
+      if (expectedLang != 'tamil' && rune >= 0x0B80 && rune <= 0x0BFF) return true;
+      if (expectedLang != 'telugu' && rune >= 0x0C00 && rune <= 0x0C7F) return true;
+      if (expectedLang != 'hindi' && rune >= 0x0900 && rune <= 0x097F) return true;
+      if (expectedLang != 'malayalam' && rune >= 0x0D00 && rune <= 0x0D7F) return true;
+      if (expectedLang != 'kannada' && rune >= 0x0C80 && rune <= 0x0CF2) return true;
+      if (expectedLang != 'punjabi' && rune >= 0x0A00 && rune <= 0x0A7F) return true;
+      if (expectedLang != 'bengali' && rune >= 0x0980 && rune <= 0x09FF) return true;
+    }
+
+    // Explicit language bracket checks: e.g. "(Telugu)", "[Hindi]", "(Malayalam)"
+    const allLangs = [
+      'tamil', 'telugu', 'hindi', 'malayalam', 'kannada', 'punjabi', 'bengali'
+    ];
+    for (final l in allLangs) {
+      if (l != expectedLang) {
+        final reg = RegExp(r'[\(\[]\s*' + RegExp.escape(l) + r'\s*[\)\]]|\bfrom\s+"?[^"]+"?\s+-\s+' + RegExp.escape(l) + r'\b', caseSensitive: false);
+        if (reg.hasMatch(raw)) return true;
+      }
+    }
+    return false;
+  }
+
   /// Filters candidates using hard rules and sorts them using soft ranking.
-  /// If strict filters leave too few candidates, it relaxes rules in the specified order:
-  /// 1. Mood/energy tolerance
-  /// 2. Artist variety cap
-  /// 3. Language (last resort)
+  /// Strict filters guarantee language consistency, vibe match, and theme/BGM exclusion.
   static List<Track> filterAndRank({
     required List<Track> candidates,
     required Track seed,
@@ -187,10 +244,11 @@ class SmartQueueEngine {
     required Set<String> existingSignatures,
     int count = SmartQueueWeights.targetQueueSize,
   }) {
-    final seedLanguage = detectLanguage(seed);
+    final seedLanguage = detectLanguage(seed).toLowerCase().trim();
     final seedEnergy = estimateEnergy(seed);
+    final seedIsTheme = isThemeOrBgm(seed);
 
-    // --- Hard Filter 1: De-duplication (ID and normalized signature) ---
+    // --- Hard Filter 1: De-duplication (ID and normalized signature) & Theme Exclusion ---
     final deduped = <Track>[];
     final seenIds = Set<String>.from(existingIds);
     final seenSignatures = Set<String>.from(existingSignatures);
@@ -203,6 +261,14 @@ class SmartQueueEngine {
       if (seenIds.contains(t.id) || seenIds.contains(cleanId)) continue;
       if (sig.isNotEmpty && seenSignatures.contains(sig)) continue;
 
+      // Filter Themes/BGMs: Do NOT merge short themes / BGMs into regular lengthy song queues!
+      if (!seedIsTheme && isThemeOrBgm(t)) continue;
+
+      // Filter out overly short tracks if the seed is a full song (>= 120s)
+      if (!seedIsTheme && seed.durationSeconds >= 120 && t.durationSeconds > 0 && t.durationSeconds < 90) {
+        continue;
+      }
+
       seenIds.add(t.id);
       seenIds.add(cleanId);
       if (sig.isNotEmpty) seenSignatures.add(sig);
@@ -211,34 +277,47 @@ class SmartQueueEngine {
 
     if (deduped.isEmpty) return const [];
 
-    // --- Hard Filter 2: Same Language Filter ---
+    // --- Hard Filter 2: Same Language Filter (STRICT: NEVER switch language!) ---
     List<Track> languageFiltered = deduped;
     if (seedLanguage.isNotEmpty) {
-      final sameLang = deduped.where((t) {
-        final tLang = detectLanguage(t);
-        // Strict match or allow undetermined if scarce
-        return tLang == seedLanguage;
+      languageFiltered = deduped.where((t) {
+        final tLang = detectLanguage(t).toLowerCase().trim();
+        // If detected language is known, it MUST match seedLanguage
+        if (tLang.isNotEmpty && tLang != seedLanguage) {
+          return false;
+        }
+        // If undetermined, ensure it does not contain indicators of a different language
+        if (tLang.isEmpty && _hasOtherLanguageIndicators(t, seedLanguage)) {
+          return false;
+        }
+        return true;
       }).toList();
 
-      if (sameLang.length >= 3) {
-        languageFiltered = sameLang;
-      } else {
-        // Relax: include tracks where language detection was ambiguous before breaking language rule
+      if (languageFiltered.isEmpty) {
+        // If zero matched, strictly keep only undetermined tracks that don't have conflicting language
         languageFiltered = deduped.where((t) {
-          final tLang = detectLanguage(t);
-          return tLang == seedLanguage || tLang.isEmpty;
+          final tLang = detectLanguage(t).toLowerCase().trim();
+          return tLang == seedLanguage;
         }).toList();
-        if (languageFiltered.isEmpty) {
-          // Relax language last only if zero matches
-          languageFiltered = deduped;
-        }
       }
     }
 
+    if (languageFiltered.isEmpty) return const [];
+
+    // --- Hard Filter 3: Same Vibe Consistency ---
+    // Prevent jarring vibe jumps (e.g. gentle slow melody jumping to loud party track, or vice versa)
+    final vibeFiltered = languageFiltered.where((t) {
+      final candEnergy = estimateEnergy(t);
+      final energyDelta = (candEnergy - seedEnergy).abs();
+      return energyDelta <= 0.40;
+    }).toList();
+
+    final poolToRank = vibeFiltered.isNotEmpty ? vibeFiltered : languageFiltered;
+
     // --- Soft Ranking: Score Candidates ---
     final scored = <(Track track, double score, double energy)>[];
-    for (int i = 0; i < languageFiltered.length; i++) {
-      final t = languageFiltered[i];
+    for (int i = 0; i < poolToRank.length; i++) {
+      final t = poolToRank[i];
       final score = calculateScore(
         candidate: t,
         seed: seed,
@@ -264,12 +343,10 @@ class SmartQueueEngine {
         final last2 = rankedTracks[rankedTracks.length - 2].artist.toLowerCase();
 
         if (last1 == last2) {
-          // Find next track with a different artist
           final alternativeIdx = pool.indexWhere((t) => t.artist.toLowerCase() != last1);
           if (alternativeIdx >= 0) {
             pickIndex = alternativeIdx;
           }
-          // If no alternative found, relax artist variety cap
         }
       }
 
@@ -318,7 +395,12 @@ class SmartQueueEngine {
     int count = SmartQueueWeights.targetQueueSize,
   }) async {
     try {
+      final seedLanguage = detectLanguage(seed).toLowerCase().trim();
+      final seedEnergy = estimateEnergy(seed);
       final cleanId = seed.id.replaceFirst('yt-', '').trim();
+      final cleanArtist = seed.artist.split(',').first.trim();
+      final cleanTitle = MediaNormalizer.cleanTitle(seed.title);
+
       List<Track> candidates = [];
       if (cleanId.isNotEmpty) {
         try {
@@ -326,26 +408,49 @@ class SmartQueueEngine {
         } catch (_) {}
       }
 
-      // 1. Supplement with artist related songs if primary queue is sparse
-      if (candidates.length < 12 && seed.artist.isNotEmpty) {
+      // 1. Supplement with artist related songs
+      if (candidates.length < 20 && seed.artist.isNotEmpty) {
         try {
           final related = await InnerTubeService.instance.fetchRelated(seed);
           candidates = [...candidates, ...related];
         } catch (_) {}
       }
 
-      // 2. Supplement with API search if still sparse
-      if (candidates.length < 12 && seed.artist.isNotEmpty) {
+      // 2. Targeted language and vibe search if candidates are sparse or already filtered
+      if (candidates.length < 25 && cleanArtist.isNotEmpty) {
         try {
-          final cleanArtist = seed.artist.split(',').first.trim();
-          final supplement = await ApiService.search('$cleanArtist radio mix');
+          final vibeKeyword = seedEnergy >= 0.65
+              ? 'hits'
+              : (seedEnergy <= 0.40 ? 'melody songs' : 'songs');
+          final query = seedLanguage.isNotEmpty
+              ? '$cleanArtist $seedLanguage $vibeKeyword'
+              : '$cleanArtist $vibeKeyword';
+          final supplement = await InnerTubeService.instance.search(query);
           candidates = [...candidates, ...supplement];
         } catch (_) {}
       }
 
-      // 3. Fallback to catalog data so automix never runs out of music
-      if (candidates.isEmpty) {
-        candidates = List<Track>.from(CatalogDataSource.allTracks);
+      // 3. Fallback search by song title & language
+      if (candidates.length < 20 && cleanTitle.isNotEmpty) {
+        try {
+          final query = seedLanguage.isNotEmpty
+              ? '$cleanTitle $seedLanguage radio'
+              : '$cleanTitle radio mix';
+          final titleRadio = await ApiService.search(query);
+          candidates = [...candidates, ...titleRadio];
+        } catch (_) {}
+      }
+
+      // 4. Fallback to catalog data, strictly filtered by matching language!
+      if (candidates.isEmpty || candidates.where((t) => detectLanguage(t) == seedLanguage).length < 5) {
+        final catalogSameLang = CatalogDataSource.allTracks.where((t) {
+          if (seedLanguage.isNotEmpty) {
+            final tLang = detectLanguage(t).toLowerCase().trim();
+            return tLang == seedLanguage;
+          }
+          return true;
+        }).toList();
+        candidates = [...candidates, ...catalogSameLang];
       }
 
       final ranked = filterAndRank(
@@ -358,14 +463,21 @@ class SmartQueueEngine {
 
       if (ranked.isNotEmpty) return ranked;
 
-      // If strict filters eliminated candidates, return non-duplicate songs directly
-      return candidates
-          .where((t) => t.id != seed.id && !existingIds.contains(t.id))
-          .take(count)
-          .toList();
+      // If strict filters left nothing, return language and vibe matching candidates only (NEVER switch language!)
+      return candidates.where((t) {
+        if (t.id == seed.id || existingIds.contains(t.id)) return false;
+        if (!isThemeOrBgm(seed) && isThemeOrBgm(t)) return false;
+        if (seedLanguage.isNotEmpty) {
+          final tLang = detectLanguage(t).toLowerCase().trim();
+          if (tLang.isNotEmpty && tLang != seedLanguage) return false;
+          if (tLang.isEmpty && _hasOtherLanguageIndicators(t, seedLanguage)) return false;
+        }
+        final delta = (estimateEnergy(t) - seedEnergy).abs();
+        return delta <= 0.45;
+      }).take(count).toList();
     } catch (e) {
       if (kDebugMode) debugPrint('[SmartQueueEngine] Error fetching candidates: $e');
-      return CatalogDataSource.allTracks.take(count).toList();
+      return const [];
     }
   }
 }

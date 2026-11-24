@@ -136,6 +136,300 @@ class MediaNormalizer {
     caseSensitive: false,
   );
 
+  /// Exact and substring pattern for known record labels, distributors, channels, and production banners
+  static final RegExp _distributorLabelExactPattern = RegExp(
+    r'^(?:'
+    r'Think\s*Music(?:\s*(?:India|South|Official))?'
+    r'|Sony\s*Music(?:\s*(?:South|India|Entertainment|Official))?'
+    r'|SonyMusicSouthVEVO|SonyMusicIndiaVEVO'
+    r'|T-Series(?:\s*(?:Tamil|Telugu|Bhakti|Apna|Music|Company|Malayalam|Kannada|Bhakti\s*Sagar|Old))?'
+    r'|Zee\s*Music(?:\s*(?:South|Company|Tamil|Telugu))?'
+    r'|Zee\s*Studios?'
+    r'|Saregama(?:\s*(?:Tamil|Telugu|Malayalam|Music|Kannada|Bhojpuri))?'
+    r'|Aditya\s*Music(?:\s*(?:Tamil|Telugu|India|Devotional))?'
+    r'|Lahari\s*Music(?:\s*(?:T-Series|South))?'
+    r'|Speed\s*Audio(?:\s*Video)?|Speed\s*Records'
+    r'|YRF(?:\s*Music)?|Yash\s*Raj\s*Films?'
+    r'|Tips(?:\s*(?:Official|Music|Industries|Bhojpuri|Gujarati))?'
+    r'|Muzik247|Divo(?:\s*(?:Music|Movies|South))?|Anand\s*Audio'
+    r'|Times\s*Music(?:\s*South)?|Junglee\s*Music(?:\s*(?:Tamil|Telugu|South))?'
+    r'|Eros\s*Now(?:\s*(?:Music|South))?|SVF|Rajshri(?:\s*(?:Tamil|Telugu|Music))?|Geetha\s*Arts|Trend\s*Music|MRT\s*Music|Silly\s*Monks'
+    r'|Universal\s*Music(?:\s*(?:India|Group))?|Warner\s*Music(?:\s*(?:India|South\s*Asia))?|Def\s*Jam(?:\s*India)?|Atlantic\s*Records|Columbia\s*Records'
+    r'|Sun\s*TV|Sun\s*Pictures|Sun\s*NXT'
+    r'|Sony\s*Pictures(?:\s*(?:India|Releasing))?'
+    r'|Red\s*Giant\s*Movies|Lyca\s*Productions'
+    r'|Studio\s*Green|Seven\s*Screen\s*Studio'
+    r')$',
+    caseSensitive: false,
+  );
+
+  /// Trailing suffixes indicating distributor channels rather than individual musical artists
+  static final RegExp _distributorSuffixPattern = RegExp(
+    r'\b(?:'
+    r'music(?:\s*(?:south|india|company|entertainment|official|tamil|telugu))?'
+    r'|records|recordings|entertainment|audio\s*video|production[s]?|vevo|studios?|pictures?|films?|media|channel|tv'
+    r')\b',
+    caseSensitive: false,
+  );
+
+  /// Checks whether a name corresponds to a music distributor, record label,
+  /// video publisher, or production house rather than an actual recording artist.
+  static bool isDistributorOrLabel(String? raw) {
+    if (raw == null) return false;
+    final s = decodeHtml(raw).trim();
+    if (s.isEmpty) return false;
+    if (_distributorLabelExactPattern.hasMatch(s)) return true;
+
+    // Check lowercase token match
+    final lower = s.toLowerCase();
+    if (lower == 'sun tv' ||
+        lower == 'sun pictures' ||
+        lower == 'sun nxt' ||
+        lower == 'muzik247' ||
+        lower == 'divo' ||
+        lower == 'divo music' ||
+        lower == 'divo movies' ||
+        lower == 'tips official' ||
+        lower == 'tips music' ||
+        lower == 'yrf' ||
+        lower == 'svf' ||
+        lower == 'saregama' ||
+        lower == 't-series' ||
+        lower == 'tseries' ||
+        lower == 'vevo') {
+      return true;
+    }
+
+    if (lower.contains('sony music') ||
+        lower.contains('think music') ||
+        lower.contains('t-series') ||
+        lower.contains('zee music') ||
+        lower.contains('aditya music') ||
+        lower.contains('lahari music') ||
+        lower.contains('speed audio') ||
+        lower.contains('junglee music') ||
+        lower.contains('times music') ||
+        lower.contains('speed records')) {
+      return true;
+    }
+
+    // Check if name ends with common channel / distributor markers e.g. "Foo Records", "Bar Music"
+    if (_distributorSuffixPattern.hasMatch(s) &&
+        (lower.contains('music') ||
+            lower.contains('records') ||
+            lower.contains('pictures') ||
+            lower.contains('studios') ||
+            lower.contains('entertainment') ||
+            lower.contains('audio video'))) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Extracts true recording artists and vocalists from a video song's description text.
+  /// Handles distributor credit blocks ("Singers: ...", "Vocals: ...", "Music: ...")
+  /// as well as YouTube Music automated release delivery blocks.
+  static String extractArtistsFromDescription(String? description) {
+    if (description == null || description.trim().isEmpty) return '';
+    final text = decodeHtml(description);
+
+    // 1. Singer(s) / Vocal(s) / Artist(s) line
+    final vocalMatch = RegExp(
+      r'(?:Singers?|Vocals?|Artists?|Singers?\s*(?:&|and)\s*Vocals?)\s*[:\-–—|]\s*([^\r\n•\t|]+)',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (vocalMatch != null) {
+      final raw = vocalMatch.group(1)?.trim();
+      if (raw != null && raw.isNotEmpty && !isDistributorOrLabel(raw)) {
+        final formatted = formatArtists(raw);
+        if (formatted.isNotEmpty && formatted.toLowerCase() != 'unknown artist') {
+          return formatted;
+        }
+      }
+    }
+
+    // 2. Music Director / Composer line (prominent primary creator in Indian and global releases)
+    final musicMatch = RegExp(
+      r'(?:Music(?:\s*Director|\s*Composed\s*by|\s*by)?|Composed\s*by|Composer)\s*[:\-–—|]\s*([^\r\n•\t|]+)',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (musicMatch != null) {
+      final raw = musicMatch.group(1)?.trim();
+      if (raw != null && raw.isNotEmpty && !isDistributorOrLabel(raw)) {
+        final formatted = formatArtists(raw);
+        if (formatted.isNotEmpty && formatted.toLowerCase() != 'unknown artist') {
+          return formatted;
+        }
+      }
+    }
+
+    // 3. YouTube Music automated delivery description:
+    // "Provided to YouTube by ..."
+    // "Track Title · Artist 1 · Artist 2"
+    final autoMatch = RegExp(
+      r'Provided to YouTube by[^\r\n]*\r?\n+([^\r\n]+)',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (autoMatch != null) {
+      final line = autoMatch.group(1)?.trim() ?? '';
+      if (line.contains('·')) {
+        final parts = line.split('·').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        if (parts.length > 1) {
+          final artistParts = parts.sublist(1).where((a) => !isDistributorOrLabel(a)).toList();
+          if (artistParts.isNotEmpty) {
+            final formatted = formatArtists(artistParts);
+            if (formatted.isNotEmpty && formatted.toLowerCase() != 'unknown artist') {
+              return formatted;
+            }
+          }
+        }
+      }
+    }
+
+    return '';
+  }
+
+  /// Extracts the original release or upload year from description text.
+  static String? extractYearFromDescription(String? description) {
+    if (description == null || description.trim().isEmpty) return null;
+    final text = decodeHtml(description);
+
+    final relMatch = RegExp(
+      r'Released on\s*[:\-–—]?\s*[^\r\n]*?\b(19\d{2}|20\d{2})\b',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (relMatch != null) return relMatch.group(1);
+
+    final pMatch = RegExp(r'℗\s*(19\d{2}|20\d{2})').firstMatch(text);
+    if (pMatch != null) return pMatch.group(1);
+
+    final dateMatch = RegExp(
+      r'Release Date\s*[:\-–—]?\s*[^\r\n]*?\b(19\d{2}|20\d{2})\b',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (dateMatch != null) return dateMatch.group(1);
+
+    final yearMatch = RegExp(
+      r'\b(?:Year|Premiered|Uploaded?|Published)\s*[:\-–—]?\s*[^\r\n]*?\b(19\d{2}|20\d{2})\b',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (yearMatch != null) return yearMatch.group(1);
+
+    return null;
+  }
+
+  /// Extracts authentic musical artists from a video song's title when the uploader
+  /// is a distributor / channel or when metadata attribution is missing.
+  static String extractArtistsFromVideoTitle(
+    String? rawTitle, {
+    String? defaultArtist,
+  }) {
+    if (rawTitle == null || rawTitle.trim().isEmpty) {
+      return defaultArtist ?? '';
+    }
+    final raw = decodeHtml(rawTitle).trim();
+
+    // 1. Pipe-separated Indian cinema music video format:
+    // "LEO - Naa Ready Lyric Video | Thalapathy Vijay | Lokesh Kanagaraj | Anirudh Ravichander"
+    // "Monica - Video Song | COOLIE | Superstar Rajinikanth | Sun Pictures | Lokesh | Anirudh | Pooja Hegde"
+    // "Remo - Sirikkadhey Music Video | Anirudh Ravichander"
+    if (raw.contains('|')) {
+      final parts = raw.split('|').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+      final artistCandidates = <String>[];
+
+      for (var i = 1; i < parts.length; i++) {
+        var segment = parts[i];
+        segment = segment.replaceAll(
+          RegExp(
+            r'^(?:superstar|starring|cast|director|directed by|produced by|music(?:\s*by)?|singer[s]?|vocal[s]?)\s*[:\-–—]?\s*',
+            caseSensitive: false,
+          ),
+          '',
+        ).trim();
+
+        if (segment.isEmpty ||
+            isDistributorOrLabel(segment) ||
+            isMetadataNoise(segment) ||
+            _bracketTagsPattern.hasMatch(segment) ||
+            _descriptorTailPattern.hasMatch(segment)) {
+          continue;
+        }
+
+        final lower = segment.toLowerCase();
+        if (lower.contains('promo') ||
+            lower.contains('teaser') ||
+            lower.contains('trailer') ||
+            lower.contains('exclusive') ||
+            lower.contains('lyric video') ||
+            lower.contains('video song') ||
+            lower.contains('full video') ||
+            lower.contains('song video') ||
+            lower.contains('lyrical video')) {
+          continue;
+        }
+
+        artistCandidates.add(segment);
+      }
+
+      if (artistCandidates.isNotEmpty) {
+        if (defaultArtist != null && defaultArtist.isNotEmpty) {
+          final defLower = defaultArtist.toLowerCase();
+          final matches = artistCandidates
+              .where((a) =>
+                  a.toLowerCase().contains(defLower) ||
+                  defLower.contains(a.toLowerCase()))
+              .toList();
+          if (matches.isNotEmpty) {
+            return formatArtists(matches.first);
+          }
+        }
+        return formatArtists(artistCandidates.take(3).toList());
+      }
+    }
+
+    // 2. "Artist - Title" or "Title - Artist" format
+    // e.g. "Cartoon, Jéja - On & On (feat. Daniel Levi)"
+    // e.g. "Alan Walker - Faded"
+    // e.g. "Ed Sheeran - Shape of You"
+    final dashMatch = RegExp(r'^([^\-–—|]+)\s*[\-–—]\s*([^\-–—|]+)').firstMatch(raw);
+    if (dashMatch != null) {
+      final left = dashMatch.group(1)!.trim();
+      final right = dashMatch.group(2)!.trim();
+
+      final leftClean = cleanArtistName(left);
+      if (leftClean.isNotEmpty &&
+          !isDistributorOrLabel(leftClean) &&
+          !isMetadataNoise(leftClean) &&
+          !_bracketTagsPattern.hasMatch(left) &&
+          leftClean.length > 2) {
+        final featMatch = RegExp(
+          r'[\(\[]\s*(?:feat\.?|ft\.?|featuring)\s+([^\]\)]+)[\)\]]',
+          caseSensitive: false,
+        ).firstMatch(right);
+        if (featMatch != null) {
+          return formatArtists('$leftClean, ${featMatch.group(1)}');
+        }
+        return formatArtists(leftClean);
+      }
+
+      final rightClean = cleanArtistName(right);
+      if (rightClean.isNotEmpty &&
+          !isDistributorOrLabel(rightClean) &&
+          !isMetadataNoise(rightClean) &&
+          !_bracketTagsPattern.hasMatch(right) &&
+          rightClean.length > 2) {
+        return formatArtists(rightClean);
+      }
+    }
+
+    if (defaultArtist != null && defaultArtist.trim().isNotEmpty) {
+      return cleanArtistName(defaultArtist);
+    }
+
+    return '';
+  }
+
   // Album verbose suffix: (Original Motion Picture Soundtrack), OST, Deluxe, etc.
   static final RegExp _albumFluffPattern = RegExp(
     r'\s*(\[|\()\s*'
@@ -414,6 +708,11 @@ class MediaNormalizer {
       return '';
     }
 
+    // Reject standalone music distributors and record labels
+    if (isDistributorOrLabel(s)) {
+      return '';
+    }
+
     // Remove YouTube channel topic suffix ("Anirudh - Topic" -> "Anirudh")
     s = s.replaceAll(RegExp(r'\s*-\s*Topic$', caseSensitive: false), '').trim();
 
@@ -446,6 +745,8 @@ class MediaNormalizer {
     s = s.replaceAll(RegExp(r'^[,\-–—•·|;:/\\]+|[,\-–—•·|;:/\\]+$'), '').trim();
     s = s.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
 
+    if (isDistributorOrLabel(s)) return '';
+
     return s;
   }
 
@@ -469,7 +770,7 @@ class MediaNormalizer {
 
     void addCandidate(String candidate) {
       final clean = cleanArtistName(candidate);
-      if (clean.isEmpty || isMetadataNoise(clean)) return;
+      if (clean.isEmpty || isMetadataNoise(clean) || isDistributorOrLabel(clean)) return;
       final lower = clean.toLowerCase();
       if (lower == 'album' ||
           lower == 'single' ||
@@ -578,10 +879,6 @@ class MediaNormalizer {
     r'(?:ytimg\.com|img\.youtube\.com)/vi(?:_webp)?/([A-Za-z0-9_-]{6,20})/',
     caseSensitive: false,
   );
-  static final RegExp _ytimgLowRe = RegExp(
-    r'/(?:default|mqdefault|sddefault|hqdefault|hq720)\.(?:jpg|webp)(?:\?.*)?$',
-    caseSensitive: false,
-  );
 
   /// Resolves high-definition InnerTube artwork (retina 720x720 square covers/avatars,
   /// 1920x1080 wide banners, or 1280x720 maxresdefault video thumbnails) optimized
@@ -589,38 +886,33 @@ class MediaNormalizer {
   static String upgradeArtworkUrl(
     String? url, {
     String? videoId,
-    int targetSize = 720,
+    int? targetSize,
     bool isBanner = false,
     bool isArtistAvatar = false,
     String? qualityOverride,
   }) {
     final imgQuality = qualityOverride ?? SettingsState.instance.imageQuality;
-    final int effectiveTargetSize;
-    if (targetSize != 720) {
-      effectiveTargetSize = targetSize;
-    } else {
-      switch (imgQuality) {
-        case 'high':
-          effectiveTargetSize = 1000;
-          break;
-        case 'low':
-          effectiveTargetSize = 250;
-          break;
-        case 'medium':
-        default:
-          effectiveTargetSize = 540;
-          break;
-      }
-    }
+    final int maxQualitySize = switch (imgQuality) {
+      'low' => 180,
+      'medium' => 400,
+      'high' => 800,
+      _ => 400,
+    };
+    final int effectiveTargetSize = targetSize != null
+        ? targetSize.clamp(60, maxQualitySize)
+        : maxQualitySize;
 
     if (url == null ||
         url.trim().isEmpty ||
         url.contains('lh3.googleusercontent.com/s/v4/g')) {
       if (videoId != null && videoId.trim().isNotEmpty) {
         final cleanId = videoId.replaceFirst('yt-', '').trim();
-        final thumb = imgQuality == 'high'
-            ? 'maxresdefault.jpg'
-            : (imgQuality == 'low' ? 'mqdefault.jpg' : 'hqdefault.jpg');
+        final thumb = switch (imgQuality) {
+          'low' => 'mqdefault.jpg',
+          'medium' => 'hqdefault.jpg',
+          'high' => 'maxresdefault.jpg',
+          _ => 'hqdefault.jpg',
+        };
         return 'https://i.ytimg.com/vi/$cleanId/$thumb';
       }
       return '';
@@ -634,7 +926,7 @@ class MediaNormalizer {
     // 1. Google / YouTube Music CDN (lh3.googleusercontent.com / yt3.ggpht.com / ggpht.com)
     if (u.contains('googleusercontent.com') || u.contains('ggpht.com')) {
       if (RegExp(r'=s0(?:$|[?#])', caseSensitive: false).hasMatch(u)) {
-        return u;
+        u = u.replaceFirst(RegExp(r'=s0(?:$|[?#])', caseSensitive: false), '');
       }
 
       final dimMatch = _googleDimRe.firstMatch(u);
@@ -644,11 +936,16 @@ class MediaNormalizer {
       final h = dimMatch != null
           ? int.tryParse(dimMatch.group(2) ?? dimMatch.group(3) ?? '0') ?? 0
           : 0;
-      final preserveLandscape = isBanner || (w > h && w >= 1000);
+      final preserveLandscape = isBanner || (w > h && w >= 600);
 
       if (preserveLandscape && !isArtistAvatar) {
         if (w >= 1920) return u;
-        const bannerSuffix = '=w1920-h1080-p-l85-rj';
+        final bannerSuffix = switch (imgQuality) {
+          'low' => '=w640-h360-p-l70-rj',
+          'medium' => '=w960-h540-p-l80-rj',
+          'high' => '=w1920-h1080-p-l85-rj',
+          _ => '=w960-h540-p-l80-rj',
+        };
         return dimMatch != null
             ? u.replaceFirst(_googleDimRe, bannerSuffix)
             : '$u$bannerSuffix';
@@ -657,11 +954,10 @@ class MediaNormalizer {
       final keepPortrait =
           isArtistAvatar || u.contains('-p') || u.contains('-c');
       final squareSuffix = keepPortrait
-          ? '=w$effectiveTargetSize-h$effectiveTargetSize-p-l85-rj'
-          : '=w$effectiveTargetSize-h$effectiveTargetSize-l85-rj';
+          ? '=w$effectiveTargetSize-h$effectiveTargetSize-p-l75-rj'
+          : '=w$effectiveTargetSize-h$effectiveTargetSize-l75-rj';
 
       if (dimMatch != null) {
-        if (w == effectiveTargetSize && w == h && !isArtistAvatar) return u;
         return u.replaceFirst(_googleDimRe, squareSuffix);
       }
       return '$u$squareSuffix';
@@ -672,12 +968,13 @@ class MediaNormalizer {
       final idMatch = _ytimgIdRe.firstMatch(u);
       final resolvedVid =
           idMatch?.group(1) ?? videoId?.replaceFirst('yt-', '').trim();
-      if (resolvedVid != null &&
-          resolvedVid.isNotEmpty &&
-          (_ytimgLowRe.hasMatch(u) || u.contains('default'))) {
-        final thumb = imgQuality == 'high'
-            ? 'maxresdefault.jpg'
-            : (imgQuality == 'low' ? 'mqdefault.jpg' : 'hqdefault.jpg');
+      if (resolvedVid != null && resolvedVid.isNotEmpty) {
+        final thumb = switch (imgQuality) {
+          'low' => 'mqdefault.jpg',
+          'medium' => 'hqdefault.jpg',
+          'high' => 'maxresdefault.jpg',
+          _ => 'hqdefault.jpg',
+        };
         return 'https://i.ytimg.com/vi/$resolvedVid/$thumb';
       }
       return u.split('?').first;
@@ -685,9 +982,12 @@ class MediaNormalizer {
 
     // 3. JioSaavn CDN (c.saavncdn.com)
     if (u.contains('saavncdn.com')) {
-      final saavnSize = imgQuality == 'high'
-          ? '500x500'
-          : (imgQuality == 'low' ? '150x150' : '250x250');
+      final saavnSize = switch (imgQuality) {
+        'low' => '150x150',
+        'medium' => '250x250',
+        'high' => '500x500',
+        _ => '250x250',
+      };
       return u.replaceAll(
         RegExp(r'\b(50x50|150x150|250x250|350x350|500x500)\b'),
         saavnSize,
@@ -698,8 +998,8 @@ class MediaNormalizer {
   }
 
   /// Resolves wide hero banners (e.g. artist immersive headers) at 1920px+ landscape.
-  static String upgradeBannerUrl(String? url, {String? videoId}) =>
-      upgradeArtworkUrl(url, videoId: videoId, isBanner: true);
+  static String upgradeBannerUrl(String? url, {String? videoId, String? qualityOverride}) =>
+      upgradeArtworkUrl(url, videoId: videoId, isBanner: true, qualityOverride: qualityOverride);
 
   /// Normalizes raw InnerTube title and subtitle runs into a typed, verified [NormalizedMediaItem].
   static NormalizedMediaItem normalize({
@@ -713,6 +1013,7 @@ class MediaNormalizer {
     String? year,
     String? browseId,
     String? videoId,
+    String? defaultArtist,
   }) {
     // 1. Resolve Title
     String resolvedTitle = '';
@@ -730,6 +1031,28 @@ class MediaNormalizer {
     if (resolvedTitle.isEmpty && rawTitle != null) {
       resolvedTitle = rawTitle;
     }
+    // Pre-check raw title runs for video keywords before cleanTitle strips descriptor tags
+    final rawAllTitle = [
+      if (titleRuns != null)
+        ...titleRuns.map((r) => r is Map ? r['text'] ?? '' : ''),
+      ?rawTitle,
+    ].join(' ');
+    final rawLower = rawAllTitle.toLowerCase();
+    bool isVideoCandidate = defaultType == 'video' ||
+        defaultType == 'music video' ||
+        rawLower.contains('video song') ||
+        rawLower.contains('song video') ||
+        rawLower.contains('music video') ||
+        rawLower.contains('official video') ||
+        rawLower.contains('official music video') ||
+        rawLower.contains('lyric video') ||
+        rawLower.contains('lyrical video') ||
+        rawLower.contains('visualizer') ||
+        rawLower.contains('பாடல்') ||
+        rawLower.contains('வீடியோ') ||
+        rawLower.contains('गाने') ||
+        rawLower.contains('वीडियो');
+
     if (defaultType == 'album') {
       resolvedTitle = cleanAlbumTitle(resolvedTitle);
     } else if (defaultType == 'playlist') {
@@ -759,13 +1082,22 @@ class MediaNormalizer {
 
         // Check if run indicates release type
         final lower = t.toLowerCase();
+        if (lower == 'video' ||
+            lower == 'music video' ||
+            lower == 'official music video') {
+          resolvedType = 'video';
+          isVideoCandidate = true;
+          continue;
+        }
         if (lower == 'album' || lower == 'single' || lower == 'ep') {
           resolvedType = lower;
           continue;
         }
 
-        // Must be an artist or creator name
-        artistCandidates.add(t);
+        // Must be an artist or creator name (skip distributor and record label channels)
+        if (!isDistributorOrLabel(t)) {
+          artistCandidates.add(t);
+        }
       }
     }
 
@@ -777,11 +1109,27 @@ class MediaNormalizer {
       final cleanedSub = decodeHtml(rawSubtitle)
           .split('•')
           .map((s) => s.trim())
-          .where((s) => !isMetadataNoise(s) && !_yearPattern.hasMatch(s))
+          .where((s) => !isMetadataNoise(s) && !_yearPattern.hasMatch(s) && !isDistributorOrLabel(s))
           .toList();
       resolvedSubtitle = formatArtists(cleanedSub);
-    } else {
-      resolvedSubtitle = 'Unknown Artist';
+    }
+
+    // If subtitle is empty, "Unknown Artist", or a distributor, extract true artist from video title
+    if (resolvedSubtitle.isEmpty ||
+        resolvedSubtitle.toLowerCase() == 'unknown artist' ||
+        isDistributorOrLabel(resolvedSubtitle)) {
+      final extracted = extractArtistsFromVideoTitle(rawAllTitle, defaultArtist: defaultArtist);
+      if (extracted.isNotEmpty) {
+        resolvedSubtitle = extracted;
+      } else {
+        resolvedSubtitle = (defaultArtist != null && defaultArtist.isNotEmpty) ? defaultArtist : 'Unknown Artist';
+      }
+    }
+
+    // Extract year from raw title if year is not yet resolved
+    if (resolvedYear == null || resolvedYear.isEmpty) {
+      final m = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(rawAllTitle);
+      if (m != null) resolvedYear = m.group(0);
     }
 
     // 3. Resolve Image URL
@@ -796,6 +1144,7 @@ class MediaNormalizer {
       year: resolvedYear,
       browseId: browseId,
       videoId: videoId,
+      isVideo: isVideoCandidate || resolvedType == 'video',
     );
   }
 
@@ -838,17 +1187,19 @@ class NormalizedMediaItem {
     this.duration,
     this.browseId,
     this.videoId,
+    this.isVideo = false,
   });
 
   final String id;
   final String title;
   final String subtitle;
   final String imageUrl;
-  final String type; // 'song', 'album', 'artist', 'playlist'
+  final String type; // 'song', 'album', 'artist', 'playlist', 'video'
   final String? year;
   final String? duration;
   final String? browseId;
   final String? videoId;
+  final bool isVideo;
 
   /// Cleaned title (alias for title).
   String get cleanTitle => title;

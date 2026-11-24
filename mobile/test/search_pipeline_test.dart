@@ -819,4 +819,88 @@ void main() {
       expect(result.topResult?.item.id ?? result.songs.first.id, equals('song-blinding-lights'));
     });
   });
+
+  group('10. Parity and Video Music Filtering', () {
+    test('filters non-music spam videos while preserving legitimate music video songs', () {
+      final song = SearchSongItem(
+        id: 'song-starboy',
+        title: 'Starboy',
+        subtitle: 'The Weeknd • Daft Punk',
+        thumbnailUrl: 'https://example.com/starboy.jpg',
+        thumbnailUrlHiRes: 'https://example.com/starboy_hi.jpg',
+        artists: [const ArtistRef(id: 'weeknd', name: 'The Weeknd')],
+        providerRank: 0,
+        musicVideoType: 'ATV',
+      );
+
+      final legitMusicVideo = SearchVideoItem(
+        id: 'video-starboy-mv',
+        title: 'Starboy (Official Music Video)',
+        subtitle: 'The Weeknd • 2.5B views',
+        thumbnailUrl: 'https://example.com/starboy_mv.jpg',
+        thumbnailUrlHiRes: 'https://example.com/starboy_mv_hi.jpg',
+        channel: 'TheWeekndVEVO',
+        durationText: '3:50',
+        views: 2500000000,
+      );
+
+      final nonMusicReview = SearchVideoItem(
+        id: 'video-tech-review',
+        title: 'Starboy Sound & Audio Tech Review',
+        subtitle: 'Gadget Guru • 10K views',
+        thumbnailUrl: 'https://example.com/review.jpg',
+        thumbnailUrlHiRes: 'https://example.com/review_hi.jpg',
+        channel: 'Gadget Guru',
+        durationText: '12:45',
+        views: 10000,
+      );
+
+      final intent = SearchIntentDetector.detectIntent('starboy', [song, legitMusicVideo, nonMusicReview]);
+      final result = SearchRanker.rank(
+        items: [nonMusicReview, song, legitMusicVideo],
+        intent: intent,
+        countryCode: 'US',
+      );
+
+      // Tech review video is filtered out
+      expect(result.videos.any((v) => v.id == 'video-tech-review'), isFalse);
+      // Legitimate music video song is preserved in videos section!
+      expect(result.videos.any((v) => v.id == 'video-starboy-mv'), isTrue);
+      expect(result.songs.any((s) => s.id == 'song-starboy'), isTrue);
+    });
+
+    test('YouTube Music verified initialTopResult is honored as Top Result', () {
+      final artistItem = SearchArtistItem(
+        id: 'artist-weeknd',
+        title: 'The Weeknd',
+        subtitle: 'Artist • 54M subscribers',
+        thumbnailUrl: 'https://example.com/weeknd.jpg',
+        thumbnailUrlHiRes: 'https://example.com/weeknd_hi.jpg',
+        browseId: 'UC_weeknd',
+        isVerified: true,
+      );
+
+      final songItem = SearchSongItem(
+        id: 'song-weeknd-hills',
+        title: 'The Hills',
+        subtitle: 'The Weeknd',
+        thumbnailUrl: 'https://example.com/hills.jpg',
+        thumbnailUrlHiRes: 'https://example.com/hills_hi.jpg',
+        artists: [const ArtistRef(id: 'weeknd', name: 'The Weeknd')],
+        providerRank: 0,
+      );
+
+      final topResultCard = SearchTopResult(item: artistItem);
+      final intent = SearchIntentDetector.detectIntent('the weeknd', [artistItem, songItem]);
+      final result = SearchRanker.rank(
+        items: [songItem, artistItem],
+        intent: intent,
+        countryCode: 'US',
+        initialTopResult: topResultCard,
+      );
+
+      expect(result.topResult, isNotNull);
+      expect(result.topResult!.item.id, equals('artist-weeknd'));
+    });
+  });
 }

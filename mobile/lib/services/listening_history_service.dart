@@ -49,7 +49,13 @@ class ListeningHistoryService {
           for (final item in list) {
             if (item is Map) {
               try {
-                final t = Track.fromJson(Map<String, dynamic>.from(item));
+                var t = Track.fromJson(Map<String, dynamic>.from(item));
+                final isVid = t.isVideo ||
+                    Track.detectIsVideo(t.title, t.album,
+                        coverUrl: t.coverUrl);
+                if (isVid && !t.isVideo) {
+                  t = t.copyWith(isVideo: true, album: 'Music Video');
+                }
                 if (!t.artist.contains("Instance of") &&
                     !t.artist.contains("ArtistRef") &&
                     t.artist != 'Unknown Artist') {
@@ -801,10 +807,52 @@ class ListeningHistoryService {
     return null;
   }
 
-  /// Returns older tracks from history (skipped first 5 recent) to rediscover.
+  /// Returns older audio tracks from history (skipped first 5 recent) to rediscover.
   List<Track> getRediscoverTracks({int limit = 10}) {
-    if (_history.length <= 5) return const [];
-    return _history.skip(5).take(limit).toList();
+    final audioHistory = _history
+        .where((t) =>
+            !t.isVideo &&
+            !Track.detectIsVideo(t.title, t.album) &&
+            t.album.toLowerCase() != 'music video')
+        .toList();
+    if (audioHistory.length <= 5) return const [];
+    return audioHistory.skip(5).take(limit).toList();
+  }
+
+  /// Returns recent audio tracks from history for "Listen again".
+  List<Track> getListenAgainTracks({int limit = 12}) {
+    return _history
+        .where((t) =>
+            !t.isVideo &&
+            !Track.detectIsVideo(t.title, t.album) &&
+            t.album.toLowerCase() != 'music video')
+        .take(limit)
+        .toList();
+  }
+
+  /// Returns recently watched music videos for "Watch again".
+  List<Track> getWatchAgainVideos({int limit = 12}) {
+    return _history
+        .where((t) =>
+            t.isVideo ||
+            Track.detectIsVideo(t.title, t.album) ||
+            t.album.toLowerCase() == 'music video')
+        .map((t) => t.copyWith(isVideo: true))
+        .take(limit)
+        .toList();
+  }
+
+  /// Returns older music videos to rediscover.
+  List<Track> getRediscoverVideos({int limit = 10}) {
+    final vids = _history
+        .where((t) =>
+            t.isVideo ||
+            Track.detectIsVideo(t.title, t.album) ||
+            t.album.toLowerCase() == 'music video')
+        .map((t) => t.copyWith(isVideo: true))
+        .toList();
+    if (vids.length <= 3) return const [];
+    return vids.skip(3).take(limit).toList();
   }
 
   /// Returns time-of-day greeting, contextual mood, and targeted search term.

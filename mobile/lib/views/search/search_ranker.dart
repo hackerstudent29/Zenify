@@ -587,6 +587,7 @@ class SearchRanker {
     String? didYouMean,
     String? continuation,
     Map<String, int> streamLatenciesMs = const {},
+    List<String> querySuggestions = const [],
   }) {
     // 1. Stage A: Multi-Stream Reciprocal Rank Fusion (RRF) & Deduplication
     final rrfScores = _computeReciprocalRankFusion(items);
@@ -598,6 +599,7 @@ class SearchRanker {
         intent: intent,
         correctedQuery: didYouMean,
         continuation: continuation,
+        suggestions: querySuggestions,
         diagnostics: SearchDiagnostics(
           query: intent.originalQuery,
           normalizedQuery: intent.normalizedQuery,
@@ -724,6 +726,7 @@ class SearchRanker {
       continuation: continuation,
       intent: intent,
       diagnostics: diagnostics,
+      suggestions: querySuggestions,
     );
   }
 

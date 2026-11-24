@@ -6,7 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/track.dart';
-import 'api_service.dart';
+import '../utils/media_normalizer.dart';
+import 'download_service.dart';
 import 'innertube_service.dart';
 
 /// Structured lyrics line format matching Zenify's Apple Music visual engine.
@@ -238,108 +239,107 @@ Future<T?> firstNonNull<T>(List<Future<T?>> fs) {
 /// 2. TIER 2 (PRIORITY #2): Line-by-Line Synced Lyrics (lrc.red line, LRCLIB syncedLyrics, Backend line)
 /// 3. TIER 3 (FALLBACK ONLY): Plain Lyrics (LRCLIB plain, YouTube Music InnerTube, Backend plain)
 class LyricsService {
-  LyricsService._();
+  LyricsService._() {
+    purgeUnsyncedCache();
+  }
   static final LyricsService instance = LyricsService._();
 
   final http.Client _client = http.Client();
   final Map<String, LyricsResult> _memCache = {};
   final Map<String, Future<LyricsResult?>> _lyricsInflight = {};
-  final Set<String> _rejectedIds = {};
+  final Map<String, int> _rejectedTimestamps = {};
 
   static String cleanTitle(String title) {
-    return title
-        .replaceAll(
-          RegExp(
-            r'\s*[\(\[\{].*?(official|video|audio|lyrics?|visualizer|remaster|hd|4k|feat|ft\.).*?[\)\]\}]',
-            caseSensitive: false,
-          ),
-          '',
-        )
-        .replaceAll(
-          RegExp(r'\s*[\(\[\{]from\s+[^)\]}]+[\)\]\}]', caseSensitive: false),
-          '',
-        )
-        .replaceAll(RegExp(r'\s*\|\s*.*$'), '')
-        .replaceAll(
-          RegExp(
-            r'\s*-\s*(official|video|audio|lyrics?).*$',
-            caseSensitive: false,
-          ),
-          '',
-        )
-        .trim();
+    if (title.trim().isEmpty) return '';
+    var s = MediaNormalizer.cleanCompactTitle(title);
+    s = s.replaceAll(
+      RegExp(
+        r'\s*[\-–—|]\s*(video|audio|lyric|song|tamil|telugu|hindi|malayalam|kannada|remaster|hd|4k|official).*$',
+        caseSensitive: false,
+      ),
+      '',
+    ).trim();
+    return s.isNotEmpty ? s : title.trim();
   }
 
   static String cleanArtist(String artist) {
-    return artist
+    if (artist.trim().isEmpty) return '';
+    var s = MediaNormalizer.cleanArtistName(artist);
+    if (s.isEmpty) s = artist;
+    if (MediaNormalizer.isDistributorOrLabel(s)) {
+      return '';
+    }
+    return s
         .split(RegExp(r'[,&/|]|\bfeat\.?\b|\bft\.?\b', caseSensitive: false))
         .first
         .trim();
   }
 
   /// Validates that a lyrics candidate's title actually matches the playing song's title.
-  /// Prevents fuzzy search results from returning random songs with different titles!
+  /// Prevents false rejections when subtitles or extra movie tags differ.
   static bool isTitleMatch(String? candidate, String target) {
     if (candidate == null || candidate.trim().isEmpty) return false;
-    final c = cleanTitle(
-      candidate,
-    ).toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final t = cleanTitle(
-      target,
-    ).toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final cRaw = cleanTitle(candidate).toLowerCase();
+    final tRaw = cleanTitle(target).toLowerCase();
+    final c = cRaw.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final t = tRaw.replaceAll(RegExp(r'[^a-z0-9]'), '');
     if (c.isEmpty || t.isEmpty) return false;
     if (c == t) return true;
 
-    // Reject if one title is drastically shorter or longer
-    final minLen = math.min(c.length, t.length);
-    final maxLen = math.max(c.length, t.length);
-    if (minLen / maxLen < 0.60 && !c.contains(t) && !t.contains(c))
-      return false;
+    // Substring containment in either direction
+    if (c.contains(t) || t.contains(c)) return true;
 
-    final cWords = cleanTitle(
-      candidate,
-    ).toLowerCase().split(RegExp(r'\s+')).where((w) => w.length >= 2).toSet();
-    final tWords = cleanTitle(
-      target,
-    ).toLowerCase().split(RegExp(r'\s+')).where((w) => w.length >= 2).toSet();
+    // Segment before hyphen or colon matches
+    final cSegment = cRaw.split(RegExp(r'[\-–—:]')).first.replaceAll(RegExp(r'[^a-z0-9]'), '').trim();
+    final tSegment = tRaw.split(RegExp(r'[\-–—:]')).first.replaceAll(RegExp(r'[^a-z0-9]'), '').trim();
+    if (cSegment.isNotEmpty && tSegment.isNotEmpty && cSegment == tSegment) {
+      return true;
+    }
+
+    final cWords = cRaw.split(RegExp(r'[^a-z0-9]+')).where((w) => w.length >= 2).toSet();
+    final tWords = tRaw.split(RegExp(r'[^a-z0-9]+')).where((w) => w.length >= 2).toSet();
     if (cWords.isEmpty || tWords.isEmpty) return false;
     final overlap = cWords.intersection(tWords);
 
-    // If target has 1 or 2 words, all target words must match
-    if (tWords.length <= 2) {
-      return overlap.length == tWords.length;
+    if (overlap.isNotEmpty) {
+      final minCount = math.min(cWords.length, tWords.length);
+      // At least 50% of shorter title's words match
+      if (overlap.length >= (minCount * 0.5).ceil()) return true;
     }
-    // If target has 3 words, at least 2 must match
-    if (tWords.length == 3) {
-      return overlap.length >= 2;
-    }
-    // For longer titles, at least 70% of words must match
-    return overlap.length >= (tWords.length * 0.7).ceil();
+
+    return false;
   }
 
   /// Validates that a lyrics candidate's artist matches the playing song's artist.
-  /// Prevents cross-artist collisions (e.g. matching a song with the same title by a different artist).
+  /// Prevents cross-artist collisions while tolerating multiple featured vocalists.
   static bool isArtistMatch(String? candidate, String target) {
     if (candidate == null || candidate.trim().isEmpty) return false;
     if (target.trim().isEmpty) return true;
+
+    if (MediaNormalizer.isDistributorOrLabel(candidate) ||
+        MediaNormalizer.isDistributorOrLabel(target)) {
+      return true;
+    }
+
     final c = candidate.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     final t = target.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-    if (c.isEmpty || t.isEmpty) return false;
+    if (c.isEmpty || t.isEmpty) return true;
     if (c == t || c.contains(t) || t.contains(c)) return true;
 
     final cArtists = candidate
         .toLowerCase()
-        .split(RegExp(r'[,&/]|feat\.?|ft\.?'))
+        .split(RegExp(r'[,&/|]|\bfeat\.?\b|\bft\.?\b'))
         .map((s) => s.trim().replaceAll(RegExp(r'[^a-z0-9]'), ''))
         .where((s) => s.length >= 2)
         .toSet();
     final tArtists = target
         .toLowerCase()
-        .split(RegExp(r'[,&/]|feat\.?|ft\.?'))
+        .split(RegExp(r'[,&/|]|\bfeat\.?\b|\bft\.?\b'))
         .map((s) => s.trim().replaceAll(RegExp(r'[^a-z0-9]'), ''))
         .where((s) => s.length >= 2)
         .toSet();
-    if (cArtists.isEmpty || tArtists.isEmpty) return false;
+
+    if (cArtists.isEmpty || tArtists.isEmpty) return true;
 
     for (final ca in cArtists) {
       for (final ta in tArtists) {
@@ -569,7 +569,7 @@ class LyricsService {
     return null;
   }
 
-  static const String _kCachePrefix = 'lyrics_cache_v10_';
+  static const String _kCachePrefix = 'lyrics_cache_v12_';
 
   /// Removes accented characters and diacritics for resilient international matching
   /// (e.g. "São Paulo" -> "Sao Paulo", "Señorita" -> "Senorita").
@@ -650,51 +650,6 @@ class LyricsService {
       return false;
     }
 
-    // 3. Strict cross-language marker collision prevention
-    final words = lyricsText
-        .toLowerCase()
-        .split(RegExp(r'[^a-z]+'))
-        .where((w) => w.length >= 3)
-        .toSet();
-    if (exp == 'telugu') {
-      if (words.intersection(_tamilMarkers).length >= 2) {
-        if (kDebugMode)
-          debugPrint(
-            '[LyricsFlow] Rejected: Tamil markers found in Telugu song lyrics',
-          );
-        return false;
-      }
-      if (words.intersection(_hindiMarkers).length >= 2) {
-        if (kDebugMode)
-          debugPrint(
-            '[LyricsFlow] Rejected: Hindi markers found in Telugu song lyrics',
-          );
-        return false;
-      }
-    } else if (exp == 'tamil') {
-      if (words.intersection(_teluguMarkers).length >= 2) {
-        if (kDebugMode)
-          debugPrint(
-            '[LyricsFlow] Rejected: Telugu markers found in Tamil song lyrics',
-          );
-        return false;
-      }
-      if (words.intersection(_hindiMarkers).length >= 2) {
-        if (kDebugMode)
-          debugPrint(
-            '[LyricsFlow] Rejected: Hindi markers found in Tamil song lyrics',
-          );
-        return false;
-      }
-    } else if (exp == 'hindi') {
-      if (words.intersection(_tamilMarkers).length >= 2) return false;
-      if (words.intersection(_teluguMarkers).length >= 2) return false;
-    } else if (exp == 'malayalam') {
-      if (words.intersection(_tamilMarkers).length >= 2) return false;
-    } else if (exp == 'kannada') {
-      if (words.intersection(_teluguMarkers).length >= 2) return false;
-    }
-
     return true;
   }
 
@@ -742,8 +697,35 @@ class LyricsService {
   /// Fetches lyrics using the strict multi-tier hierarchy:
   /// Tier 1 (WBW) -> Tier 2 (Line-by-Line) -> Tier 3 (Plain Fallback).
   Future<LyricsResult?> fetchLyrics(Track track) {
+    // Fast path: Offline / Downloaded songs must NEVER hit network!
+    // Check if offline lyrics exist on disk, otherwise return null immediately.
+    if (DownloadService.instance.isDownloaded(track.id) ||
+        DownloadService.instance.getLocalAudioPath(track.id) != null ||
+        track.coverUrl.startsWith('file://')) {
+      final localLyrics = DownloadService.instance.getLocalLyrics(track.id);
+      if (kDebugMode) {
+        debugPrint('[LyricsFlow] Offline track (${track.id}): local lyrics=${localLyrics != null}');
+      }
+      return Future.value(localLyrics);
+    }
+
+    // Fast path: Never fetch lyrics for video songs (waste of network and CPU)
+    if (track.isVideo ||
+        track.id.startsWith('vid-') ||
+        track.id.startsWith('video-') ||
+        Track.detectIsVideo(track.title, track.album, coverUrl: track.coverUrl)) {
+      if (kDebugMode) {
+        debugPrint('[LyricsFlow] Skip lyrics: track is a video song (${track.id})');
+      }
+      return Future.value(null);
+    }
+
     final cacheKey = track.id;
-    if (_rejectedIds.contains(cacheKey)) return Future.value(null);
+    final rejTime = _rejectedTimestamps[cacheKey];
+    if (rejTime != null &&
+        (DateTime.now().millisecondsSinceEpoch - rejTime) < 30000) {
+      return Future.value(null);
+    }
     final inFlight = _lyricsInflight[cacheKey];
     if (inFlight != null) return inFlight;
 
@@ -753,6 +735,10 @@ class LyricsService {
     return future;
   }
 
+  void clearRejected(String trackId) {
+    _rejectedTimestamps.remove(trackId);
+  }
+
   Future<LyricsResult?> _doFetchLyrics(Track track, String cacheKey) async {
     final lang = track.language.isNotEmpty
         ? track.language.toLowerCase().trim()
@@ -760,46 +746,40 @@ class LyricsService {
 
     if (kDebugMode) {
       debugPrint(
-        '[LyricsFlow] START fetchLyrics trackId=${track.id} title="${track.title}" artist="${track.artist}" lang="$lang"',
+        '[LyricsFlow] START ultra-fast fetchLyrics trackId=${track.id} title="${track.title}" artist="${track.artist}" lang="$lang"',
       );
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // STEP 0: In-Memory & Offline Disk Cache (Instant, 0ms)
+    // ─────────────────────────────────────────────────────────────────────────
     if (_memCache.containsKey(cacheKey)) {
       final mem = _memCache[cacheKey]!;
-      // Return synced immediately from memory if compatible
       if (mem.synced &&
           (lang.isEmpty ||
               mem.rawLrc == null ||
               isLanguageCompatible(mem.rawLrc!, lang))) {
-        if (kDebugMode)
-          debugPrint(
-            '[LyricsFlow] MEM_CACHE_HIT key=$cacheKey source=${mem.source}',
-          );
+        if (kDebugMode) {
+          debugPrint('[LyricsFlow] MEM_CACHE_HIT key=$cacheKey source=${mem.source}');
+        }
         return mem;
       }
     }
 
-    // Check SharedPreferences offline cache (ONLY accept if synced & language compatible)
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedStr = prefs.getString('$_kCachePrefix$cacheKey');
       if (cachedStr != null) {
         final json = jsonDecode(cachedStr) as Map<String, dynamic>;
         final cachedArtist = json['artist'] as String?;
-        if (cachedArtist != null &&
-            !isArtistMatch(cachedArtist, track.artist)) {
-          // Stale cross-artist cache collision; eradicate it immediately
+        if (cachedArtist != null && !isArtistMatch(cachedArtist, track.artist)) {
           await prefs.remove('$_kCachePrefix$cacheKey');
         } else {
-          final lines =
-              (json['lines'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          final lines = (json['lines'] as List?)?.cast<Map<String, dynamic>>() ?? [];
           final isSynced = json['synced'] == true;
           final rawLrc = json['rawLrc'] as String?;
           if (lines.isNotEmpty && isSynced) {
-            final isCompat =
-                lang.isEmpty ||
-                rawLrc == null ||
-                isLanguageCompatible(rawLrc, lang);
+            final isCompat = lang.isEmpty || rawLrc == null || isLanguageCompatible(rawLrc, lang);
             if (isCompat) {
               final result = LyricsResult(
                 lines: lines,
@@ -808,10 +788,9 @@ class LyricsService {
                 rawLrc: rawLrc,
               );
               _memCache[cacheKey] = result;
-              if (kDebugMode)
-                debugPrint(
-                  '[LyricsFlow] DISK_CACHE_HIT key=$cacheKey source=${result.source}',
-                );
+              if (kDebugMode) {
+                debugPrint('[LyricsFlow] DISK_CACHE_HIT key=$cacheKey source=${result.source}');
+              }
               return result;
             }
           }
@@ -821,839 +800,366 @@ class LyricsService {
 
     final cleanT = cleanTitle(track.title);
     final cleanA = cleanArtist(track.artist);
+    final fullA = MediaNormalizer.cleanArtistName(track.artist);
 
-    final videoId = track.id.startsWith('yt-')
-        ? track.id.substring(3)
-        : track.id;
-
-    String? officialYtLyrics;
-    Future<LyricsResult?> nativeLyricsFuture() async {
-      if (videoId.isEmpty) return null;
-      try {
-        final raw = await InnerTubeService.instance.getLyrics(videoId);
-        if (raw == null || raw.trim().isEmpty) return null;
-        officialYtLyrics = raw;
-        if (lang.isNotEmpty && !isLanguageCompatible(raw, lang)) {
-          return null;
-        }
-        final parsed = LrcParser.parse(raw);
-        if (parsed.lines.isEmpty) return null;
-        return LyricsResult(
-          lines: parsed.lines,
-          synced: parsed.synced,
-          source: parsed.synced ? 'innertube_official_synced' : 'innertube_official_plain',
-          rawLrc: raw,
-        );
-      } catch (_) {
-        return null;
-      }
-    }
-
-    Future<LyricsResult?> backendLyricsFuture() async {
-      try {
-        final b = await _fetchBackendLyrics(track, cleanT, cleanA)
-            .timeout(const Duration(seconds: 4));
-        if (b == null || b.isEmpty) return null;
-        if (b.rawLrc != null && lang.isNotEmpty && !isLanguageCompatible(b.rawLrc!, lang)) {
-          return null;
-        }
-        return b;
-      } catch (_) {
-        return null;
-      }
-    }
-
-    // Race native InnerTube lyrics and backend in parallel
-    final backendTask = backendLyricsFuture();
-    final fastWinner = await firstNonNull([
-      nativeLyricsFuture(),
-      backendTask,
-    ]);
-
-    if (fastWinner != null && fastWinner.isNotEmpty && fastWinner.synced) {
-      return _saveAndReturn(
-        cacheKey,
-        fastWinner.lines,
-        true,
-        fastWinner.source,
-        rawLrc: fastWinner.rawLrc,
-        artist: cleanA,
-        title: cleanT,
-        officialYtLyrics: officialYtLyrics,
-      );
-    }
-
-    final LyricsResult? plainFallback = (fastWinner != null && fastWinner.isNotEmpty && !fastWinner.synced)
-        ? fastWinner
-        : null;
-
-    // =========================================================================
-    // TIER 1 (PRIORITY #1): WORD-BY-WORD (WBW) SYNCED LYRICS
-    // =========================================================================
-
-    // 1a. Query lrc.red for Word-by-Word Enhanced LRC (with duration validation)
-    LyricsResult? lrcRedLineCandidate;
+    // ─────────────────────────────────────────────────────────────────────────
+    // STEP 1: lrc.red First (Strict: If success, DO NOT proceed to Step 2!)
+    // ─────────────────────────────────────────────────────────────────────────
     try {
-      final lrcRed = await _fetchLrcRed(
+      final lrcRedResult = await _fetchLrcRedFast(cleanT, cleanA, fullA, lang);
+      if (lrcRedResult != null && lrcRedResult.isNotEmpty && lrcRedResult.synced) {
+        if (kDebugMode) {
+          debugPrint(
+            '[LyricsFlow] STEP 1 SUCCESS (lrc.red): Terminating early, returning synced lyrics.',
+          );
+        }
+        return _saveAndReturn(
+          cacheKey,
+          lrcRedResult.lines,
+          true,
+          lrcRedResult.source,
+          rawLrc: lrcRedResult.rawLrc,
+          artist: cleanA,
+          title: cleanT,
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[LyricsFlow] Step 1 (lrc.red) error: $e');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // STEP 2: lrclib Next (https://github.com/tranxuanthang/lrclib.git)
+    // (Strict: If synced found, DO NOT proceed to Step 3!)
+    // ─────────────────────────────────────────────────────────────────────────
+    String? stashedPlainLyrics;
+    try {
+      final lrclibResult = await _fetchLrclibFast(
         cleanT,
         cleanA,
+        fullA,
         lang,
-        track.durationSeconds,
-      );
-      if (lrcRed.wbw != null && lrcRed.wbw!.isNotEmpty) {
-        return _saveAndReturn(
-          cacheKey,
-          lrcRed.wbw!.lines,
-          true,
-          'lrc_red_wbw',
-          rawLrc: lrcRed.wbw!.rawLrc,
-          artist: cleanA,
-          title: cleanT,
-          officialYtLyrics: officialYtLyrics,
-        );
-      }
-      lrcRedLineCandidate = lrcRed.line;
-    } catch (e) {
-      if (kDebugMode) debugPrint('[LyricsService] Tier 1 (lrc.red) error: $e');
-    }
-
-    // 1b. Query Zenify Backend for Word-by-Word Synced Lyrics
-    LyricsResult? backendCandidate;
-    try {
-      backendCandidate = await backendTask;
-      if (backendCandidate != null &&
-          backendCandidate.synced &&
-          (lang.isEmpty ||
-              backendCandidate.rawLrc == null ||
-              isLanguageCompatible(backendCandidate.rawLrc!, lang)) &&
-          backendCandidate.lines.any(
-            (l) => l['words'] != null && (l['words'] as List).isNotEmpty,
-          )) {
-        return _saveAndReturn(
-          cacheKey,
-          backendCandidate.lines,
-          true,
-          backendCandidate.source,
-          rawLrc: backendCandidate.rawLrc,
-          artist: cleanA,
-          title: cleanT,
-          officialYtLyrics: officialYtLyrics,
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('[LyricsService] Tier 1 (Backend) error: $e');
-    }
-
-    // =========================================================================
-    // TIER 2 (PRIORITY #2): LINE-BY-LINE SYNCED LYRICS
-    // =========================================================================
-
-    // 2a. Use lrc.red line-synced result if found during Tier 1
-    if (lrcRedLineCandidate != null &&
-        lrcRedLineCandidate.isNotEmpty &&
-        lrcRedLineCandidate.synced) {
-      return _saveAndReturn(
-        cacheKey,
-        lrcRedLineCandidate.lines,
-        true,
-        'lrc_red_line',
-        rawLrc: lrcRedLineCandidate.rawLrc,
-        artist: cleanA,
-        title: cleanT,
-        officialYtLyrics: officialYtLyrics,
-      );
-    }
-
-    // 2b. Query LRCLIB STRICTLY for syncedLyrics (reject plain lyrics & conflicting languages)
-    try {
-      final lrclibSynced = await _fetchLrclibSynced(
-        cleanT,
-        cleanA,
         track.album,
-        track.durationSeconds,
-        lang,
       );
-      if (lrclibSynced != null &&
-          lrclibSynced.isNotEmpty &&
-          lrclibSynced.synced) {
+      if (lrclibResult.synced != null &&
+          lrclibResult.synced!.isNotEmpty &&
+          lrclibResult.synced!.synced) {
+        if (kDebugMode) {
+          debugPrint(
+            '[LyricsFlow] STEP 2 SUCCESS (lrclib synced): Terminating early, returning synced lyrics.',
+          );
+        }
         return _saveAndReturn(
           cacheKey,
-          lrclibSynced.lines,
+          lrclibResult.synced!.lines,
           true,
-          'lrclib_synced',
-          rawLrc: lrclibSynced.rawLrc,
+          lrclibResult.synced!.source,
+          rawLrc: lrclibResult.synced!.rawLrc,
           artist: cleanA,
           title: cleanT,
-          officialYtLyrics: officialYtLyrics,
         );
       }
+      stashedPlainLyrics = lrclibResult.plain;
     } catch (e) {
-      if (kDebugMode)
-        debugPrint('[LyricsService] Tier 2 (LRCLIB synced) error: $e');
+      if (kDebugMode) debugPrint('[LyricsFlow] Step 2 (lrclib) error: $e');
     }
 
-    // 2c. InnerTube official lyrics if synced
-    try {
-      final ytSyncLyrics = officialYtLyrics;
-      if (ytSyncLyrics != null && ytSyncLyrics.trim().isNotEmpty) {
-        final parsed = LrcParser.parse(ytSyncLyrics);
-        if (parsed.lines.isNotEmpty && parsed.synced) {
-          return _saveAndReturn(
+    // ─────────────────────────────────────────────────────────────────────────
+    // STEP 3: Plain text if available (LRCLIB plain or InnerTube official)
+    // (Strict: If plain found, DO NOT proceed to Step 4!)
+    // ─────────────────────────────────────────────────────────────────────────
+    // 3a. Use plain lyrics stashed during LRCLIB query
+    if (stashedPlainLyrics != null && stashedPlainLyrics.trim().isNotEmpty) {
+      if (lang.isEmpty || isLanguageCompatible(stashedPlainLyrics, lang)) {
+        final parsed = LrcParser.parse(stashedPlainLyrics);
+        if (parsed.lines.isNotEmpty) {
+          if (kDebugMode) {
+            debugPrint(
+              '[LyricsFlow] STEP 3 SUCCESS (lrclib plain): Returning plain text lyrics.',
+            );
+          }
+          return _returnPlainMemoryOnly(
             cacheKey,
             parsed.lines,
-            true,
-            'innertube_official_synced',
-            rawLrc: ytSyncLyrics,
-            artist: cleanA,
-            title: cleanT,
+            'lrclib_plain',
           );
         }
       }
-    } catch (_) {}
-
-    // 2d. Use Zenify Backend line-synced lyrics if available
-    if (backendCandidate != null &&
-        backendCandidate.isNotEmpty &&
-        backendCandidate.synced &&
-        (lang.isEmpty ||
-            backendCandidate.rawLrc == null ||
-            isLanguageCompatible(backendCandidate.rawLrc!, lang))) {
-      return _saveAndReturn(
-        cacheKey,
-        backendCandidate.lines,
-        true,
-        backendCandidate.source,
-        rawLrc: backendCandidate.rawLrc,
-        artist: cleanA,
-        title: cleanT,
-        officialYtLyrics: officialYtLyrics,
-      );
     }
 
-    // =========================================================================
-    // TIER 3 (FALLBACK / LAST RESORT ONLY): PLAIN UNSYNCED LYRICS
-    // =========================================================================
-
-    // 3a. Use fast plain fallback if already obtained from InnerTube or Backend
-    if (plainFallback != null && plainFallback.lines.isNotEmpty) {
-      return _returnPlainMemoryOnly(
-        cacheKey,
-        plainFallback.lines,
-        plainFallback.source,
-      );
-    }
-
-    // 3b. YouTube Music InnerTube Official Plain Lyrics (Tied directly to videoId - 100% accurate!)
-    final ytPlainLyrics = officialYtLyrics;
-    if (ytPlainLyrics != null && ytPlainLyrics.trim().isNotEmpty) {
-      final parsed = LrcParser.parse(ytPlainLyrics);
-      if (parsed.lines.isNotEmpty) {
-        return _returnPlainMemoryOnly(
-          cacheKey,
-          parsed.lines,
-          'innertube_official_plain',
-        );
-      }
-    }
-
-    // 3c. LRCLIB plainLyrics (strictly validated with title match)
-    try {
-      final lrclibPlain = await _fetchLrclibPlain(
-        cleanT,
-        cleanA,
-        track.album,
-        track.durationSeconds,
-        lang,
-      );
-      if (lrclibPlain != null && lrclibPlain.isNotEmpty) {
-        return _returnPlainMemoryOnly(
-          cacheKey,
-          lrclibPlain.lines,
-          'lrclib_plain',
-        );
-      }
-    } catch (_) {}
-
-    // 3d. Zenify Backend plain lyrics
-    if (backendCandidate != null &&
-        backendCandidate.isNotEmpty &&
-        (lang.isEmpty ||
-            backendCandidate.rawLrc == null ||
-            isLanguageCompatible(backendCandidate.rawLrc!, lang))) {
-      return _returnPlainMemoryOnly(
-        cacheKey,
-        backendCandidate.lines,
-        backendCandidate.source,
-      );
-    }
-
-    _rejectedIds.add(cacheKey);
-    return null;
-  }
-
-  // ───────────────────────── Tier 1: lrc.red Provider ───────────────────────
-
-  Future<({LyricsResult? wbw, LyricsResult? line})> _fetchLrcRed(
-    String title,
-    String artist,
-    String lang,
-    int durationSeconds,
-  ) async {
-    final normTitle = normalizeDiacritics(title);
-    final normArtist = normalizeDiacritics(artist);
-    final aLower = artist.toLowerCase();
-
-    final queries = <String>[];
-    queries.add('$title $artist'.trim());
-    if (normTitle != title || normArtist != artist) {
-      queries.add('$normTitle $normArtist'.trim());
-    }
-
-    // Artist alias queries (e.g. The Weeknd -> Abel Tesfaye, Vivek - Mervin -> Vivek Mervin)
-    if (aLower.contains('weeknd')) {
-      queries.add('$title Abel Tesfaye');
-    } else if (aLower.contains('vivek') && aLower.contains('mervin')) {
-      queries.add('$title Vivek Mervin');
-    }
-
-    for (final query in queries) {
+    // 3b. InnerTube official plain lyrics
+    final videoId =
+        track.id.startsWith('yt-') ? track.id.substring(3) : track.id;
+    if (videoId.isNotEmpty) {
       try {
-        final q = Uri.encodeComponent(query);
-        final searchUri = Uri.parse('https://lrc.red/search.json?q=$q');
-        final searchRes = await _client
-            .get(
-              searchUri,
-              headers: {'User-Agent': 'ZenifyApp/1.0 (https://zenify.app)'},
-            )
-            .timeout(const Duration(milliseconds: 2500));
-
-        if (searchRes.statusCode != 200) continue;
-
-        final searchJson =
-            jsonDecode(utf8.decode(searchRes.bodyBytes))
-                as Map<String, dynamic>;
-        final hits =
-            (searchJson['hits'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-        if (hits.isEmpty) continue;
-
-        // Check top hits for matching title and ISRC
-        for (final hit in hits.take(3)) {
-          final hitTitle = (hit['title'] ?? hit['track'] ?? hit['name'] ?? '')
-              .toString();
-          if (hitTitle.isNotEmpty && !isTitleMatch(hitTitle, title)) continue;
-          final hitArtist =
-              (hit['artist'] ?? hit['artistName'] ?? hit['author'] ?? '')
-                  .toString();
-          if (hitArtist.isEmpty || !isArtistMatch(hitArtist, artist)) continue;
-
-          final isrc = (hit['isrc'] ?? '').toString().trim();
-          if (isrc.isEmpty) continue;
-
-          final metaUri = Uri.parse('https://lrc.red/s/$isrc.json');
-          final metaRes = await _client
-              .get(
-                metaUri,
-                headers: {'User-Agent': 'ZenifyApp/1.0 (https://zenify.app)'},
-              )
-              .timeout(const Duration(seconds: 3));
-
-          if (metaRes.statusCode != 200) continue;
-          final metaJson =
-              jsonDecode(utf8.decode(metaRes.bodyBytes))
-                  as Map<String, dynamic>;
-          final syncType = (metaJson['sync'] ?? '').toString().toLowerCase();
-          final lrcUrl = metaJson['files']?['lrc']?.toString();
-
-          if (lrcUrl != null && lrcUrl.isNotEmpty) {
-            final lrcRes = await _client
-                .get(
-                  Uri.parse(lrcUrl),
-                  headers: {'User-Agent': 'ZenifyApp/1.0 (https://zenify.app)'},
-                )
-                .timeout(const Duration(seconds: 4));
-
-            if (lrcRes.statusCode == 200) {
-              final lrcContent = utf8.decode(lrcRes.bodyBytes);
-              // CRUCIAL: Anti-collision language check
-              if (lang.isNotEmpty && !isLanguageCompatible(lrcContent, lang)) {
-                continue; // Skip hit of different language
-              }
-
-              final parsed = LrcParser.parse(lrcContent);
-              if (parsed.lines.isNotEmpty && parsed.synced) {
-                // Duration verification: Reject mismatched versions or cuts
-                if (durationSeconds > 30) {
-                  final lastLineTimeMs =
-                      (parsed.lines.last['timeMs'] as num?)?.toInt() ??
-                      (parsed.lines.last['startMs'] as num?)?.toInt() ??
-                      0;
-                  if (lastLineTimeMs > 0) {
-                    if (lastLineTimeMs < (durationSeconds * 0.40 * 1000) ||
-                        lastLineTimeMs > ((durationSeconds + 20) * 1000)) {
-                      if (kDebugMode) {
-                        debugPrint(
-                          '[LyricsService] lrc.red REJECTED: duration mismatch '
-                          '(lastLine=${lastLineTimeMs / 1000}s vs track=${durationSeconds}s)',
-                        );
-                      }
-                      continue;
-                    }
-                  }
-                }
-
-                final hasWordTimings = parsed.lines.any(
-                  (l) => l['words'] != null && (l['words'] as List).isNotEmpty,
+        final raw = await InnerTubeService.instance
+            .getLyrics(videoId)
+            .timeout(const Duration(milliseconds: 1500));
+        if (raw != null && raw.trim().isNotEmpty) {
+          if (lang.isEmpty || isLanguageCompatible(raw, lang)) {
+            final parsed = LrcParser.parse(raw);
+            if (parsed.lines.isNotEmpty) {
+              if (parsed.synced) {
+                return _saveAndReturn(
+                  cacheKey,
+                  parsed.lines,
+                  true,
+                  'innertube_official_synced',
+                  rawLrc: raw,
+                  artist: cleanA,
+                  title: cleanT,
                 );
-                if (syncType == 'word' || hasWordTimings) {
-                  return (
-                    wbw: LyricsResult(
-                      lines: parsed.lines,
-                      synced: true,
-                      source: 'lrc_red_wbw',
-                      rawLrc: lrcContent,
-                    ),
-                    line: null,
-                  );
-                } else {
-                  return (
-                    wbw: null,
-                    line: LyricsResult(
-                      lines: parsed.lines,
-                      synced: true,
-                      source: 'lrc_red_line',
-                      rawLrc: lrcContent,
-                    ),
-                  );
-                }
               }
-            }
-          }
-        }
-      } catch (e) {
-        if (kDebugMode) debugPrint('[LyricsService] lrc.red error: $e');
-      }
-    }
-    return (wbw: null, line: null);
-  }
-
-  // ───────────────────────── Backend Provider ───────────────────────────────
-
-  Future<LyricsResult?> _fetchBackendLyrics(
-    Track track,
-    String cleanT,
-    String cleanA,
-  ) async {
-    try {
-      final queryParams = <String, String>{'title': cleanT, 'artist': cleanA};
-      if (track.album.isNotEmpty && track.album != 'Single') {
-        queryParams['album'] = track.album;
-      }
-      if (track.language.isNotEmpty) {
-        queryParams['language'] = track.language;
-      }
-      if (track.durationSeconds > 0 && track.durationSeconds != 210) {
-        queryParams['duration'] = track.durationSeconds.toString();
-      }
-
-      final res = await ApiService.fetchBackendLyrics(
-        track.id,
-        queryParams,
-      ).timeout(const Duration(milliseconds: 2500));
-      if (res != null) {
-        final raw = res['doc']?['lines'] ?? res['lines'];
-        if (raw is List && raw.isNotEmpty) {
-          final lines = <Map<String, dynamic>>[];
-          for (final item in raw) {
-            if (item is Map) {
-              final m = Map<String, dynamic>.from(item);
-              final text = (m['text'] ?? '').toString();
-              if (text.trim().isEmpty) continue;
-
-              final dynamic rawStart = m['startMs'] ?? m['timeMs'] ?? m['time'];
-              final int? start = rawStart is num
-                  ? (rawStart < 1000 &&
-                            m['startMs'] == null &&
-                            m['timeMs'] == null
-                        ? (rawStart * 1000).round()
-                        : rawStart.round())
-                  : null;
-
-              final dynamic rawEnd = m['endMs'] ?? m['endTime'];
-              final int? end = rawEnd is num
-                  ? (rawEnd < 1000 && m['endMs'] == null
-                        ? (rawEnd * 1000).round()
-                        : rawEnd.round())
-                  : null;
-
-              lines.add({
-                'text': text,
-                'timeMs': start,
-                'startMs': start,
-                'endMs': end,
-                'words': m['words'],
-              });
-            }
-          }
-          if (lines.isNotEmpty) {
-            final synced = lines.any(
-              (l) => (l['timeMs'] ?? l['startMs']) is num,
-            );
-            final hasWbw = lines.any(
-              (l) => l['words'] != null && (l['words'] as List).isNotEmpty,
-            );
-            return LyricsResult(
-              lines: lines,
-              synced: synced,
-              source: hasWbw ? 'zenify_backend_wbw' : 'zenify_backend',
-            );
-          }
-        }
-
-        // Check if raw LRC string exists
-        final rawLrc = res['rawLrc'] ?? res['syncedLyrics'] ?? res['lyrics'];
-        if (rawLrc is String && rawLrc.trim().isNotEmpty) {
-          final parsed = LrcParser.parse(rawLrc);
-          if (parsed.lines.isNotEmpty) {
-            final hasWbw = parsed.lines.any(
-              (l) => l['words'] != null && (l['words'] as List).isNotEmpty,
-            );
-            return LyricsResult(
-              lines: parsed.lines,
-              synced: parsed.synced,
-              source: hasWbw ? 'zenify_backend_wbw_lrc' : 'zenify_backend_lrc',
-              rawLrc: rawLrc,
-            );
-          }
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('[LyricsService] Backend error: $e');
-    }
-    return null;
-  }
-
-  // ───────────────────────── Tier 2: LRCLIB Synced Provider ─────────────────
-
-  Future<LyricsResult?> _fetchLrclibSynced(
-    String title,
-    String artist,
-    String album,
-    int durationSeconds,
-    String lang,
-  ) async {
-    final normTitle = normalizeDiacritics(title);
-    final normArtist = normalizeDiacritics(artist);
-    final aLower = artist.toLowerCase();
-
-    // 1. Direct match with GET /api/get (try exact and normalized title/artist)
-    final directPairs = [
-      (t: title, a: artist),
-      if (normTitle != title || normArtist != artist)
-        (t: normTitle, a: normArtist),
-    ];
-
-    for (final pair in directPairs) {
-      final durationAttempts = <String?>[
-        if (durationSeconds > 0 && durationSeconds != 210)
-          durationSeconds.toString(),
-        if (durationSeconds > 0 && durationSeconds != 210)
-          (durationSeconds - 1).toString(),
-        if (durationSeconds > 0 && durationSeconds != 210)
-          (durationSeconds + 1).toString(),
-        null, // Fallback without duration constraint
-      ];
-
-      for (final durStr in durationAttempts) {
-        try {
-          final uri = Uri.https('lrclib.net', '/api/get', {
-            'track_name': pair.t,
-            'artist_name': pair.a,
-            'duration': ?durStr,
-          });
-
-          final res = await _client
-              .get(
-                uri,
-                headers: {
-                  'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
-                },
-              )
-              .timeout(const Duration(seconds: 4));
-
-          if (res.statusCode == 200) {
-            final json =
-                jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-            final syncedLyrics = json['syncedLyrics'] as String?;
-
-            if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
-              // Verify language compatibility
-              if (lang.isEmpty || isLanguageCompatible(syncedLyrics, lang)) {
-                final parsed = LrcParser.parse(syncedLyrics);
-                if (parsed.lines.isNotEmpty && parsed.synced) {
-                  return LyricsResult(
-                    lines: parsed.lines,
-                    synced: true,
-                    source: 'lrclib_synced',
-                    rawLrc: syncedLyrics,
-                  );
-                }
+              if (kDebugMode) {
+                debugPrint(
+                  '[LyricsFlow] STEP 3 SUCCESS (innertube plain): Returning plain text lyrics.',
+                );
               }
-            }
-          }
-        } catch (_) {}
-      }
-    }
-
-    // 2. Multi-query search fallback with candidate language scoring
-    final queries = <String>[];
-    if (lang.isNotEmpty) {
-      queries.add('$title $artist $lang'.trim());
-      if (normTitle != title) queries.add('$normTitle $artist $lang'.trim());
-    }
-    queries.add('$title $artist'.trim());
-    if (normTitle != title || normArtist != artist) {
-      queries.add('$normTitle $normArtist'.trim());
-    }
-    if (aLower.contains('weeknd')) {
-      queries.add('$normTitle The Weeknd');
-    }
-
-    for (final q in queries) {
-      try {
-        final searchUri = Uri.https('lrclib.net', '/api/search', {'q': q});
-
-        final searchRes = await _client
-            .get(
-              searchUri,
-              headers: {
-                'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
-              },
-            )
-            .timeout(const Duration(seconds: 4));
-
-        if (searchRes.statusCode == 200) {
-          final list = jsonDecode(utf8.decode(searchRes.bodyBytes));
-          if (list is List && list.isNotEmpty) {
-            final scored =
-                <({Map<String, dynamic> item, int score, String lyrics})>[];
-
-            for (final item in list) {
-              if (item is Map) {
-                final map = Map<String, dynamic>.from(item);
-                final candTrack = (map['trackName'] ?? '').toString();
-                if (candTrack.isNotEmpty && !isTitleMatch(candTrack, title)) {
-                  continue; // Reject completely if track name does not match!
-                }
-                final candArtist = (map['artistName'] ?? '').toString();
-                if (candArtist.isEmpty || !isArtistMatch(candArtist, artist)) {
-                  continue; // Reject completely if artist does not match!
-                }
-                final syncedLyrics = map['syncedLyrics'] as String?;
-                if (syncedLyrics == null || syncedLyrics.trim().isEmpty)
-                  continue;
-
-                // Anti-collision language compatibility check
-                if (lang.isNotEmpty &&
-                    !isLanguageCompatible(syncedLyrics, lang)) {
-                  continue; // Reject completely if language conflicts!
-                }
-
-                int score = 100;
-                final candTrackLower = candTrack.toLowerCase();
-                final candAlbum = (map['albumName'] ?? '')
-                    .toString()
-                    .toLowerCase();
-                final candMeta = '$candTrackLower $candAlbum';
-
-                // Exact title match gets huge boost
-                if (candTrackLower == title.toLowerCase() ||
-                    candTrackLower == normTitle.toLowerCase()) {
-                  score += 300;
-                } else {
-                  score += 100;
-                }
-
-                // Exact artist match gets huge boost
-                if (candArtist.toLowerCase() == artist.toLowerCase() ||
-                    candArtist.toLowerCase() == normArtist.toLowerCase()) {
-                  score += 250;
-                }
-
-                if (album.isNotEmpty && album != 'Single') {
-                  final cleanAlb = album.toLowerCase();
-                  if (candAlbum.isNotEmpty &&
-                      (candAlbum == cleanAlb ||
-                          candAlbum.contains(cleanAlb) ||
-                          cleanAlb.contains(candAlbum))) {
-                    score += 200; // Major score boost for matching album/movie!
-                  }
-                }
-
-                if (lang.isNotEmpty) {
-                  if (candMeta.contains(lang)) {
-                    score += 150;
-                  }
-                  // Check competing languages
-                  final otherLangs = [
-                    'tamil',
-                    'telugu',
-                    'hindi',
-                    'malayalam',
-                    'kannada',
-                    'punjabi',
-                  ];
-                  for (final ol in otherLangs) {
-                    if (ol != lang && candMeta.contains(ol)) {
-                      score -= 500; // Penalize wrong language tags
-                    }
-                  }
-                }
-
-                if (durationSeconds > 0 && durationSeconds != 210) {
-                  final candDur = (map['duration'] as num?)?.toInt() ?? 0;
-                  if (candDur > 0) {
-                    final diff = (candDur - durationSeconds).abs();
-                    if (diff <= 2) {
-                      score += 400; // High confidence duration match!
-                    } else if (diff <= 5) {
-                      score += 200;
-                    } else if (diff <= 10) {
-                      score += 50;
-                    } else if (diff > 15) {
-                      score -= 400; // Heavily penalize different cuts!
-                    }
-                  }
-                }
-
-                if (score > 0) {
-                  scored.add((item: map, score: score, lyrics: syncedLyrics));
-                }
-              }
-            }
-
-            if (scored.isNotEmpty) {
-              scored.sort((a, b) => b.score.compareTo(a.score));
-              final best = scored.first;
-              if (best.score > 0) {
-                final parsed = LrcParser.parse(best.lyrics);
-                if (parsed.lines.isNotEmpty && parsed.synced) {
-                  return LyricsResult(
-                    lines: parsed.lines,
-                    synced: true,
-                    source: 'lrclib_search_synced',
-                    rawLrc: best.lyrics,
-                  );
-                }
-              }
+              return _returnPlainMemoryOnly(
+                cacheKey,
+                parsed.lines,
+                'innertube_official_plain',
+              );
             }
           }
         }
       } catch (_) {}
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // STEP 4: Lyrics Not Available (UI shows empty state / not available)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (kDebugMode) {
+      debugPrint(
+        '[LyricsFlow] STEP 4: Lyrics Not Available for "${track.title}" by "${track.artist}".',
+      );
+    }
+    _rejectedTimestamps[cacheKey] = DateTime.now().millisecondsSinceEpoch;
     return null;
   }
 
-  // ───────────────────────── Tier 3: LRCLIB Plain Provider ──────────────────
+  // ───────────────────────── Step 1: lrc.red Provider ───────────────────────
 
-  Future<LyricsResult?> _fetchLrclibPlain(
+  Future<LyricsResult?> _fetchLrcRedFast(
     String title,
-    String artist,
-    String album,
-    int durationSeconds,
+    String primaryArtist,
+    String fullArtist,
     String lang,
   ) async {
+    final query = primaryArtist.isNotEmpty
+        ? '$title $primaryArtist'.trim()
+        : title.trim();
+
     try {
-      final uri = Uri.https('lrclib.net', '/api/get', {
-        'track_name': title,
-        'artist_name': artist,
-        if (album.isNotEmpty && album != 'Single') 'album_name': album,
-        if (durationSeconds > 0 && durationSeconds != 210)
-          'duration': durationSeconds.toString(),
-      });
-
-      final res = await _client
+      final searchUri = Uri.parse(
+        'https://lrc.red/search.json?q=${Uri.encodeComponent(query)}',
+      );
+      final searchRes = await _client
           .get(
-            uri,
-            headers: {
-              'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
-            },
+            searchUri,
+            headers: {'User-Agent': 'ZenifyApp/1.0 (https://zenify.app)'},
           )
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(milliseconds: 1200));
 
-      if (res.statusCode == 200) {
-        final json =
-            jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-        final plainLyrics = json['plainLyrics'] as String?;
-        if (plainLyrics != null && plainLyrics.trim().isNotEmpty) {
-          if (lang.isEmpty || isLanguageCompatible(plainLyrics, lang)) {
-            final parsed = LrcParser.parse(plainLyrics);
-            if (parsed.lines.isNotEmpty) {
-              return LyricsResult(
+      if (searchRes.statusCode != 200) return null;
+
+      final searchJson =
+          jsonDecode(utf8.decode(searchRes.bodyBytes)) as Map<String, dynamic>;
+      final hits =
+          (searchJson['hits'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      if (hits.isEmpty) return null;
+
+      for (final hit in hits.take(3)) {
+        final hitTitle =
+            (hit['title'] ?? hit['track'] ?? hit['name'] ?? '').toString();
+        if (hitTitle.isNotEmpty && !isTitleMatch(hitTitle, title)) continue;
+
+        final hitArtist =
+            (hit['artist'] ?? hit['artistName'] ?? hit['author'] ?? '').toString();
+        if (hitArtist.isNotEmpty &&
+            primaryArtist.isNotEmpty &&
+            !isArtistMatch(hitArtist, primaryArtist) &&
+            !isArtistMatch(hitArtist, fullArtist)) {
+          continue;
+        }
+
+        final isrc = (hit['isrc'] ?? '').toString().trim();
+        if (isrc.isEmpty) continue;
+
+        // Fetch .lrc directly in ONE single request (instant and ultra fast)
+        final lrcUri = Uri.parse('https://lrc.red/s/$isrc.lrc');
+        final lrcRes = await _client
+            .get(
+              lrcUri,
+              headers: {'User-Agent': 'ZenifyApp/1.0 (https://zenify.app)'},
+            )
+            .timeout(const Duration(milliseconds: 1200));
+
+        if (lrcRes.statusCode == 200) {
+          final lrcContent = utf8.decode(lrcRes.bodyBytes);
+          if (lang.isNotEmpty && !isLanguageCompatible(lrcContent, lang)) {
+            continue;
+          }
+
+          final parsed = LrcParser.parse(lrcContent);
+          if (parsed.lines.isNotEmpty && parsed.synced) {
+            final hasWordTimings = parsed.lines.any(
+              (l) => l['words'] != null && (l['words'] as List).isNotEmpty,
+            );
+            return LyricsResult(
+              lines: parsed.lines,
+              synced: true,
+              source: hasWordTimings ? 'lrc_red_wbw' : 'lrc_red',
+              rawLrc: lrcContent,
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[LyricsFlow] _fetchLrcRedFast error: $e');
+    }
+    return null;
+  }
+
+  // ───────────────────────── Step 2: LRCLIB Provider ────────────────────────
+
+  Future<({LyricsResult? synced, String? plain})> _fetchLrclibFast(
+    String title,
+    String primaryArtist,
+    String fullArtist,
+    String lang,
+    String album,
+  ) async {
+    String? stashedPlain;
+
+    // Concurrently fire direct GET /api/get and search GET /api/search in parallel (ultra-fast)
+    final directFuture = () async {
+      try {
+        final uri = Uri.https('lrclib.net', '/api/get', {
+          'track_name': title,
+          if (primaryArtist.isNotEmpty) 'artist_name': primaryArtist,
+          if (album.isNotEmpty &&
+              album.toLowerCase() != 'single' &&
+              album.toLowerCase() != 'music video')
+            'album_name': album,
+        });
+        final res = await _client
+            .get(
+              uri,
+              headers: {
+                'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
+              },
+            )
+            .timeout(const Duration(milliseconds: 1400));
+        if (res.statusCode == 200) {
+          return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+        }
+      } catch (_) {}
+      return null;
+    }();
+
+    final searchFuture = () async {
+      try {
+        final query = primaryArtist.isNotEmpty
+            ? '$title $primaryArtist'.trim()
+            : title.trim();
+        final searchUri = Uri.https('lrclib.net', '/api/search', {
+          'q': query,
+        });
+        final res = await _client
+            .get(
+              searchUri,
+              headers: {
+                'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
+              },
+            )
+            .timeout(const Duration(milliseconds: 1400));
+        if (res.statusCode == 200) {
+          final list = jsonDecode(utf8.decode(res.bodyBytes));
+          if (list is List && list.isNotEmpty) {
+            return list.cast<Map<dynamic, dynamic>>();
+          }
+        }
+      } catch (_) {}
+      return null;
+    }();
+
+    final results = await Future.wait([directFuture, searchFuture]);
+    final directJson = results[0] as Map<String, dynamic>?;
+    final searchList = results[1] as List<Map<dynamic, dynamic>>?;
+
+    // 1. Check direct GET result first
+    if (directJson != null) {
+      final plainLyrics = directJson['plainLyrics'] as String?;
+      final syncedLyrics = directJson['syncedLyrics'] as String?;
+
+      if (plainLyrics != null && plainLyrics.trim().isNotEmpty) {
+        stashedPlain = plainLyrics;
+      }
+
+      if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
+        if (lang.isEmpty || isLanguageCompatible(syncedLyrics, lang)) {
+          final parsed = LrcParser.parse(syncedLyrics);
+          if (parsed.lines.isNotEmpty && parsed.synced) {
+            return (
+              synced: LyricsResult(
                 lines: parsed.lines,
-                synced: false,
-                source: 'lrclib_plain',
+                synced: true,
+                source: 'lrclib_synced',
+                rawLrc: syncedLyrics,
+              ),
+              plain: null,
+            );
+          }
+        }
+      }
+    }
+
+    // 2. Check search GET hits
+    if (searchList != null && searchList.isNotEmpty) {
+      for (final item in searchList.take(3)) {
+        final map = Map<String, dynamic>.from(item);
+        final candTrack = (map['trackName'] ?? map['name'] ?? '').toString();
+        if (candTrack.isNotEmpty && !isTitleMatch(candTrack, title)) {
+          continue;
+        }
+
+        final candArtist = (map['artistName'] ?? '').toString();
+        if (candArtist.isNotEmpty &&
+            primaryArtist.isNotEmpty &&
+            !isArtistMatch(candArtist, primaryArtist) &&
+            !isArtistMatch(candArtist, fullArtist)) {
+          continue;
+        }
+
+        final plainLyrics = map['plainLyrics'] as String?;
+        final syncedLyrics = map['syncedLyrics'] as String?;
+
+        if (plainLyrics != null &&
+            plainLyrics.trim().isNotEmpty &&
+            stashedPlain == null) {
+          stashedPlain = plainLyrics;
+        }
+
+        if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
+          if (lang.isEmpty || isLanguageCompatible(syncedLyrics, lang)) {
+            final parsed = LrcParser.parse(syncedLyrics);
+            if (parsed.lines.isNotEmpty && parsed.synced) {
+              return (
+                synced: LyricsResult(
+                  lines: parsed.lines,
+                  synced: true,
+                  source: 'lrclib_search_synced',
+                  rawLrc: syncedLyrics,
+                ),
+                plain: null,
               );
             }
           }
         }
       }
-    } catch (_) {}
-
-    final queries = <String>[];
-    if (lang.isNotEmpty) {
-      queries.add('$title $artist $lang'.trim());
-    }
-    queries.add('$title $artist'.trim());
-
-    for (final q in queries) {
-      try {
-        final searchUri = Uri.https('lrclib.net', '/api/search', {'q': q});
-
-        final searchRes = await _client
-            .get(
-              searchUri,
-              headers: {
-                'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
-              },
-            )
-            .timeout(const Duration(seconds: 4));
-
-        if (searchRes.statusCode == 200) {
-          final list = jsonDecode(utf8.decode(searchRes.bodyBytes));
-          if (list is List && list.isNotEmpty) {
-            for (final item in list) {
-              if (item is Map) {
-                final candTrack = (item['trackName'] ?? '').toString();
-                if (candTrack.isNotEmpty && !isTitleMatch(candTrack, title)) {
-                  continue; // Reject if title does not match
-                }
-                final candArtist = (item['artistName'] ?? '').toString();
-                if (candArtist.isNotEmpty &&
-                    !isArtistMatch(candArtist, artist)) {
-                  continue; // Reject if artist does not match
-                }
-                final plainLyrics = item['plainLyrics'] as String?;
-                if (plainLyrics != null && plainLyrics.trim().isNotEmpty) {
-                  if (lang.isEmpty || isLanguageCompatible(plainLyrics, lang)) {
-                    final parsed = LrcParser.parse(plainLyrics);
-                    if (parsed.lines.isNotEmpty) {
-                      return LyricsResult(
-                        lines: parsed.lines,
-                        synced: false,
-                        source: 'lrclib_search_plain',
-                      );
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      } catch (_) {}
     }
 
-    return null;
+    return (synced: null, plain: stashedPlain);
   }
 
   // ───────────────────────── Storage Helpers ────────────────────────────────

@@ -11,6 +11,7 @@ import { Eye, EyeOff, Check, Loader2, AlertCircle, Mail, Lock, User, KeyRound, C
 import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
 import { DynamicBackground } from "@/components/shared/DynamicBackground";
 import { SEO } from "@/components/shared/SEO";
+import { AppMigrationNotice } from "@/components/shared/AppMigrationNotice";
 import { cn } from "@/lib/utils";
 import notify from "@/lib/notify";
 
@@ -432,22 +433,23 @@ function AuthPageContent() {
       <main
         role="main"
         style={{ fontFamily: SF_FONT }}
-        className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black antialiased"
+        className="relative flex min-h-screen w-full items-center justify-center overflow-x-hidden overflow-y-auto bg-black antialiased py-8 px-4"
       >
         <SEO title="Log In – Zenify" noindex={true} path="/login" />
         <MemoBackground />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/60" />
 
-        {/* macOS window */}
-        <motion.div
-          initial={{ opacity: 0, y: 24, scale: 0.94 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ type: "spring", stiffness: 220, damping: 24, mass: 1 }}
-          className="relative z-10 w-full max-w-[340px] px-5"
-        >
-          <motion.div className="">
-            <div>
-              {/* Header */}
+        <div className="relative z-10 flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-12 xl:gap-16 w-full max-w-5xl my-auto">
+          {/* macOS window */}
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 220, damping: 24, mass: 1 }}
+            className="w-full max-w-[340px] px-2 sm:px-0 shrink-0"
+          >
+            <motion.div className="">
+              <div>
+                {/* Header */}
               <div className="mb-3.5 flex flex-col items-center text-center">
                 <div className="mb-2.5 flex items-center justify-center">
                   <ZenifyLogo size={44} animated={false} />
@@ -839,8 +841,12 @@ function AuthPageContent() {
             </div>
           </motion.div>
         </motion.div>
-      </main>
-    </MotionConfig>
+
+        {/* Side-by-side migration advisory card for desktop & clean stacked on mobile */}
+        <AppMigrationNotice variant="side-panel" className="shrink-0" />
+      </div>
+    </main>
+  </MotionConfig>
   );
 }
 

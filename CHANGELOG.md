@@ -2,6 +2,44 @@
 
 All notable user updates and improvements to Zenify are documented here.
 
+## [1.1.21] - 2026-11-24 (Stable Version 1)
+
+> 🎉 **First Stable Version:** Zenify v1.1.21 marks the official **Stable Version 1** milestone release for the Zenify Flutter Android application.
+
+### What's New in Stable Version 1
+- **Strict YouTube Music Search Parity**:
+  - Unrestricted, pristine search results directly mirroring YouTube Music for queries across songs, video songs, official albums, verified artists, and public playlists.
+  - Resolved previous search distortion and missing album/playlist shelves.
+- **16:9 Landscape Video Previews**:
+  - Native 16:9 landscape thumbnails for video songs in Search History and Search Results (`76x44`).
+  - Native 16:9 landscape thumbnails in Playback Queue (`QueuePanel`) and Room Together queue (`76x48`).
+- **Instant Search History Tap-to-Play**:
+  - Tapping an audio song or video song in search history starts playback instantly without triggering unnecessary re-searches.
+  - Tapping an artist or album in search history navigates directly to the target catalog page.
+- **Ultra-Fast Lyrics Engine with Video Skip**:
+  - Multi-provider parallel resolver (`lrc.red` + `lrclib.net`) fetching synced lyrics in sub-300ms.
+  - Automatic video bypass: Video tracks skip lyrical fetching to conserve network bandwidth and eliminate playback latency.
+  - Upgraded lyrics storage to `lyrics_cache_v12_` with clean startup cache invalidation.
+- **Website Service Migration Notice**:
+  - Added notification on the Zenify website recommending users migrate to the Zenify Android App for optimal 320kbps lossless streaming and zero browser restrictions.
+
+## [1.1.20] - 2026-11-23
+
+### What's New
+- **Comprehensive Zenify Replay & Insights Architecture**:
+  - Full listening telemetry aggregation engine, all-time index, and personalized annual & monthly recaps.
+  - 27 interactive analytics features including Listener Personality, Daypart Breakdown, Heatmap Calendar, Marathon Sessions, Loyalty Timeline, and Milestones Trophy Room.
+  - Interactive Replay Quiz with dynamic question generation, Replay Match compatibility comparison, and Dedicate a Song social sharing.
+- **Robust YouTube & Live Streaming Engine**:
+  - Multi-client fallbacks (`ANDROID_VR`, `IOS`, `TVHTML5`) with dual-budget streaming timeouts.
+  - Adaptive PoToken generator, RefusedRetryDataSource, and StreamUrlCache for zero-stall audio playback.
+  - Native video texture playback in player shell with fluid liquid sheet transitions and landscape side-by-side mode (lyrics + queue).
+- **Fast Syllable-Synchronized Lyrics Service**:
+  - Multi-provider parallel resolver (Better Lyrics, Unison, LRCLIB, JioSaavn) with syllable-level word tracking and romanization.
+  - Strict uniform typography sizing and live interlude pauses.
+- **Entity-Intent Search & Dynamic Island Header**:
+  - Intelligent entity ranking with music-only video filtering and collapsible floating island header.
+
 ## [1.1.19] - 2026-11-21
 
 ### What's New

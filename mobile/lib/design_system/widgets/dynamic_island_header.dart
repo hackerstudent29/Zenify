@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart' show CupertinoIcons, CupertinoPageRoute;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
@@ -15,7 +15,9 @@ import 'apple_glass.dart';
 import 'monogram_avatar.dart';
 import 'pressable_scale.dart';
 
-/// Apple Dynamic Island Notification model.
+/// Notification shown in the second-row island pill.
+/// [title] = the action ("Added to Liked"), [body] = name of the thing,
+/// [leading] = artwork (use [trackThumb]).
 class IslandNotification {
   IslandNotification({
     required this.id,
@@ -42,61 +44,63 @@ class IslandNotification {
     return MediaNormalizer.cleanTitle(title ?? '').trim();
   }
 
-  /// Helper to create a consistent 22x22 thumbnail or icon badge.
+  /// Consistent 26x26 artwork thumbnail / icon badge.
   static Widget trackThumb(
     String? coverUrl, {
     IconData fallbackIcon = CupertinoIcons.music_note,
     Color iconColor = const Color(0xFFE11D48),
   }) {
+    Widget fallback() => Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(child: Icon(fallbackIcon, color: iconColor, size: 15)),
+        );
+
     if (coverUrl != null && coverUrl.startsWith('http')) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         child: CachedNetworkImage(
           imageUrl: coverUrl,
-          width: 22,
-          height: 22,
+          width: 26,
+          height: 26,
           fit: BoxFit.cover,
-          errorWidget: (_, _, _) => Container(
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Center(child: Icon(fallbackIcon, color: iconColor, size: 13)),
-          ),
+          errorWidget: (_, _, _) => fallback(),
         ),
       );
     }
-    return Container(
-      width: 22,
-      height: 22,
-      decoration: BoxDecoration(
-        color: iconColor.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Center(child: Icon(fallbackIcon, color: iconColor, size: 13)),
-    );
+    return fallback();
   }
 }
 
-/// Global notifier driving the Dynamic Island Header notification queue.
-/// Coordinates enter/exit animations with [_NotifTicker] & [DynamicIslandHeader].
+/// Global queue for the notification pill.
+///
+/// Lifecycle of one notification (~3s total):
+///   spring open (~0.3s) -> hold (2.4s) -> spring close (~0.4s) -> next.
+/// Touching the pill pauses the hold timer; swipe-up dismisses instantly.
 class IslandNotifier extends ChangeNotifier {
   static final IslandNotifier instance = IslandNotifier._();
   IslandNotifier._();
   factory IslandNotifier() => instance;
 
+  static const Duration _openAndHold = Duration(milliseconds: 2700);
+  static const Duration _resumeHold = Duration(milliseconds: 1400);
+  static const Duration _closeAnim = Duration(milliseconds: 400);
+  static const Duration _gap = Duration(milliseconds: 100);
+
   final _queue = <IslandNotification>[];
   IslandNotification? _current;
   bool _isClosing = false;
+  Timer? _holdTimer;
   Timer? _closeTimer;
   Timer? _nextTimer;
 
   IslandNotification? get current => _current;
   bool get isClosing => _isClosing;
 
-  /// Helper for firing an in-app Dynamic Island notification from anywhere.
   static void showNotification(IslandNotification n) => instance.show(n);
 
   void show(IslandNotification n) {
@@ -108,204 +112,163 @@ class IslandNotifier extends ChangeNotifier {
     if (_queue.isEmpty) return;
     _isClosing = false;
     _current = _queue.removeAt(0);
+    _armHold(_openAndHold);
     notifyListeners();
   }
 
-  /// Animates the active notification closed (~280ms) before dequeuing the next item.
-  /// [id] guards against double calls when multiple headers are mounted.
+  void _armHold(Duration d) {
+    _holdTimer?.cancel();
+    final id = _current?.id;
+    _holdTimer = Timer(d, () => dismiss(id: id));
+  }
+
+  /// Finger is on the pill: keep it open.
+  void pause() => _holdTimer?.cancel();
+
+  /// Finger lifted without dismissing: let it linger a little more.
+  void resume() {
+    if (_current != null && !_isClosing) _armHold(_resumeHold);
+  }
+
+  /// Springs the pill closed, then brings in the next queued item.
   void dismiss({String? id}) {
-    if (_current == null || _isClosing || (id != null && id != _current!.id)) return;
+    if (_current == null || _isClosing || (id != null && id != _current!.id)) {
+      return;
+    }
+    _holdTimer?.cancel();
     _isClosing = true;
     notifyListeners();
 
     _closeTimer?.cancel();
     _nextTimer?.cancel();
-    _closeTimer = Timer(const Duration(milliseconds: 280), () {
+    _closeTimer = Timer(_closeAnim, () {
       _isClosing = false;
       _current = null;
       notifyListeners();
-      _nextTimer = Timer(const Duration(milliseconds: 120), () {
+      _nextTimer = Timer(_gap, () {
         if (_current == null && !_isClosing) _next();
       });
     });
   }
 }
 
-/// Notification ticker widget:
-/// - Fast ~220ms intro animation for icon + text
-/// - 3s duration for short text, 3–5s with smooth right-to-left scroll for longer text
-/// - Symmetric close transition when [isClosing] becomes true.
-class _NotifTicker extends StatefulWidget {
-  const _NotifTicker({
+/// The second-row notification pill: [artwork]  Action  Name
+///
+/// [progress] is a spring value (0 = tucked under the main pill, 1 = open,
+/// may overshoot slightly for the Apple-Music style bounce).
+class _NotifPill extends StatelessWidget {
+  const _NotifPill({
     super.key,
     required this.notif,
-    required this.isClosing,
-    required this.onDone,
+    required this.progress,
+    required this.height,
+    required this.maxWidth,
   });
 
   final IslandNotification notif;
-  final bool isClosing;
-  final VoidCallback onDone;
-
-  static const Duration minHold = Duration(milliseconds: 3000);
-  static const Duration maxHold = Duration(milliseconds: 5000);
-  static const double speed = 55.0; // px / second
-
-  @override
-  State<_NotifTicker> createState() => _NotifTickerState();
-}
-
-class _NotifTickerState extends State<_NotifTicker> with SingleTickerProviderStateMixin {
-  final _ctrl = ScrollController();
-  late final AnimationController _introCtrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 220),
-  );
-  bool _dead = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _introCtrl.forward();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _run());
-  }
-
-  @override
-  void dispose() {
-    _dead = true;
-    _introCtrl.dispose();
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  bool get _ok => !_dead && mounted && _ctrl.hasClients;
-
-  Future<void> _run() async {
-    var elapsedMs = 0;
-
-    // Wait for intro + pill resize to finish before measuring horizontal overflow.
-    await Future<void>.delayed(const Duration(milliseconds: 260));
-    elapsedMs += 260;
-    if (!_ok) return;
-
-    final overflow = _ctrl.position.maxScrollExtent;
-
-    if (overflow > 2.0) {
-      // Brief pause so user sees the action title first before scrolling.
-      await Future<void>.delayed(const Duration(milliseconds: 450));
-      elapsedMs += 450;
-      if (!_ok) return;
-
-      // Fit right-to-left scroll cleanly inside the 3s..5s total lifetime budget.
-      final idealScrollMs = (overflow / _NotifTicker.speed * 1000).round();
-      final maxScrollBudgetMs =
-          (_NotifTicker.maxHold.inMilliseconds - elapsedMs - 350).clamp(1200, 3900);
-      final scrollMs = idealScrollMs.clamp(1200, maxScrollBudgetMs);
-
-      await _ctrl.animateTo(
-        overflow,
-        duration: Duration(milliseconds: scrollMs),
-        curve: Curves.linear,
-      );
-      elapsedMs += scrollMs;
-      if (!_ok) return;
-
-      final postPauseMs =
-          (_NotifTicker.maxHold.inMilliseconds - elapsedMs).clamp(0, 350);
-      if (postPauseMs > 0) {
-        await Future<void>.delayed(Duration(milliseconds: postPauseMs));
-        elapsedMs += postPauseMs;
-      }
-    }
-
-    // Ensure minimum 3s display time while capping strictly at 5s.
-    final minRemainingMs = _NotifTicker.minHold.inMilliseconds - elapsedMs;
-    if (minRemainingMs > 0) {
-      await Future<void>.delayed(Duration(milliseconds: minRemainingMs));
-    }
-    if (!_dead && mounted) widget.onDone();
-  }
+  final double progress;
+  final double height;
+  final double maxWidth;
 
   @override
   Widget build(BuildContext context) {
-    final n = widget.notif;
-    final text = Text.rich(
-      TextSpan(children: [
-        TextSpan(
-          text: n.title,
-          style: const TextStyle(
-            fontFamily: 'SF Pro Display',
-            fontWeight: FontWeight.w700,
-            fontSize: 13.5,
-            color: Colors.white,
-            letterSpacing: -0.2,
-          ),
-        ),
-        if (n.body != null && n.body!.trim().isNotEmpty)
-          TextSpan(
-            text: '  ${n.body!.trim()}',
-            style: const TextStyle(
-              fontFamily: 'SF Pro',
-              fontWeight: FontWeight.w500,
-              fontSize: 13,
-              color: Colors.white70,
-              letterSpacing: -0.1,
-            ),
-          ),
-      ]),
-      maxLines: 1,
-      softWrap: false,
-    );
+    final p = progress;
+    final pc = p.clamp(0.0, 1.0);
 
-    return AnimatedOpacity(
-      opacity: widget.isClosing ? 0.0 : 1.0,
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeInCubic,
-      child: AnimatedScale(
-        scale: widget.isClosing ? 0.88 : 1.0,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeInCubic,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (n.leading != null) ...[
-                FadeTransition(
-                  opacity: _introCtrl,
-                  child: ScaleTransition(
-                    scale: Tween<double>(begin: 0.65, end: 1.0).animate(
-                      CurvedAnimation(parent: _introCtrl, curve: Curves.easeOutBack),
-                    ),
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: ClipRRect(borderRadius: BorderRadius.circular(6), child: n.leading),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              Flexible(
-                child: FadeTransition(
-                  opacity: _introCtrl,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0.08, 0),
-                      end: Offset.zero,
-                    ).animate(CurvedAnimation(parent: _introCtrl, curve: Curves.easeOutCubic)),
-                    child: ClipRect(
-                      child: SingleChildScrollView(
-                        controller: _ctrl,
-                        scrollDirection: Axis.horizontal,
-                        physics: const NeverScrollableScrollPhysics(),
-                        child: text,
+    // Pill grows out of the main island: slides down from behind it while
+    // scaling from a small dot-like capsule to full size.
+    final dy = -(1.0 - p) * (height + 14);
+    final sx = 0.38 + 0.62 * p;
+    final sy = 0.62 + 0.38 * p;
+    final shellOpacity = Curves.easeOut.transform((pc / 0.45).clamp(0.0, 1.0));
+    final contentOpacity =
+        Curves.easeOut.transform(((pc - 0.4) / 0.5).clamp(0.0, 1.0));
+
+    final hasBody = notif.body != null && notif.body!.trim().isNotEmpty;
+    final notifier = IslandNotifier.instance;
+
+    return Opacity(
+      opacity: shellOpacity,
+      child: Transform.translate(
+        offset: Offset(0, dy),
+        child: Transform(
+          alignment: Alignment.topCenter,
+          transform: Matrix4.diagonal3Values(sx, sy, 1.0),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (_) => notifier.pause(),
+            onTapCancel: notifier.resume,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              notif.onTap?.call();
+              notifier.dismiss(id: notif.id);
+            },
+            onVerticalDragStart: (_) => notifier.pause(),
+            onVerticalDragEnd: (d) {
+              if ((d.primaryVelocity ?? 0) < -120) {
+                notifier.dismiss(id: notif.id);
+              } else {
+                notifier.resume();
+              }
+            },
+            child: AppleGlass(
+              borderRadius: BorderRadius.circular(height / 2),
+              child: Container(
+                height: height,
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                padding: const EdgeInsets.fromLTRB(7, 0, 18, 0),
+                child: Opacity(
+                  opacity: contentOpacity,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (notif.leading != null) ...[
+                        SizedBox(
+                          width: 26,
+                          height: 26,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: notif.leading,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                      ] else
+                        const SizedBox(width: 11),
+                      Flexible(
+                        child: Text.rich(
+                          TextSpan(children: [
+                            TextSpan(
+                              text: notif.title,
+                              style: const TextStyle(
+                                fontFamily: 'SF Pro Display',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13.5,
+                                color: Colors.white,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            if (hasBody)
+                              TextSpan(
+                                text: '  ${notif.body!.trim()}',
+                                style: const TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 13,
+                                  color: Colors.white70,
+                                  letterSpacing: -0.1,
+                                ),
+                              ),
+                          ]),
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -313,18 +276,17 @@ class _NotifTickerState extends State<_NotifTicker> with SingleTickerProviderSta
   }
 }
 
-/// Apple Dynamic Island-style 3-dock floating header.
+/// Apple Dynamic Island-style floating header.
 ///
-/// 1. Left dock: back button (or logo on root pages)
-/// 2. Centre dock: pill with the page title
-/// 3. Right dock: profile avatar (or your own [trailing])
+/// Row 1 (main pill): left dock (back / logo) · centre title · right dock.
+///   At rest the docks are two separate glass circles. When the title is
+///   revealed they spring toward each other and merge into one capsule.
+/// Row 2 (notification pill): independent glass pill below row 1 that springs
+///   open, shows artwork + action + name for ~3s, then springs closed.
+///   The main pill is never touched by notifications.
 ///
-/// SCROLL MODE (works on every page: artist, album, playlist, podcast…):
-/// pass the page's [scrollController] and a [revealOffset]. The centre pill is
-/// hidden at the top and springs into the centre once the scroll offset passes
-/// [revealOffset] (the point where the big in-page title slides under the
-/// island). Scrolling back up springs it away again.
-/// Without [scrollController] the header behaves exactly as before.
+/// NOTE: this widget now reserves vertical room for row 2
+/// (top + height + 8 + 40). Use it as an overlay (Stack/Positioned) as before.
 class DynamicIslandHeader extends StatefulWidget {
   const DynamicIslandHeader({
     super.key,
@@ -339,13 +301,14 @@ class DynamicIslandHeader extends StatefulWidget {
     this.centerWidget,
     this.trailing,
     this.onMore,
-    this.height = 52.0,
+    this.height = 46.0,
     this.topPadding,
     this.horizontalMargin = 16.0,
     this.scrollController,
     this.revealOffset = 120,
     this.isDockPage,
     this.onCenterTap,
+    this.alwaysShowTitle = false,
   });
 
   final String title;
@@ -363,34 +326,51 @@ class DynamicIslandHeader extends StatefulWidget {
   final double? topPadding;
   final double horizontalMargin;
 
-  /// Page scroll controller that drives the centre pill (optional).
+  /// Page scroll controller that drives the centre title (optional).
   final ScrollController? scrollController;
 
-  /// Scroll offset at which the centre pill spawns.
+  /// Scroll offset at which the centre title spawns.
   final double revealOffset;
 
-  /// Whether this header is on a root page in the persistent navbar dock.
-  /// When true, renders the full transparent Zenify logo on the left.
+  /// Root page in the persistent navbar dock (shows the Zenify logo on left).
   final bool? isDockPage;
 
-  /// Optional tap handler for the centre island pill.
+  /// Optional tap handler for the centre title.
   final VoidCallback? onCenterTap;
+
+  /// Permanently display and center title in the island capsule (no scroll required).
+  final bool alwaysShowTitle;
 
   @override
   State<DynamicIslandHeader> createState() => _DynamicIslandHeaderState();
 }
 
-class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerProviderStateMixin {
-  static const _spring = SpringDescription(mass: 1, stiffness: 300, damping: 21);
+class _DynamicIslandHeaderState extends State<DynamicIslandHeader>
+    with TickerProviderStateMixin {
+  // Main pill merge: ~critically damped so circles glide together with just
+  // a hint of softness (no visible rubber-banding on the glass).
+  static const _mergeSpring =
+      SpringDescription(mass: 1, stiffness: 380, damping: 32);
 
-  // Subpages / detail pages start at 0.0 (strictly hidden at rest).
-  // Only root dock pages with no controller (Home, Explore) start at 1.0.
+  // Notification pill: slightly bouncy open, firmer close.
+  static const _openSpring =
+      SpringDescription(mass: 1, stiffness: 420, damping: 23);
+  static const _closeSpring =
+      SpringDescription(mass: 1, stiffness: 380, damping: 34);
+
+  static const double _notifGap = 8.0;
+  static const double _notifHeight = 40.0;
+
   late final AnimationController _c = AnimationController.unbounded(
     vsync: this,
-    value: (widget.isDockPage == true && widget.scrollController == null) ? 1.0 : 0.0,
+    value: (widget.alwaysShowTitle || (widget.isDockPage == true && widget.scrollController == null))
+        ? 1.0
+        : 0.0,
   );
-  late final AnimationController _n =
-      AnimationController.unbounded(vsync: this, value: IslandNotifier.instance.current == null ? 0.0 : 1.0);
+  late final AnimationController _n = AnimationController.unbounded(
+    vsync: this,
+    value: IslandNotifier.instance.current == null ? 0.0 : 1.0,
+  );
   bool _shown = false;
   ScrollController? _activeSc;
   double _scrollOffset = 0.0;
@@ -406,12 +386,8 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
     final sc = _findController();
     if (sc != null && sc.hasClients) {
       final off = sc.offset;
-      if ((off - _scrollOffset).abs() > 0.5) {
-        if (mounted) {
-          setState(() {
-            _scrollOffset = off;
-          });
-        }
+      if ((off - _scrollOffset).abs() > 0.5 && mounted) {
+        setState(() => _scrollOffset = off);
       }
     }
   }
@@ -423,21 +399,21 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
 
   ScrollController? _findController() {
     if (widget.scrollController != null) return widget.scrollController;
-    if (mounted) {
-      return PrimaryScrollController.maybeOf(context);
-    }
+    if (mounted) return PrimaryScrollController.maybeOf(context);
     return null;
   }
 
   void _check(bool jump) {
+    if (widget.alwaysShowTitle) {
+      if (_c.value != 1.0) _c.value = 1.0;
+      _shown = true;
+      return;
+    }
     final sc = _findController();
     final isSub = _isSubpage;
 
     if (sc == null || !mounted || !sc.hasClients) {
-      // If this is a subpage with in-page title and no active scroll offset, keep island hidden
-      if (isSub && _c.value > 0.0 && !_shown) {
-        _c.value = 0.0;
-      }
+      if (isSub && _c.value > 0.0 && !_shown) _c.value = 0.0;
       return;
     }
     final show = isSub ? (sc.offset > widget.revealOffset) : true;
@@ -447,26 +423,25 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
     if (jump || MediaQuery.disableAnimationsOf(context)) {
       _c.value = to;
     } else {
-      _c.animateWith(SpringSimulation(_spring, _c.value, to, 0));
+      // Carry current velocity so reversing mid-flight stays fluid.
+      _c.animateWith(SpringSimulation(_mergeSpring, _c.value, to, _c.velocity));
     }
   }
 
   void _onNotifChanged() {
     if (!mounted) return;
     final notifier = IslandNotifier.instance;
-    final showNotif = notifier.current != null && !notifier.isClosing;
-    final to = showNotif ? 1.0 : 0.0;
+    final open = notifier.current != null && !notifier.isClosing;
+    final to = open ? 1.0 : 0.0;
     if (MediaQuery.disableAnimationsOf(context)) {
       _n.value = to;
     } else {
       _n.animateWith(
         SpringSimulation(
-          showNotif
-              ? const SpringDescription(mass: 1, stiffness: 320, damping: 19)
-              : const SpringDescription(mass: 1, stiffness: 360, damping: 26),
+          open ? _openSpring : _closeSpring,
           _n.value,
           to,
-          0,
+          _n.velocity,
         ),
       );
     }
@@ -476,24 +451,28 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
   @override
   void initState() {
     super.initState();
+    if (widget.alwaysShowTitle) {
+      _c.value = 1.0;
+      _shown = true;
+    }
     widget.scrollController?.addListener(_listener);
     _activeSc = widget.scrollController;
     IslandNotifier.instance.addListener(_onNotifChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncScrollOffset();
       _check(true);
-      if (IslandNotifier.instance.current != null) {
-        _n.value = 1.0;
-      }
     });
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_isSubpage && !_shown) {
-      _c.value = 0.0;
+    if (widget.alwaysShowTitle) {
+      if (_c.value != 1.0) _c.value = 1.0;
+      _shown = true;
+      return;
     }
+    if (_isSubpage && !_shown) _c.value = 0.0;
     final newSc = _findController();
     if (newSc != _activeSc) {
       _activeSc?.removeListener(_listener);
@@ -509,16 +488,17 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
   @override
   void didUpdateWidget(covariant DynamicIslandHeader old) {
     super.didUpdateWidget(old);
+    if (widget.alwaysShowTitle) {
+      if (_c.value != 1.0) _c.value = 1.0;
+      _shown = true;
+      return;
+    }
     if (old.scrollController != widget.scrollController) {
       _activeSc?.removeListener(_listener);
       _activeSc = widget.scrollController ?? PrimaryScrollController.maybeOf(context);
       _activeSc?.addListener(_listener);
       _syncScrollOffset();
-      if (_isSubpage) {
-        _shown = false;
-        _c.value = 0;
-        WidgetsBinding.instance.addPostFrameCallback((_) => _check(true));
-      } else if (widget.scrollController == null) {
+      if (!_isSubpage && widget.scrollController == null) {
         _c.value = 1;
       } else {
         _shown = false;
@@ -540,164 +520,236 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
     super.dispose();
   }
 
+  void _scrollToTop(int ms) {
+    final sc = widget.scrollController;
+    if (sc != null && sc.hasClients && sc.offset > 0) {
+      HapticFeedback.lightImpact();
+      sc.animateTo(0,
+          duration: Duration(milliseconds: ms), curve: Curves.easeOutCubic);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final mqTop = MediaQuery.paddingOf(context).top;
     final top = widget.topPadding ?? math.max(54.0, mqTop + 4.0);
     final canPop = widget.showBack ?? Navigator.canPop(context);
     final isDock = widget.isDockPage ?? (!canPop && widget.showBack != true);
-    final active = IslandNotifier.instance.current;
-    final hasContent = (widget.showCenter &&
-            (widget.title.trim().isNotEmpty || widget.centerWidget != null)) ||
-        active != null;
+    final hasContent = widget.showCenter &&
+        (widget.title.trim().isNotEmpty || widget.centerWidget != null);
 
-    final double h = widget.height;
-    final double scrollProgress = (_scrollOffset / 50.0).clamp(0.0, 1.0);
+    final h = widget.height;
+    final scrollProgress = (_scrollOffset / 50.0).clamp(0.0, 1.0);
+    final screenW = MediaQuery.sizeOf(context).width;
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // Top edge black fade-in effect when content scrolls up.
-        // Provides a dark background vignette so clock, notifications, battery and header
-        // controls remain crystal clear and legible over bright scrolling artwork.
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: top + h + 24,
-          child: IgnorePointer(
-            child: Opacity(
-              opacity: scrollProgress,
-              child: const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black,
-                      Color(0xD9000000),
-                      Color(0x66000000),
-                      Colors.transparent,
-                    ],
-                    stops: [0.0, 0.42, 0.78, 1.0],
+    return SizedBox(
+      height: top + h + _notifGap + _notifHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Top-edge black vignette so status bar + island stay legible.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: top + h + 24,
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: scrollProgress,
+                child: const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black,
+                        Color(0xD9000000),
+                        Color(0x66000000),
+                        Colors.transparent,
+                      ],
+                      stops: [0.0, 0.42, 0.78, 1.0],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
 
-        // Header floating capsule / discrete glass buttons
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-            widget.horizontalMargin,
-            top,
-            widget.horizontalMargin,
-            0,
-          ),
-          child: SizedBox(
+          // ───────── Row 1: main pill ─────────
+          Positioned(
+            top: top,
+            left: widget.horizontalMargin,
+            right: widget.horizontalMargin,
             height: h,
             child: AnimatedBuilder(
-              animation:
-                  Listenable.merge([_c, _n, LiquidGlassController.instance]),
+              animation: Listenable.merge([_c, LiquidGlassController.instance]),
               builder: (context, _) {
-                final double nVal = _n.value.clamp(0.0, 1.0);
-                final double cVal = _c.value.clamp(0.0, 1.0);
-                final double vis = hasContent ? math.max(cVal, nVal) : 0.0;
-                final double f = vis.clamp(0.0, 1.0).toDouble();
-
+                final f = hasContent ? _c.value.clamp(0.0, 1.0) : 0.0;
                 return LayoutBuilder(
-                  builder: (context, constraints) {
-                    final double totalWidth = constraints.maxWidth;
-                    final double halfWidth = totalWidth / 2;
-                    final double expandWidth = h + (halfWidth - h) * f;
-
-                    return Stack(
-                      clipBehavior: Clip.none,
-                      alignment: Alignment.center,
-                      children: [
-                        // When transitioning between 0 and 1, render expanding glass capsules
-                        if (hasContent && f > 0.001 && f < 0.999) ...[
-                          // Left expanding glass capsule
-                          Positioned(
-                            left: 0,
-                            top: 0,
-                            width: expandWidth,
-                            height: h,
-                            child: IgnorePointer(
-                              child: AppleGlass(
-                                borderRadius: BorderRadius.circular(h / 2),
-                                child: const SizedBox.expand(),
-                              ),
-                            ),
-                          ),
-                          // Right expanding glass capsule
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            width: expandWidth,
-                            height: h,
-                            child: IgnorePointer(
-                              child: AppleGlass(
-                                borderRadius: BorderRadius.circular(h / 2),
-                                child: const SizedBox.expand(),
-                              ),
-                            ),
-                          ),
-                        ],
-
-                        // State A: Individual discrete circular glass buttons (Left back & Right more)
-                        // Visible when at top / title not presented
-                        if (f < 0.999)
-                          Positioned.fill(
-                            child: Opacity(
-                              opacity: (1.0 - f).clamp(0.0, 1.0),
-                              child: IgnorePointer(
-                                ignoring: f >= 0.5,
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    _buildLeftDock(context, canPop, isDock),
-                                    _buildRightDock(context),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-
-                        // State B: Expanded single unified floating glass capsule
-                        // Holding Left <, Page Title (strictly centered), and Right ⋮
-                        if (hasContent && f > 0.001)
-                          Positioned.fill(
-                            child: Opacity(
-                              opacity: f.clamp(0.0, 1.0),
-                              child: IgnorePointer(
-                                ignoring: f < 0.5,
-                                child: _buildUnifiedCapsule(
-                                  context,
-                                  canPop,
-                                  isDock,
-                                  expansionProgress: f,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
+                  builder: (context, constraints) => _buildMainPill(
+                    context,
+                    constraints.maxWidth,
+                    f,
+                    canPop,
+                    isDock,
+                    hasContent,
+                  ),
                 );
               },
             ),
           ),
+
+          // ───────── Row 2: notification pill ─────────
+          Positioned(
+            top: top + h + _notifGap,
+            left: widget.horizontalMargin,
+            right: widget.horizontalMargin,
+            height: _notifHeight,
+            child: AnimatedBuilder(
+              animation: _n,
+              builder: (context, _) {
+                final cur = IslandNotifier.instance.current;
+                final p = _n.value;
+                if (cur == null || p < 0.002) return const SizedBox.shrink();
+                return Align(
+                  alignment: Alignment.topCenter,
+                  child: _NotifPill(
+                    key: ValueKey(cur.id),
+                    notif: cur,
+                    progress: p,
+                    height: _notifHeight,
+                    maxWidth: screenW - widget.horizontalMargin * 2 - 8,
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Layered so nothing ever cross-fades:
+  ///  1. glass layer  – two capsules that grow toward each other, swapped for
+  ///                    one identical full-width capsule once they touch
+  ///  2. title layer  – fades/scales in as the glass closes
+  ///  3. dock content – back/logo + right button, ALWAYS at the same spot, so
+  ///                    they never jump between the "separate" and "merged" states
+  Widget _buildMainPill(
+    BuildContext context,
+    double totalWidth,
+    double f,
+    bool canPop,
+    bool isDock,
+    bool hasContent,
+  ) {
+    final h = widget.height;
+    final half = totalWidth / 2;
+    final lw = (isDock && widget.leading == null) ? 98.0 : h;
+    final rw = h;
+    final leftW = lw + (half - lw) * f;
+    final rightW = rw + (half - rw) * f;
+    final merged = hasContent && f >= 0.995;
+
+    final rightVisible =
+        widget.trailing != null || widget.onMore != null || widget.showProfile;
+    // Custom docks bring their own glass at rest: only draw ours as it merges.
+    final leftGlassOpacity = widget.leading != null ? f : 1.0;
+    final rightGlassOpacity =
+        (widget.trailing != null || !rightVisible) ? f : 1.0;
+
+    final side = math.max(lw, rw) + 4; // symmetric => title strictly centred
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // 1. glass
+        if (merged)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AppleGlass(
+                borderRadius: BorderRadius.circular(h / 2),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          )
+        else ...[
+          Positioned(
+            left: 0,
+            top: 0,
+            width: leftW,
+            height: h,
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: leftGlassOpacity,
+                child: AppleGlass(
+                  borderRadius: BorderRadius.circular(h / 2),
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            top: 0,
+            width: rightW,
+            height: h,
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: rightGlassOpacity,
+                child: AppleGlass(
+                  borderRadius: BorderRadius.circular(h / 2),
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
+          ),
+        ],
+
+        // 2. title
+        if (hasContent && f > 0.001)
+          Positioned(
+            left: side,
+            right: side,
+            top: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              ignoring: f < 0.5,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  if (widget.onCenterTap != null) {
+                    HapticFeedback.lightImpact();
+                    widget.onCenterTap!();
+                  } else {
+                    _scrollToTop(500);
+                  }
+                },
+                child: Center(child: _titleContent(f)),
+              ),
+            ),
+          ),
+
+        // 3. dock content (fixed positions)
+        Positioned(
+          left: 0,
+          top: 0,
+          width: lw,
+          height: h,
+          child: Center(child: _buildLeft(context, canPop, isDock, lw)),
+        ),
+        Positioned(
+          right: 0,
+          top: 0,
+          width: rw,
+          height: h,
+          child: Center(child: _buildRight(context)),
         ),
       ],
     );
   }
 
-  /// Discrete left circular button
-  Widget _buildLeftDock(BuildContext context, bool canPop, bool isDock) {
+  Widget _buildLeft(BuildContext context, bool canPop, bool isDock, double lw) {
     if (widget.leading != null) return widget.leading!;
     final h = widget.height;
 
@@ -706,21 +758,12 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
         scale: 0.94,
         onTap: () {
           HapticFeedback.lightImpact();
-          final sc = widget.scrollController;
-          if (sc != null && sc.hasClients && sc.offset > 0) {
-            sc.animateTo(
-              0,
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeOutCubic,
-            );
-          }
+          _scrollToTop(400);
         },
-        child: AppleGlass(
-          borderRadius: BorderRadius.circular(h / 2),
-          child: Container(
-            height: h,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-            alignment: Alignment.center,
+        child: SizedBox(
+          width: lw,
+          height: h,
+          child: Center(
             child: Image.asset(
               'assets/images/zenify_logo.png',
               height: 28,
@@ -747,163 +790,9 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
           Navigator.maybePop(context);
         }
       },
-      child: AppleGlass(
-        borderRadius: BorderRadius.circular(h / 2),
-        child: SizedBox(
-          width: h,
-          height: h,
-          child: Center(
-            child: Icon(
-              CupertinoIcons.chevron_back,
-              color: LiquidGlassController.instance.c.foreground,
-              size: 20,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Single unified floating glass capsule matching:
-  /// height: 52px; border-radius: 26px; padding: 0 4px;
-  /// Holding [ Back <    Title (centered)    Vertical ⋮ ]
-  Widget _buildUnifiedCapsule(
-    BuildContext context,
-    bool canPop,
-    bool isDock, {
-    double expansionProgress = 1.0,
-  }) {
-    final h = widget.height;
-    final notifier = IslandNotifier.instance;
-    final active = notifier.current;
-    final closing = notifier.isClosing;
-
-    return AppleGlass(
-      borderRadius: BorderRadius.circular(h / 2),
-      child: Container(
-        height: h,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Center: Page title / notification (strictly centered on the capsule)
-            Positioned(
-              left: 50,
-              right: 50,
-              top: 0,
-              bottom: 0,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  final cur = IslandNotifier.instance.current;
-                  if (cur != null) {
-                    HapticFeedback.lightImpact();
-                    cur.onTap?.call();
-                    IslandNotifier.instance.dismiss(id: cur.id);
-                    return;
-                  }
-                  if (widget.onCenterTap != null) {
-                    HapticFeedback.lightImpact();
-                    widget.onCenterTap!();
-                    return;
-                  }
-                  final sc = widget.scrollController;
-                  if (sc != null && sc.hasClients && sc.offset > 0) {
-                    HapticFeedback.lightImpact();
-                    sc.animateTo(
-                      0,
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.easeOutCubic,
-                    );
-                  }
-                },
-                child: Center(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
-                    child: active != null
-                        ? _NotifTicker(
-                            key: ValueKey(active.id),
-                            notif: active,
-                            isClosing: closing,
-                            onDone: () =>
-                                IslandNotifier.instance.dismiss(id: active.id),
-                          )
-                        : _titleContent(expansionProgress: expansionProgress),
-                  ),
-                ),
-              ),
-            ),
-
-            // Left: back button or logo
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              child: Center(child: _buildCapsuleLeft(context, canPop, isDock)),
-            ),
-
-            // Right: Three-dot button or profile avatar
-            Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              child: Center(child: _buildCapsuleRight(context)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCapsuleLeft(BuildContext context, bool canPop, bool isDock) {
-    if (widget.leading != null) return widget.leading!;
-    if (isDock) {
-      return PressableScale(
-        scale: 0.94,
-        onTap: () {
-          HapticFeedback.lightImpact();
-          final sc = widget.scrollController;
-          if (sc != null && sc.hasClients && sc.offset > 0) {
-            sc.animateTo(
-              0,
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeOutCubic,
-            );
-          }
-        },
-        child: Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          alignment: Alignment.center,
-          child: Image.asset(
-            'assets/images/zenify_logo.png',
-            height: 24,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-            errorBuilder: (_, _, _) => Image.asset(
-              'assets/images/z_logo.png',
-              height: 22,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
-      );
-    }
-    return PressableScale(
-      scale: 0.88,
-      onTap: () {
-        HapticFeedback.lightImpact();
-        if (widget.onBack != null) {
-          widget.onBack!();
-        } else if (canPop) {
-          Navigator.maybePop(context);
-        }
-      },
       child: SizedBox(
-        width: 44,
-        height: 44,
+        width: lw,
+        height: h,
         child: Center(
           child: Icon(
             CupertinoIcons.chevron_back,
@@ -915,8 +804,10 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
     );
   }
 
-  Widget _buildCapsuleRight(BuildContext context) {
+  Widget _buildRight(BuildContext context) {
     if (widget.trailing != null) return widget.trailing!;
+    final h = widget.height;
+
     if (widget.onMore != null) {
       return PressableScale(
         scale: 0.88,
@@ -925,8 +816,8 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
           widget.onMore!();
         },
         child: SizedBox(
-          width: 44,
-          height: 44,
+          width: h,
+          height: h,
           child: Center(
             child: Icon(
               CupertinoIcons.ellipsis_vertical,
@@ -937,7 +828,10 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
         ),
       );
     }
-    if (!widget.showProfile) return const SizedBox(width: 44);
+
+    if (!widget.showProfile) return SizedBox(width: h);
+
+    const av = 28.0;
     return PressableScale(
       scale: 0.88,
       onTap: () {
@@ -945,17 +839,20 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
         if (widget.onProfileTap != null) {
           widget.onProfileTap!();
         } else {
-          Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+          Navigator.of(context, rootNavigator: true).push(
+            CupertinoPageRoute<void>(
+              builder: (_) => const ProfileScreen(),
+            ),
+          );
         }
       },
       child: SizedBox(
-        width: 44,
-        height: 44,
+        width: h,
+        height: h,
         child: Center(
           child: SizedBox(
-            width: 28,
-            height: 28,
+            width: av,
+            height: av,
             child: Consumer<AuthState>(
               builder: (context, auth, _) {
                 final avatar = auth.user?.avatarUrl;
@@ -964,15 +861,14 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
                     child: CachedNetworkImage(
                       imageUrl: avatar,
                       fit: BoxFit.cover,
-                      placeholder: (_, _) => MonogramAvatar(
-                          name: auth.user?.name ?? 'Z', size: 28),
-                      errorWidget: (_, _, _) => MonogramAvatar(
-                          name: auth.user?.name ?? 'Z', size: 28),
+                      placeholder: (_, _) =>
+                          MonogramAvatar(name: auth.user?.name ?? 'Z', size: av),
+                      errorWidget: (_, _, _) =>
+                          MonogramAvatar(name: auth.user?.name ?? 'Z', size: av),
                     ),
                   );
                 }
-                return MonogramAvatar(
-                    name: auth.user?.name ?? 'Zenify', size: 28);
+                return MonogramAvatar(name: auth.user?.name ?? 'Zenify', size: av);
               },
             ),
           ),
@@ -981,11 +877,13 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
     );
   }
 
-  Widget _titleContent({double expansionProgress = 1.0}) {
+  Widget _titleContent(double f) {
     final fg = LiquidGlassController.instance.c.foreground;
-    final titleAlpha = Curves.easeOutCubic
-        .transform(((expansionProgress - 0.25) / 0.75).clamp(0.0, 1.0));
-    final titleScale = 0.88 + 0.12 * expansionProgress;
+    // Title appears only once the glass is ~25% merged, so text never floats
+    // over a half-formed capsule.
+    final alpha =
+        Curves.easeOutCubic.transform(((f - 0.25) / 0.75).clamp(0.0, 1.0));
+    final scale = 0.9 + 0.1 * f;
 
     final child = widget.centerWidget ??
         Text(
@@ -1004,85 +902,21 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
           ),
         );
 
-    if (expansionProgress >= 0.999) return child;
-
+    if (f >= 0.999) return child;
     return Opacity(
-      opacity: titleAlpha,
-      child: Transform.scale(
-        scale: titleScale,
-        child: child,
-      ),
-    );
-  }
-
-  /// Discrete right circular button
-  Widget _buildRightDock(BuildContext context) {
-    if (widget.trailing != null) return widget.trailing!;
-    if (widget.onMore != null) {
-      return DynamicIslandActionButton(
-        icon: CupertinoIcons.ellipsis_vertical,
-        onTap: widget.onMore!,
-        size: widget.height,
-      );
-    }
-    if (!widget.showProfile) return SizedBox(width: widget.height);
-    final h = widget.height;
-
-    return PressableScale(
-      scale: 0.88,
-      onTap: () {
-        HapticFeedback.lightImpact();
-        if (widget.onProfileTap != null) {
-          widget.onProfileTap!();
-        } else {
-          Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
-        }
-      },
-      child: AppleGlass(
-        borderRadius: BorderRadius.circular(h / 2),
-        child: SizedBox(
-          width: h,
-          height: h,
-          child: Center(
-            child: SizedBox(
-              width: 30,
-              height: 30,
-              child: Consumer<AuthState>(
-                builder: (context, auth, _) {
-                  final avatar = auth.user?.avatarUrl;
-                  if (avatar != null && avatar.startsWith('http')) {
-                    return ClipOval(
-                      child: CachedNetworkImage(
-                        imageUrl: avatar,
-                        fit: BoxFit.cover,
-                        placeholder: (_, _) => MonogramAvatar(
-                            name: auth.user?.name ?? 'Z', size: 30),
-                        errorWidget: (_, _, _) => MonogramAvatar(
-                            name: auth.user?.name ?? 'Z', size: 30),
-                      ),
-                    );
-                  }
-                  return MonogramAvatar(
-                      name: auth.user?.name ?? 'Zenify', size: 30);
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
+      opacity: alpha,
+      child: Transform.scale(scale: scale, child: child),
     );
   }
 }
 
-/// Standard Apple-Glass circular action button for Dynamic Island header docks
-/// (e.g. Three-Dot more options button, search button, etc.).
+/// Standalone Apple-Glass circular action button.
 class DynamicIslandActionButton extends StatelessWidget {
   const DynamicIslandActionButton({
     super.key,
     this.icon = CupertinoIcons.ellipsis_vertical,
     required this.onTap,
-    this.size = 52.0,
+    this.size = 46.0,
     this.iconSize = 20.0,
   });
 
@@ -1117,10 +951,8 @@ class DynamicIslandActionButton extends StatelessWidget {
   }
 }
 
-/// Wrap the big in-page title (hero name) with this.
-/// As you scroll down inch by inch, it creates a signature "vacuum pull" effect:
-/// the hero name curves diagonally upward and horizontally toward the screen center
-/// while scaling down to island size, smoothly being absorbed into the Dynamic Island pill.
+/// Wrap the big in-page title (hero name) with this. As you scroll, it is
+/// "vacuumed" up and toward the centre while scaling down into the island.
 class IslandTitleFade extends StatelessWidget {
   const IslandTitleFade({
     super.key,
@@ -1145,11 +977,8 @@ class IslandTitleFade extends StatelessWidget {
           final t = ((o - start) / span).clamp(0.0, 1.0).toDouble();
           if (t <= 0) return child!;
 
-          // Vacuum pull curve: gentle lift that accelerates directly into the center island
           final curved = Curves.easeInOutCubic.transform(t);
-
           final screenWidth = MediaQuery.sizeOf(context).width;
-          // Vector from the left margin (~20px) toward the horizontal center of the screen
           final double targetX = (screenWidth / 2) - 40;
 
           final dx = targetX * curved;

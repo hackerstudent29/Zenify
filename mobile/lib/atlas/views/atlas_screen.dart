@@ -21,6 +21,7 @@ import 'country_screen.dart';
 import 'journey_detail_screen.dart';
 import 'passport_screen.dart';
 import 'search_sheet.dart';
+import '../../services/system_notification_service.dart';
 
 /// Sound Atlas. The globe is a fixed stage; shelves live in a draggable
 /// bottom sheet (Apple Maps / Music style), so globe gestures never fight
@@ -48,6 +49,7 @@ class _AtlasScreenState extends State<AtlasScreen>
   @override
   void initState() {
     super.initState();
+    SystemNotificationService.instance.recordAtlasVisit();
     PassportStore.instance.load();
     AtlasRepository.instance.load().then((d) {
       if (!mounted) return;

@@ -166,7 +166,8 @@ class InnerTube(
                     writeTimeout(60, TimeUnit.SECONDS)
                     protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
                     retryOnConnectionFailure(true)
-                    cache(okhttp3.Cache(File(System.getProperty("java.io.tmpdir"), "http_cache"), 50L * 1024L * 1024L))
+                    val cDir = com.zenify.mobile.yt.YtEngine.appContext?.cacheDir ?: File(System.getProperty("java.io.tmpdir"), "http_cache")
+                    cache(okhttp3.Cache(File(cDir, "innertube_http_cache"), 50L * 1024L * 1024L))
                     configuredProxy?.let(::proxy)
                     configuredProxyAuth?.let { auth ->
                         proxyAuthenticator { _, response ->

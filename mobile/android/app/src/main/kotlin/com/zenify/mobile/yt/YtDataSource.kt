@@ -18,7 +18,12 @@ import java.io.File
 @OptIn(UnstableApi::class)
 object YtDataSource {
     private const val TAG = "YtDataSource"
-    private const val CACHE_SIZE_BYTES = 64L * 1024L * 1024L // 64 MB lean live streaming cache
+    @Volatile
+    var cacheSizeBytes: Long = 256L * 1024L * 1024L // 256 MB default live streaming cache
+
+    fun setMaxCacheSizeBytes(bytes: Long) {
+        cacheSizeBytes = bytes.coerceIn(50L * 1024L * 1024L, 2048L * 1024L * 1024L)
+    }
 
     @Volatile
     private var simpleCache: SimpleCache? = null
@@ -28,7 +33,7 @@ object YtDataSource {
         return simpleCache ?: run {
             val cacheDir = File(context.applicationContext.cacheDir, "audio")
             if (!cacheDir.exists()) cacheDir.mkdirs()
-            val evictor = LeastRecentlyUsedCacheEvictor(CACHE_SIZE_BYTES)
+            val evictor = LeastRecentlyUsedCacheEvictor(cacheSizeBytes)
             val cache = SimpleCache(cacheDir, evictor)
             simpleCache = cache
             cache
@@ -61,7 +66,7 @@ object YtDataSource {
                 for (key in cache.keys.toList()) {
                     try {
                         cache.removeResource(key)
-                    } catch (_: Throwable) {}
+                    } catch (e: Throwable) {}
                 }
             } ?: run {
                 val cacheDir = File(context.applicationContext.cacheDir, "audio")
@@ -69,6 +74,17 @@ object YtDataSource {
                     cacheDir.deleteRecursively()
                 }
             }
+            // Clear headless WebView disk cache and DOM storage
+            try {
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    try {
+                        android.webkit.WebStorage.getInstance().deleteAllData()
+                        val webView = android.webkit.WebView(context.applicationContext)
+                        webView.clearCache(true)
+                        webView.destroy()
+                    } catch (_: Throwable) {}
+                }
+            } catch (_: Throwable) {}
         } catch (e: Throwable) {
             Log.w(TAG, "Failed clearing audio cache: ${e.message}")
         }
@@ -82,7 +98,7 @@ object YtDataSource {
 
         // 1. Base HTTP source backed by our single shared OkHttpClient with IPv4 preference
         val okHttpFactory = OkHttpDataSource.Factory(Net.ok)
-            .setUserAgent(StreamHeaders.defaultUaFor("TVHTML5"))
+            .setUserAgent(StreamHeaders.defaultUaFor("IOS"))
 
         // 2. Default data source (supports assets/raw/file + delegates HTTP to OkHttp)
         val defaultFactory = DefaultDataSource.Factory(appContext, okHttpFactory)
@@ -102,6 +118,10 @@ object YtDataSource {
                 val wantVideo = isVideoUri || uri.getQueryParameter("v") == "1"
                 val videoId = uri.lastPathSegment ?: uri.host ?: error("Invalid zenify URI: $uri")
                 val qualityParam = uri.getQueryParameter("q") ?: YtEngine.currentQuality
+                val vqParam = uri.getQueryParameter("vq")?.toIntOrNull()
+                if (vqParam != null && vqParam > 0) {
+                    YtEngine.videoMaxHeight = vqParam
+                }
                 val resolved = try {
                     runBlocking { YtEngine.resolve(videoId, wantVideo = wantVideo, quality = qualityParam) }
                 } catch (e: InterruptedException) {
@@ -109,7 +129,11 @@ object YtDataSource {
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw java.io.InterruptedIOException("resolve cancelled")
                 } catch (e: Throwable) {
-                    throw java.io.IOException("resolve failed: ${e.message}", e)
+                    try {
+                        runBlocking { YtEngine.resolve(videoId, force = true, wantVideo = wantVideo, quality = qualityParam) }
+                    } catch (e2: Throwable) {
+                        throw java.io.IOException("resolve failed: ${e2.message}", e2)
+                    }
                 }
                 onResolved?.invoke(videoId, resolved)
                 val targetUrl = if (isVideoUri && !resolved.videoUrl.isNullOrBlank()) {
@@ -131,14 +155,18 @@ object YtDataSource {
                     .build()
             } else if (uri.host?.contains("googlevideo.com") == true) {
                 val active = com.zenify.mobile.audio.ZenAudioPlugin.activeHeaders
+                val client = DenialClassifier.clientOf(uri.toString()) ?: "IOS"
                 val headers = if (active.isNotEmpty()) {
                     active
                 } else {
-                    StreamHeaders.forClient("ANDROID")
+                    StreamHeaders.forClient(client)
                 }
-                dataSpec.buildUpon()
-                    .setHttpRequestHeaders(headers)
-                    .build()
+                val curMediaId = com.zenify.mobile.audio.ZenAudioPlugin.currentMediaId
+                val b = dataSpec.buildUpon().setHttpRequestHeaders(headers)
+                if (dataSpec.key == null && !curMediaId.isNullOrBlank()) {
+                    b.setKey(curMediaId)
+                }
+                b.build()
             } else {
                 dataSpec
             }
@@ -150,7 +178,7 @@ object YtDataSource {
             Log.w(TAG, "Stream denied: $denial for videoId=$videoId")
             val clientFromUrl = DenialClassifier.clientOf(failedUrl)
             val cached = YtEngine.urlCache.findAnyForVideo(videoId)
-            val client = clientFromUrl ?: cached?.client ?: "ANDROID_VR"
+            val client = clientFromUrl ?: cached?.client ?: "IOS"
             Log.w(TAG, "Marking client failed for $videoId: $client")
             YtEngine.markClientFailed(videoId, client)
             evictMedia(appContext, videoId)

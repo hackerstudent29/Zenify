@@ -16,6 +16,15 @@ import { GlobalNotification } from "@/components/shared/GlobalNotification";
 import { NotificationListener } from "@/components/shared/NotificationListener";
 import { GlobalLoginSplash } from "@/components/auth/GlobalLoginSplash";
 import { CookieConsentBanner } from "@/components/shared/CookieConsentBanner";
+import { AppMigrationNotice } from "@/components/shared/AppMigrationNotice";
+import { usePathname } from "next/navigation";
+
+function GlobalMigrationBanner() {
+  const pathname = usePathname();
+  const isAuth = pathname === "/login" || pathname === "/register";
+  if (isAuth) return null;
+  return <AppMigrationNotice variant="floating" />;
+}
 
 export default function RootLayout({
   children,
@@ -33,6 +42,7 @@ export default function RootLayout({
           <GlobalLoginSplash />
           <NotificationListener />
           <CookieConsentBanner />
+          <GlobalMigrationBanner />
         </AuthGuard>
       </Providers>
     </>

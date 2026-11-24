@@ -33,6 +33,7 @@
 // Public API is unchanged — drop-in replacement.
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -962,6 +963,12 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
   ImageProvider _providerFor(String key) {
     if (key.startsWith('asset:')) {
       return AssetImage(key.substring(6));
+    }
+    if (key.startsWith('file://')) {
+      return FileImage(File(key.substring(7)));
+    }
+    if (key.startsWith('/') || (key.length >= 2 && key[1] == ':')) {
+      return FileImage(File(key));
     }
     if (widget.imageProviderBuilder != null) {
       return widget.imageProviderBuilder!(key);

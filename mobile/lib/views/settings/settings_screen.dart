@@ -23,6 +23,7 @@ import '../auth/welcome_screen.dart';
 import '../player/studio_fx_sheet.dart';
 import '../profile/profile_edit_sheets.dart';
 import '../profile/profile_screen.dart';
+import 'crossfade_style_section.dart';
 import 'glass_customizer_screen.dart';
 
 class _QualityOption {
@@ -32,6 +33,7 @@ class _QualityOption {
     required this.subtitle,
     required this.badge,
     required this.points,
+    this.isRecommended = false,
   });
 
   final String code;
@@ -39,6 +41,7 @@ class _QualityOption {
   final String subtitle;
   final String badge;
   final List<String> points;
+  final bool isRecommended;
 }
 
 const _audioQualityOptions = <_QualityOption>[
@@ -47,11 +50,12 @@ const _audioQualityOptions = <_QualityOption>[
     title: 'High',
     subtitle: '160 kbps Opus • Studio Master',
     badge: '160 kbps',
+    isRecommended: true,
     points: [
       'Format: 160 kbps Opus / 320 kbps stream',
-      'File Size: ~3.8 MB – 4.2 MB per song',
-      'Network: Best on Wi-Fi & 4G / 5G',
-      'Experience: Pristine studio sound & dynamic range',
+      'Data Usage: ~3.8 MB – 4.5 MB per 4-min song',
+      'Device Fit: Recommended for all phones & headphones',
+      'Network: Pristine studio sound on Wi-Fi & 4G / 5G',
     ],
   ),
   _QualityOption(
@@ -61,9 +65,9 @@ const _audioQualityOptions = <_QualityOption>[
     badge: '128 kbps',
     points: [
       'Format: 128 kbps AAC / Opus',
-      'File Size: ~2.8 MB – 3.2 MB per song',
-      'Network: Smooth on all cellular networks',
-      'Experience: Clean clarity with balanced data usage',
+      'Data Usage: ~2.6 MB – 3.2 MB per 4-min song',
+      'Device Fit: Good for everyday listening',
+      'Network: Smooth playback on all cellular networks',
     ],
   ),
   _QualityOption(
@@ -73,9 +77,9 @@ const _audioQualityOptions = <_QualityOption>[
     badge: '~70 kbps',
     points: [
       'Format: ~70 kbps Opus stream',
-      'File Size: ~1.6 MB – 2.0 MB per song',
-      'Network: 50%+ data savings on 3G / 4G',
-      'Experience: Smooth playback on limited data plans',
+      'Data Usage: ~1.6 MB – 2.0 MB per 4-min song',
+      'Device Fit: Low memory and CPU usage',
+      'Network: 50%+ data savings on limited data plans',
     ],
   ),
   _QualityOption(
@@ -85,9 +89,97 @@ const _audioQualityOptions = <_QualityOption>[
     badge: '~50 kbps',
     points: [
       'Format: ~50 kbps Opus stream',
-      'File Size: ~1.1 MB – 1.4 MB per song',
-      'Network: Plays reliably in weak network areas',
-      'Experience: Maximum compression for emergency listening',
+      'Data Usage: ~1.0 MB – 1.3 MB per 4-min song',
+      'Device Fit: Maximum battery preservation',
+      'Network: Plays reliably in low-coverage areas',
+    ],
+  ),
+];
+
+const _videoQualityOptions = <_QualityOption>[
+  _QualityOption(
+    code: '8k',
+    title: '8K Ultra HD',
+    subtitle: '4320p • Extreme Definition',
+    badge: '4320p',
+    points: [
+      'Resolution: 7680×4320 (4320p 8K UHD)',
+      'Data Usage: ~280 MB – 420 MB per 4-min video',
+      'Device Fit: Flagship devices with 8K hardware decoder',
+      'Network: Unmetered ultra-fast Wi-Fi or 5G',
+    ],
+  ),
+  _QualityOption(
+    code: '4k',
+    title: '4K Cinema',
+    subtitle: '2160p • Ultra Crisp',
+    badge: '2160p',
+    points: [
+      'Resolution: 3840×2160 (2160p 4K UHD)',
+      'Data Usage: ~120 MB – 180 MB per 4-min video',
+      'Device Fit: Premium AMOLED & tablet screens',
+      'Network: High-speed Wi-Fi or fast 5G',
+    ],
+  ),
+  _QualityOption(
+    code: '2k',
+    title: '2K Quad HD',
+    subtitle: '1440p • Pristine Clarity',
+    badge: '1440p',
+    points: [
+      'Resolution: 2560×1440 (1440p QHD)',
+      'Data Usage: ~60 MB – 90 MB per 4-min video',
+      'Device Fit: Crisp on 2K / 120Hz displays',
+      'Network: Solid broadband Wi-Fi or 4G/5G',
+    ],
+  ),
+  _QualityOption(
+    code: '1080p',
+    title: 'Full HD',
+    subtitle: '1080p • Studio Sharp',
+    badge: '1080p',
+    points: [
+      'Resolution: 1920×1080 (1080p Full HD)',
+      'Data Usage: ~28 MB – 45 MB per 4-min video',
+      'Device Fit: Razor-sharp on 1080p phone screens',
+      'Network: Standard Wi-Fi and reliable 4G',
+    ],
+  ),
+  _QualityOption(
+    code: '720p',
+    title: 'HD',
+    subtitle: '720p • Balanced Quality',
+    badge: '720p',
+    isRecommended: true,
+    points: [
+      'Resolution: 1280×720 (720p HD)',
+      'Data Usage: ~12 MB – 18 MB per 4-min video',
+      'Device Fit: Recommended for all phones • Cool & smooth',
+      'Network: Fast buffer and instant seeking anywhere',
+    ],
+  ),
+  _QualityOption(
+    code: '480p',
+    title: 'Standard',
+    subtitle: '480p • Smooth Playback',
+    badge: '480p',
+    points: [
+      'Resolution: 854×480 (480p SD)',
+      'Data Usage: ~6 MB – 9 MB per 4-min video',
+      'Device Fit: Lightweight on GPU, RAM and battery',
+      'Network: Quick loading on weaker cellular signals',
+    ],
+  ),
+  _QualityOption(
+    code: '360p',
+    title: 'Data Saver',
+    subtitle: '360p • Minimal Bandwidth',
+    badge: '360p',
+    points: [
+      'Resolution: 640×360 (360p Compact)',
+      'Data Usage: ~3 MB – 5 MB per 4-min video',
+      'Device Fit: Minimal heat and lowest power drain',
+      'Network: Works smoothly on 2G / 3G and strict quotas',
     ],
   ),
 ];
@@ -100,33 +192,34 @@ const _imageQualityOptions = <_QualityOption>[
     badge: '1000px HD',
     points: [
       'Resolution: 1000×1000 HD cover art',
-      'File Size: ~180 KB – 320 KB per image',
+      'Data Usage: ~180 KB – 320 KB per image',
+      'Device Fit: Best for tablets & large flagship displays',
       'Network: Best on Wi-Fi & fast mobile data',
-      'Experience: Razor-sharp on high-resolution displays',
     ],
   ),
   _QualityOption(
     code: 'medium',
     title: 'Medium',
-    subtitle: '540px • Standard HD',
-    badge: '540px',
+    subtitle: '450px • Standard HD',
+    badge: '450px',
+    isRecommended: true,
     points: [
-      'Resolution: 540×540 standard cover art',
-      'File Size: ~70 KB – 120 KB per image',
-      'Network: Fast loading on standard mobile data',
-      'Experience: Clean clarity with optimized caching',
+      'Resolution: 450×450 standard cover art',
+      'Data Usage: ~70 KB – 120 KB per image',
+      'Device Fit: Recommended for all phones • Ultra-fast scroll',
+      'Network: Balanced cache size and snappy loading',
     ],
   ),
   _QualityOption(
     code: 'low',
     title: 'Data Saver',
-    subtitle: '250px • Compact',
-    badge: '250px',
+    subtitle: '200px • Compact',
+    badge: '200px',
     points: [
-      'Resolution: 250×250 compact thumbnail',
-      'File Size: ~20 KB – 40 KB per image',
+      'Resolution: 200×200 compact thumbnail',
+      'Data Usage: ~15 KB – 25 KB per image',
+      'Device Fit: Minimal RAM footprint on entry devices',
       'Network: Maximum data savings on slow connections',
-      'Experience: Lightweight image for fastest scrolling',
     ],
   ),
 ];
@@ -137,6 +230,17 @@ String _audioQualityLabel(String code) => switch (code) {
   'low' => 'Data Saver',
   'ultra_low' => 'Ultra Data Saver',
   _ => 'High',
+};
+
+String _videoQualityLabel(String code) => switch (code) {
+  '8k' => '8K Ultra HD (4320p)',
+  '4k' => '4K Cinema (2160p)',
+  '2k' => '2K Quad HD (1440p)',
+  '1080p' => 'Full HD (1080p)',
+  '720p' => 'HD (720p)',
+  '480p' => 'Standard (480p)',
+  '360p' => 'Data Saver (360p)',
+  _ => 'HD (720p)',
 };
 
 String _imageQualityLabel(String code) => switch (code) {
@@ -252,9 +356,19 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
   void _showQualityInfoPopup(
     BuildContext context,
     _QualityOption opt, {
-    required bool isAudio,
+    bool isAudio = false,
+    bool isVideo = false,
   }) {
     HapticFeedback.lightImpact();
+    final IconData iconData;
+    if (isAudio) {
+      iconData = CupertinoIcons.waveform;
+    } else if (isVideo) {
+      iconData = CupertinoIcons.videocam;
+    } else {
+      iconData = CupertinoIcons.photo;
+    }
+
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -303,27 +417,56 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
                             ),
                           ),
                           alignment: Alignment.center,
-                          child: Icon(
-                            isAudio
-                                ? CupertinoIcons.waveform
-                                : CupertinoIcons.photo,
-                            size: 17,
-                            color: AM.rose,
-                          ),
+                          child: Icon(iconData, size: 17, color: AM.rose),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                opt.title,
-                                style: const TextStyle(
-                                  fontFamily: 'SF Pro',
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      opt.title,
+                                      style: const TextStyle(
+                                        fontFamily: 'SF Pro',
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                  if (opt.isRecommended) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 1.5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AM.rose.withValues(alpha: 0.16),
+                                        borderRadius: BorderRadius.circular(5),
+                                        border: Border.all(
+                                          color: AM.rose.withValues(
+                                            alpha: 0.40,
+                                          ),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'RECOMMENDED',
+                                        style: TextStyle(
+                                          fontFamily: 'SF Pro',
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.3,
+                                          color: AM.rose,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                               Text(
                                 opt.badge,
@@ -430,95 +573,114 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
     );
   }
 
-  Widget _buildQualityOptionTile({
+  Widget _buildQualityOptionRow({
     required BuildContext context,
     required _QualityOption option,
     required bool isSelected,
-    required bool isAudio,
+    bool isAudio = false,
+    bool isVideo = false,
     required VoidCallback onTap,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.white.withValues(alpha: 0.03),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected
-                  ? AM.rose.withValues(alpha: 0.50)
-                  : Colors.white.withValues(alpha: 0.08),
-              width: isSelected ? 1.2 : 0.8,
+    return PressableScale(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 24,
+              child: isSelected
+                  ? const Icon(
+                      CupertinoIcons.checkmark_alt,
+                      size: 20,
+                      color: AM.rose,
+                    )
+                  : null,
             ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                isSelected
-                    ? CupertinoIcons.checkmark_circle_fill
-                    : CupertinoIcons.circle,
-                size: 20,
-                color: isSelected ? AM.rose : Colors.white30,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      option.title,
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 16,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w600,
-                        color: Colors.white,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          option.title,
+                          style: TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 16,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: isSelected ? AM.rose : Colors.white,
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      option.subtitle,
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.55),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () =>
-                    _showQualityInfoPopup(context, option, isAudio: isAudio),
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.08),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.20),
-                      width: 0.9,
+                      if (option.isRecommended) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AM.rose.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(5),
+                            border: Border.all(
+                              color: AM.rose.withValues(alpha: 0.35),
+                              width: 0.6,
+                            ),
+                          ),
+                          child: const Text(
+                            'RECOMMENDED',
+                            style: TextStyle(
+                              fontFamily: 'SF Pro',
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.2,
+                              color: AM.rose,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    option.subtitle,
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w400,
+                      color: Color(0xFFA1A1A6),
                     ),
                   ),
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    CupertinoIcons.info,
-                    size: 15,
-                    color: Colors.white70,
-                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _showQualityInfoPopup(
+                context,
+                option,
+                isAudio: isAudio,
+                isVideo: isVideo,
+              ),
+              child: Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                child: const Icon(
+                  CupertinoIcons.info_circle,
+                  size: 20,
+                  color: Color(0xFFA1A1A6),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -530,7 +692,8 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
     required String subtitle,
     required List<_QualityOption> options,
     required String currentCode,
-    required bool isAudio,
+    bool isAudio = false,
+    bool isVideo = false,
     required ValueChanged<String> onSelected,
   }) {
     HapticFeedback.lightImpact();
@@ -539,7 +702,7 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
         context: context,
         useRootNavigator: true,
         backgroundColor: Colors.transparent,
-        barrierColor: Colors.black.withValues(alpha: 0.55),
+        barrierColor: Colors.black.withValues(alpha: 0.50),
         isScrollControlled: true,
         enableDrag: true,
         builder: (ctx) {
@@ -554,22 +717,29 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
                 ),
                 border: Border(
                   top: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.14),
+                    color: Colors.white.withValues(alpha: 0.12),
                     width: 0.6,
                   ),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    blurRadius: 36,
+                    offset: const Offset(0, -6),
+                  ),
+                ],
               ),
               child: SafeArea(
                 top: false,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Grabber
+                    // Grabber handle
                     Center(
                       child: Container(
                         width: 36,
                         height: 4.5,
-                        margin: const EdgeInsets.only(top: 10, bottom: 14),
+                        margin: const EdgeInsets.only(top: 10, bottom: 10),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.22),
                           borderRadius: BorderRadius.circular(2.5),
@@ -577,83 +747,77 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                style: const TextStyle(
-                                  fontFamily: 'SF Pro',
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: -0.3,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                subtitle,
-                                style: TextStyle(
-                                  fontFamily: 'SF Pro',
-                                  fontSize: 13,
-                                  color: Colors.white.withValues(alpha: 0.55),
-                                ),
-                              ),
-                            ],
-                          ),
-                          PressableScale(
-                            onTap: () => Navigator.pop(ctx),
-                            child: Container(
-                              padding: const EdgeInsets.all(5),
-                              decoration: const ShapeDecoration(
-                                shape: CircleBorder(),
-                                color: Color(0x1FFFFFFF),
-                              ),
-                              child: const Icon(
-                                Icons.close_rounded,
-                                size: 18,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Divider(
-                      height: 0.5,
-                      thickness: 0.5,
-                      color: Colors.white.withValues(alpha: 0.12),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        12,
-                        16,
-                        math.max(16, safeBottom + 12),
-                      ),
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          for (int i = 0; i < options.length; i++) ...[
-                            _buildQualityOptionTile(
-                              context: ctx,
-                              option: options[i],
-                              isSelected: options[i].code == currentCode,
-                              isAudio: isAudio,
-                              onTap: () {
-                                AM.impact();
-                                onSelected(options[i].code);
-                                Navigator.pop(ctx);
-                              },
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: 'SF Pro Display',
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: -0.3,
                             ),
-                            if (i < options.length - 1)
-                              const SizedBox(height: 8),
-                          ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: 'SF Pro',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFFA1A1A6),
+                              letterSpacing: -0.1,
+                            ),
+                          ),
                         ],
+                      ),
+                    ),
+                    const Divider(
+                      height: 0.5,
+                      thickness: 0.5,
+                      color: Color(0xFF38383A),
+                    ),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: EdgeInsets.only(
+                          bottom: math.max(16, safeBottom + 8),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (int i = 0; i < options.length; i++) ...[
+                              _buildQualityOptionRow(
+                                context: ctx,
+                                option: options[i],
+                                isSelected: options[i].code == currentCode,
+                                isAudio: isAudio,
+                                isVideo: isVideo,
+                                onTap: () {
+                                  AM.impact();
+                                  onSelected(options[i].code);
+                                  Navigator.pop(ctx);
+                                },
+                              ),
+                              if (i < options.length - 1)
+                                const Divider(
+                                  height: 0.5,
+                                  thickness: 0.5,
+                                  indent: 56,
+                                  color: Color(0xFF38383A),
+                                ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -670,7 +834,7 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
     await _showQualityPickerSheet(
       context: context,
       title: 'Audio Quality',
-      subtitle: 'Streaming and download fidelity',
+      subtitle: 'Streaming fidelity for music playback',
       options: _audioQualityOptions,
       currentCode: s.audioQuality,
       isAudio: true,
@@ -680,6 +844,26 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
           context,
           'Audio quality set to ${_audioQualityLabel(code)}',
           icon: CupertinoIcons.waveform,
+        );
+      },
+    );
+  }
+
+  Future<void> _pickVideoQuality(SettingsState s) async {
+    await _showQualityPickerSheet(
+      context: context,
+      title: 'Video Streaming Quality',
+      subtitle: 'Playback resolution and data usage for music videos',
+      options: _videoQualityOptions,
+      currentCode: s.videoQuality,
+      isAudio: false,
+      isVideo: true,
+      onSelected: (code) {
+        s.setVideoQuality(code);
+        appleToast(
+          context,
+          'Video streaming quality set to ${_videoQualityLabel(code)}',
+          icon: CupertinoIcons.videocam,
         );
       },
     );
@@ -717,6 +901,26 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
         appleToast(
           context,
           'Download audio quality set to ${_audioQualityLabel(code)}',
+          icon: CupertinoIcons.arrow_down_circle,
+        );
+      },
+    );
+  }
+
+  Future<void> _pickDownloadVideoQuality(SettingsState s) async {
+    await _showQualityPickerSheet(
+      context: context,
+      title: 'Download Video Quality',
+      subtitle: 'Video fidelity and storage size for offline videos',
+      options: _videoQualityOptions,
+      currentCode: s.downloadVideoQuality,
+      isAudio: false,
+      isVideo: true,
+      onSelected: (code) {
+        s.setDownloadVideoQuality(code);
+        appleToast(
+          context,
+          'Download video quality set to ${_videoQualityLabel(code)}',
           icon: CupertinoIcons.arrow_down_circle,
         );
       },
@@ -830,7 +1034,7 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-              onTap: () => Navigator.of(context).push(
+              onTap: () => Navigator.of(context, rootNavigator: true).push(
                 auth.isLoggedIn
                     ? CupertinoPageRoute<void>(
                         builder: (_) => const ProfileScreen(fromSettings: true),
@@ -838,7 +1042,8 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
                     : CupertinoPageRoute<void>(
                         fullscreenDialog: true,
                         builder: (_) => WelcomeScreen(
-                          onFinished: () => Navigator.of(context).pop(),
+                          onFinished: () =>
+                              Navigator.of(context, rootNavigator: true).pop(),
                         ),
                       ),
               ),
@@ -846,17 +1051,23 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
           ],
         ),
 
-        // 2. Audio
+        // 2. Audio & Video
         AMSection(
-          header: 'Audio',
+          header: 'Audio & Video',
           footer:
-              'Volume normalization keeps loudness consistent between songs.',
+              'Streaming resolution dynamically adapts to user limits and network bandwidth.',
           children: [
             AMRow(
               title: 'Audio Quality',
               value: _audioQualityLabel(s.audioQuality),
               chevron: true,
               onTap: () => _pickAudioQuality(s),
+            ),
+            AMRow(
+              title: 'Video Streaming Quality',
+              value: _videoQualityLabel(s.videoQuality),
+              chevron: true,
+              onTap: () => _pickVideoQuality(s),
             ),
             AMRow(
               title: 'Studio FX & Spatial Audio',
@@ -886,6 +1097,7 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
               divisions: 12,
               onChanged: (v) => s.setCrossfadeSeconds(v.round()),
             ),
+            const CrossfadeStyleSection(),
             AMSwitchRow(
               title: 'Gapless Playback',
               subtitle: 'Seamless transitions between tracks',
@@ -921,7 +1133,7 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
               subtitle: 'Material, blur, prism and motion',
               value: GlassEngine.instance.presetName,
               chevron: true,
-              onTap: () => Navigator.of(context)
+              onTap: () => Navigator.of(context, rootNavigator: true)
                   .push(
                     CupertinoPageRoute<void>(
                       builder: (_) => const GlassCustomizerScreen(),
@@ -1026,13 +1238,19 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
         AMSection(
           header: 'Downloads',
           footer:
-              'Choose audio and artwork fidelity for offline songs. High quality downloads provide crystal clear sound with lightweight storage.',
+              'Choose audio, video and artwork fidelity for offline media. High quality downloads provide crystal clear playback with lightweight storage.',
           children: [
             AMRow(
               title: 'Download Audio Quality',
               subtitle: _audioQualityLabel(s.downloadAudioQuality),
               chevron: true,
               onTap: () => _pickDownloadAudioQuality(s),
+            ),
+            AMRow(
+              title: 'Download Video Quality',
+              subtitle: _videoQualityLabel(s.downloadVideoQuality),
+              chevron: true,
+              onTap: () => _pickDownloadVideoQuality(s),
             ),
             AMRow(
               title: 'Download Artwork Quality',
@@ -1062,18 +1280,45 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
 
         // 7. Notifications
         AMSection(
-          header: 'Notifications',
+          header: 'System Notifications',
+          footer:
+              'Zenify only sends high-value system alerts with zero routine spam. Quiet hours are respected from 10 PM to 9 AM.',
           children: [
             AMSwitchRow(
+              title: 'App Updates',
+              subtitle: 'New version releases and changelogs',
+              value: s.notifyUpdates,
+              onChanged: s.setNotifyUpdates,
+            ),
+            AMSwitchRow(
+              title: 'Discovery & Replay',
+              subtitle: 'Atlas world explorer and taste reminders',
+              value: s.notifyDiscovery,
+              onChanged: s.setNotifyDiscovery,
+            ),
+            AMSwitchRow(
+              title: 'Weekly Sunday Digest',
+              subtitle: 'Weekly listening hours and top artist summary at 8 PM',
+              value: s.notifyWeeklyDigest,
+              onChanged: s.setNotifyWeeklyDigest,
+            ),
+            AMSwitchRow(
               title: 'New Releases',
-              subtitle: 'From your favorite artists',
+              subtitle: 'From your favorite and followed artists',
               value: s.newReleaseAlerts,
               onChanged: s.setNewReleaseAlerts,
             ),
             AMSwitchRow(
               title: 'Room Together Invites',
+              subtitle: 'Live shared listening party invitations',
               value: s.notifyTogetherInvites,
               onChanged: s.setNotifyTogetherInvites,
+            ),
+            AMSwitchRow(
+              title: 'Offline Downloads',
+              subtitle: 'Alerts when background music downloads complete',
+              value: s.notifyDownloads,
+              onChanged: s.setNotifyDownloads,
             ),
           ],
         ),

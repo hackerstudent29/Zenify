@@ -442,8 +442,89 @@ class ArtistService {
         }
 
         if (ytChannel['videos'] is List) {
-          musicVideos.addAll((ytChannel['videos'] as List).whereType<Track>());
+          for (final item in (ytChannel['videos'] as List).whereType<Track>()) {
+            var vidArtist = item.artist;
+            if (vidArtist.isEmpty ||
+                vidArtist.toLowerCase() == 'unknown artist' ||
+                MediaNormalizer.isDistributorOrLabel(vidArtist)) {
+              vidArtist = MediaNormalizer.extractArtistsFromVideoTitle(
+                item.title,
+                defaultArtist: cleanName,
+              );
+            }
+            musicVideos.add(item.copyWith(
+              artist: vidArtist,
+              isVideo: true,
+            ));
+          }
         }
+      }
+
+      // If musicVideos is empty, supplement by searching official videos
+      if (musicVideos.isEmpty) {
+        try {
+          final searchedVids = await InnerTubeService.instance.searchVideos('$cleanName official video');
+          for (final v in searchedVids) {
+            var vidArtist = v.artist;
+            if (vidArtist.isEmpty ||
+                vidArtist.toLowerCase() == 'unknown artist' ||
+                MediaNormalizer.isDistributorOrLabel(vidArtist)) {
+              vidArtist = MediaNormalizer.extractArtistsFromVideoTitle(
+                v.title,
+                defaultArtist: cleanName,
+              );
+            }
+            musicVideos.add(v.copyWith(
+              artist: vidArtist,
+              isVideo: true,
+            ));
+            if (musicVideos.length >= 10) break;
+          }
+        } catch (_) {}
+      }
+
+      // Concurrently resolve authentic upload years and description credits for initial videos
+      if (musicVideos.isNotEmpty) {
+        try {
+          final futures = musicVideos.take(8).map((t) async {
+            final cleanId = t.id.replaceFirst(RegExp(r'^(yt-|yt:)'), '');
+            if (cleanId.isEmpty) return t;
+            final hasYear = t.year != null && RegExp(r'\b(19\d{2}|20\d{2})\b').hasMatch(t.year!);
+            final hasArtist = t.artist.isNotEmpty &&
+                t.artist.toLowerCase() != 'unknown artist' &&
+                !MediaNormalizer.isDistributorOrLabel(t.artist);
+            if (hasYear && hasArtist) return t;
+
+            final details = await InnerTubeService.instance.getVideoDetails(cleanId);
+            if (details != null) {
+              var art = t.artist;
+              if (!hasArtist) {
+                final fromDesc = MediaNormalizer.extractArtistsFromDescription(details.description);
+                if (fromDesc.isNotEmpty) {
+                  art = fromDesc;
+                } else {
+                  art = MediaNormalizer.extractArtistsFromVideoTitle(
+                    details.title.isNotEmpty ? details.title : t.title,
+                    defaultArtist: cleanName,
+                  );
+                }
+              }
+              return t.copyWith(
+                year: (details.year != null && details.year!.isNotEmpty) ? details.year : t.year,
+                artist: art,
+                isVideo: true,
+              );
+            }
+            return t;
+          });
+          final updated = await Future.wait(futures).timeout(
+            const Duration(milliseconds: 3000),
+            onTimeout: () => musicVideos.take(8).toList(),
+          );
+          for (var i = 0; i < updated.length; i++) {
+            musicVideos[i] = updated[i];
+          }
+        } catch (_) {}
       }
 
       // If topSongs is empty, fetch via InnerTube search directly

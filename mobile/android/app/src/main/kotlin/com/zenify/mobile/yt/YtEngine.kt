@@ -39,10 +39,9 @@ import java.util.concurrent.atomic.AtomicLong
 
 object YtEngine {
     private const val TAG = "YtEngine"
-    private const val EXCLUDE_TTL_MS = 5 * 60_000L // 5 minutes failure cooldown
-    private const val AUDIO_BUDGET_MS = 12_000L
-    private const val VIDEO_BUDGET_MS = 12_000L
-    private const val BREAKER_TTL_MS = 3 * 60_000L
+    private const val EXCLUDE_TTL_MS = 2 * 60_000L // 2 minutes failure cooldown per video
+    private const val AUDIO_BUDGET_MS = 20_000L
+    private const val VIDEO_BUDGET_MS = 20_000L
 
     @Volatile var videoMaxHeight: Int = 1080 // set from the settings quality
 
@@ -51,22 +50,8 @@ object YtEngine {
     private val excluded = ConcurrentHashMap<String, Pair<Set<String>, Long>>()
     val urlCache = StreamUrlCache()
 
-    private val clientFails = ConcurrentHashMap<String, Pair<Int, Long>>()
-    private val negCache = ConcurrentHashMap<String, Long>()
     private val lastCipherRefresh = AtomicLong(0)
     private val prefetching = AtomicInteger(0)
-
-    private fun noteClientFail(c: String) {
-        val now = System.currentTimeMillis()
-        clientFails.compute(c) { _, o ->
-            if (o == null || now - o.second > BREAKER_TTL_MS) 1 to now else (o.first + 1) to now
-        }
-    }
-    private fun noteClientOk(c: String) { clientFails.remove(c) }
-    private fun breakerExcluded(): Set<String> {
-        val now = System.currentTimeMillis()
-        return clientFails.filter { (_, v) -> v.first >= 3 && now - v.second < BREAKER_TTL_MS }.keys
-    }
 
     @Volatile
     var currentQuality: String = "high"
@@ -146,7 +131,7 @@ object YtEngine {
             ) =
                 try {
                     this@withEmbeddedConfigFallback.fetchConfig(videoId, useLoginCookies)
-                } catch (_: IllegalStateException) {
+                } catch (e: IllegalStateException) {
                     this@withEmbeddedConfigFallback.fetchEmbeddedConfig(videoId, useLoginCookies = false)
                 }
         }
@@ -156,38 +141,39 @@ object YtEngine {
             return if (hints.wantVideo) {
                 listOf(
                     YouTubeClient.IOS,
-                    YouTubeClient.TVHTML5,
+                    YouTubeClient.VISIONOS,
                     YouTubeClient.TVHTML5_SIMPLY,
-                    YouTubeClient.ANDROID_VR_1_65_10,
-                    YouTubeClient.ANDROID_VR_NO_AUTH,
                     YouTubeClient.ANDROID,
                     YouTubeClient.WEB,
                     YouTubeClient.WEB_REMIX,
                 )
             } else {
                 listOf(
-                    YouTubeClient.TVHTML5,
-                    YouTubeClient.TVHTML5_SIMPLY,
                     YouTubeClient.IOS,
-                    YouTubeClient.ANDROID_MUSIC,
-                    YouTubeClient.ANDROID_VR_1_65_10,
-                    YouTubeClient.ANDROID_VR_NO_AUTH,
-                    YouTubeClient.ANDROID,
+                    YouTubeClient.VISIONOS,
+                    YouTubeClient.TVHTML5_SIMPLY,
                     YouTubeClient.WEB_REMIX,
+                    YouTubeClient.ANDROID_MUSIC,
                 )
             }
         }
     }
 
     @Volatile
+    private var poTokenGenerator: PoTokenGenerator? = null
+
+    @Volatile
+    var appContext: Context? = null
+    @Volatile
     private var extractorInstance: InnerTubeExtractor? = null
 
     fun init(context: Context) {
+        val appCtx = context.applicationContext
+        appContext = appCtx
         if (extractorInstance == null) {
             synchronized(this) {
                 if (extractorInstance == null) {
-                    val appContext = context.applicationContext
-                    val configRepo = AndroidPlayerConfigRepository(appContext)
+                    val configRepo = AndroidPlayerConfigRepository(appCtx)
                     val remoteStore = RemotePlayerConfigStore(ktorClient, configRepo, InnerTubeLogger.NONE)
                     val cipher = YouTubeCipherService(
                         httpClient = ktorClient,
@@ -203,11 +189,15 @@ object YtEngine {
                     )
                     val safeParser = rawParser.withEmbeddedConfigFallback()
 
+                    val poTokenGen = PoTokenGenerator(appCtx)
+                    poTokenGenerator = poTokenGen
+
                     extractorInstance = InnerTubeExtractor(
                         configParser = safeParser,
                         cipherService = cipher,
                         innerTube = innerTube,
                         fallbackStrategy = ZenifyClientStrategy,
+                        tokenProvider = poTokenGen,
                         clientHealthMonitor = ClientHealthMonitor.NONE,
                         logger = InnerTubeLogger.NONE,
                     )
@@ -227,9 +217,11 @@ object YtEngine {
         quality: String = currentQuality,
     ): Resolved {
         val effectiveQuality = if (quality.isNotBlank()) quality else currentQuality
-        val cacheKey = if (wantVideo) "$videoId#video#$effectiveQuality" else "$videoId#$effectiveQuality"
-        if (force) negCache.remove(cacheKey)
-        if (!force) {
+        val cacheKey = if (wantVideo) "$videoId#video#${videoMaxHeight}p#$effectiveQuality" else "$videoId#$effectiveQuality"
+        if (force) {
+            urlCache.invalidate(videoId)
+            excluded.remove(videoId)
+        } else {
             urlCache[cacheKey]?.let { cached ->
                 if (!wantVideo || !cached.videoUrl.isNullOrBlank()) {
                     return cached.toResolved()
@@ -247,76 +239,49 @@ object YtEngine {
     }
 
     private suspend fun doResolve(videoId: String, wantVideo: Boolean, cacheKey: String, quality: String): Resolved {
-        negCache[cacheKey]?.let {
-            val ttl = if (wantVideo) 15_000L else 5_000L
-            if (System.currentTimeMillis() - it < ttl) throw IOException("recently failed: $videoId")
-            negCache.remove(cacheKey)
-        }
         val gen = urlCache.generation(cacheKey)
         val aq = if (quality == "low" || quality == "ultra_low") AudioQuality.LOW else AudioQuality.HIGH
 
         val result = withTimeoutOrNull(if (wantVideo) VIDEO_BUDGET_MS else AUDIO_BUDGET_MS) {
-            val ex = (excludedClients(videoId) + breakerExcluded()).toMutableSet()
+            var ex = excludedClients(videoId).toMutableSet()
             for (attempt in 0 until 3) {
                 val s = try {
                     extract(videoId, ex, aq, wantVideo)
                 } catch (e: StreamResolveException) {
-                    if (attempt == 0 && ex.isNotEmpty()) { ex.clear(); continue }
+                    if (ex.isNotEmpty()) {
+                        ex.clear()
+                        excluded.remove(videoId)
+                        continue
+                    }
+                    return@withTimeoutOrNull null
+                } catch (e: Throwable) {
+                    if (ex.isNotEmpty()) {
+                        ex.clear()
+                        excluded.remove(videoId)
+                        continue
+                    }
                     return@withTimeoutOrNull null
                 }
-                if (s.sabrBootstrap != null) { ex += s.clientName; noteClientFail(s.clientName); continue }
-                val h = StreamHeaders.forClient(s.clientName)
-                if (!probeStream(s.audioUrl, h)) {
-                    excludeClient(videoId, s.clientName); ex += s.clientName; continue
+                if (s.sabrBootstrap != null) {
+                    excludeClient(videoId, s.clientName)
+                    ex += s.clientName
+                    continue
                 }
-                noteClientOk(s.clientName)
-                var r = s.toResolved()
-                val vu = r.videoUrl
-                if (wantVideo && !vu.isNullOrBlank() && vu != r.url && !probeStream(vu, h)) {
-                    r = r.copy(videoUrl = null, videoWidth = null, videoHeight = null) // audio still plays
+                if (s.audioUrl.isBlank()) {
+                    excludeClient(videoId, s.clientName)
+                    ex += s.clientName
+                    continue
                 }
-                return@withTimeoutOrNull r
+                // Return immediately without blocking network probe; ExoPlayer handles native byte ranges
+                return@withTimeoutOrNull s.toResolved()
             }
             null
         }
         if (result == null) {
-            negCache[cacheKey] = System.currentTimeMillis()
             throw IOException("resolve failed/timeout: $videoId")
         }
         urlCache.put(cacheKey, result, gen)
         return result
-    }
-
-    private fun probeStream(url: String, headers: Map<String, String>): Boolean {
-        if (url.isBlank()) return false
-        val isHls = url.contains("/manifest/hls") || url.contains(".m3u8")
-        val reqBuilder = okhttp3.Request.Builder().url(url)
-        if (!isHls) {
-            reqBuilder.header("Range", "bytes=0-1")
-        }
-        headers.forEach { (k, v) -> reqBuilder.header(k, v) }
-        return try {
-            Net.ok.newCall(reqBuilder.build()).execute().use { resp ->
-                val code = resp.code
-                if (code in 400..499 && code != 416) {
-                    Log.w(TAG, "probeStream $code forbidden/error (attestation gated) for $url")
-                    false
-                } else if (isHls) {
-                    code in 200..399
-                } else {
-                    code in 200..299 || code == 416
-                }
-            }
-        } catch (e: Throwable) {
-            val msg = e.message ?: ""
-            if (msg.contains("403") || msg.contains("401") || msg.contains("400")) {
-                Log.w(TAG, "probeStream 403/400 exception for $url: $msg")
-                false
-            } else {
-                Log.w(TAG, "probeStream network warning for $url: $msg")
-                true
-            }
-        }
     }
 
     private suspend fun extract(
@@ -370,20 +335,15 @@ object YtEngine {
 
     private fun excludeClient(videoId: String, client: String) {
         excluded.compute(videoId) { _, e -> ((e?.first ?: emptySet()) + client) to System.currentTimeMillis() }
-        noteClientFail(client)
         val now = System.currentTimeMillis(); val last = lastCipherRefresh.get()
         if (now - last > 60_000 && lastCipherRefresh.compareAndSet(last, now)) {
-            scope.launch { try { cipherService.refreshAfterStreamRejection() } catch (_: Throwable) {} }
+            scope.launch { try { cipherService.refreshAfterStreamRejection() } catch (e: Throwable) {} }
         }
     }
 
     fun markClientFailed(videoId: String, client: String) { // used by playback 403 path
         excludeClient(videoId, client)
         urlCache.invalidate(videoId)
-        negCache.remove(videoId)
-        negCache.remove("$videoId#video")
-        negCache.remove("$videoId#$currentQuality")
-        negCache.remove("$videoId#video#$currentQuality")
     }
 
     private fun excludedClients(videoId: String): Set<String> {
@@ -403,7 +363,7 @@ object YtEngine {
             try {
                 for (id in videoIds.take(2)) {
                     val key = "$id#$currentQuality"
-                    if (urlCache[key] != null || inflight.containsKey(key) || negCache.containsKey(key)) continue
+                    if (urlCache[key] != null || inflight.containsKey(key)) continue
                     try { resolve(id) } catch (e: Throwable) {
                         if (e is CancellationException) throw e
                         Log.w(TAG, "Prefetch skipped $id: ${e.message}")
@@ -418,6 +378,7 @@ object YtEngine {
             try {
                 extractorInstance?.prewarm()
                 cipherService.prewarmEjs()
+                poTokenGenerator?.prewarm()
             } catch (e: Throwable) {
                 Log.w(TAG, "Prewarm failed: ${e.message}")
             }
@@ -427,7 +388,10 @@ object YtEngine {
     fun clearAll(context: Context) {
         urlCache.clear()
         excluded.clear()
-        negCache.clear()
-        clientFails.clear()
+        scope.launch {
+            try {
+                poTokenGenerator?.invalidateAttestation()
+            } catch (e: Throwable) {}
+        }
     }
 }

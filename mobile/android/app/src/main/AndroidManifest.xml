@@ -32,8 +32,8 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:enableOnBackInvokedCallback="true"
-        android:allowBackup="false"
-        android:hasFragileUserData="false"
+        android:allowBackup="true"
+        android:hasFragileUserData="true"
         android:usesCleartextTraffic="true">
         <!-- Disable experimental Impeller on Android to prevent CanAcceptOpacity validation breaks and pipeline stalls -->
         <meta-data

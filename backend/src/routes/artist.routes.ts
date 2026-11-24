@@ -3,7 +3,7 @@ import { prisma } from '../utils/prisma';
 import { ArtistController } from '../controllers/artist.controller';
 import { cleanArtistNames, isFakeOrNumericArtistName, CANONICAL_ARTISTS, getCanonicalArtist } from '../utils/artist.js';
 import { CleanCdnAudioService } from '../services/clean-cdn-audio.service.js';
-import { upgradeInnerTubeArtwork } from '../utils/innertube-artwork';
+import { upgradeInnerTubeArtwork, isDistributorOrLabel, extractArtistsFromVideoTitle } from '../utils/innertube-artwork';
 
 export async function artistRoutes(server: FastifyInstance) {
     const artistController = new ArtistController(server);
@@ -99,20 +99,26 @@ export async function artistRoutes(server: FastifyInstance) {
         if (!payload.musicVideos || payload.musicVideos.length === 0) {
             try {
                 const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
-                const ytVideos = await ExternalMetadataService.searchYoutubeMusicInnertube(`${name} official video`).catch(() => []);
+                const ytVideos = await (ExternalMetadataService.searchYoutubeMusicVideosInnertube?.(`${name} official video`) || ExternalMetadataService.searchYoutubeMusicInnertube(`${name} official video`)).catch(() => []);
                 if (ytVideos && ytVideos.length > 0) {
-                    payload.musicVideos = ytVideos.slice(0, 12).map((v: any) => ({
-                        id: v.videoId ? `yt-${v.videoId}` : (v.id || ''),
-                        title: v.title || `${name} Video`,
-                        artist: name,
-                        album: 'Music Video',
-                        coverUrl: v.coverUrl || v.thumbnail || payload.imageUrl,
-                        duration: v.duration || 210,
-                        audioUrl: v.videoId ? `https://www.youtube.com/watch?v=${v.videoId}` : (v.audioUrl || ''),
-                        isVideo: true,
-                        isVirtual: true,
-                        type: 'video'
-                    }));
+                    payload.musicVideos = ytVideos.slice(0, 12).map((v: any) => {
+                        const vidArtist = (v.artist && !isDistributorOrLabel(v.artist) && v.artist.toLowerCase() !== 'unknown artist')
+                            ? v.artist
+                            : extractArtistsFromVideoTitle(v.title, name);
+                        return {
+                            id: v.videoId ? `yt-${v.videoId}` : (v.id || ''),
+                            title: v.title || `${name} Video`,
+                            artist: vidArtist || name,
+                            album: 'Music Video',
+                            coverUrl: v.coverUrl || v.thumbnail || payload.imageUrl,
+                            duration: v.duration || 210,
+                            audioUrl: v.videoId ? `https://www.youtube.com/watch?v=${v.videoId}` : (v.audioUrl || ''),
+                            isVideo: true,
+                            isVirtual: true,
+                            type: 'video',
+                            year: v.year || (v.publishDate ? v.publishDate.slice(0, 4) : undefined)
+                        };
+                    });
                 }
             } catch {}
         }

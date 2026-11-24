@@ -10,6 +10,7 @@ import '../data/atlas_repository.dart';
 import '../models/atlas_models.dart';
 import '../widgets/atlas_components.dart';
 import '../widgets/atlas_press.dart';
+import '../../services/dock_visibility.dart';
 
 typedef AtlasSearchResult = ({
   AtlasCity? city,
@@ -21,19 +22,22 @@ Future<AtlasSearchResult?> showAtlasSearch(
   BuildContext context,
   AtlasData data,
 ) {
-  return showModalBottomSheet<AtlasSearchResult>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    barrierColor: const Color(0x99000000),
-    sheetAnimationStyle: AnimationStyle(
-      duration: const Duration(milliseconds: 520),
-      reverseDuration: const Duration(milliseconds: 300),
-      curve: const SpringCurve(),
-      reverseCurve: Curves.easeInCubic,
+  return DockVisibility.runModal(
+    () => showModalBottomSheet<AtlasSearchResult>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: const Color(0x99000000),
+      sheetAnimationStyle: AnimationStyle(
+        duration: const Duration(milliseconds: 520),
+        reverseDuration: const Duration(milliseconds: 300),
+        curve: const SpringCurve(),
+        reverseCurve: Curves.easeInCubic,
+      ),
+      builder: (_) => _SearchSheet(data: data),
     ),
-    builder: (_) => _SearchSheet(data: data),
   );
 }
 

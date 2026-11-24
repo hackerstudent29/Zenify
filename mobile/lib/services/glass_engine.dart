@@ -320,7 +320,16 @@ class GlassEngine extends ChangeNotifier {
   static final GlassEngine instance = GlassEngine._();
   static const _prefsKey = 'glass_engine_v2';
 
-  GlassConfig _config = GlassPresets.all.first.config;
+  GlassConfig _config = GlassPresets.byId('black')?.config ??
+      const GlassConfig(
+        preset: 'black',
+        fluidity: 0,
+        blur: 0,
+        base: 'black',
+        depth: 0,
+        rimStrength: 0.2,
+        prism: 0,
+      );
   GlassConfig get config => _config;
   String get presetName {
     final p = GlassPresets.byId(_config.preset);

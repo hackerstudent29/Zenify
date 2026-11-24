@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,7 +14,6 @@ import 'zen_player.dart';
 
 class SettingsState extends ChangeNotifier {
   SettingsState._();
-
   static final SettingsState instance = SettingsState._();
 
   late SharedPreferences _prefs;
@@ -22,12 +23,16 @@ class SettingsState extends ChangeNotifier {
   Timer? _debounceTimer;
   final Map<String, String> _syncTimestamps = {};
 
-  // ==================== AUDIO SETTINGS ====================
+  // ==================== AUDIO & VIDEO QUALITY SETTINGS ====================
   // high (160kbps Opus / 320kbps Studio) | medium (128kbps AAC) | low (70kbps Opus Data Saver) | ultra_low (50kbps Opus)
   String _audioQuality = 'high';
   String get audioQuality => _audioQuality;
 
-  // high (1200x1200px HD) | medium (600x600px standard) | low (300x300px compact)
+  // 8k | 4k | 2k | 1080p | 720p | 480p | 360p
+  String _videoQuality = '720p';
+  String get videoQuality => _videoQuality;
+
+  // high (1000px HD) | medium (450px standard) | low (200px compact)
   String _imageQuality = 'medium';
   String get imageQuality => _imageQuality;
 
@@ -45,11 +50,15 @@ class SettingsState extends ChangeNotifier {
   String _downloadAudioQuality = 'high';
   String get downloadAudioQuality => _downloadAudioQuality;
 
+  // 8k | 4k | 2k | 1080p | 720p | 480p | 360p
+  String _downloadVideoQuality = '720p';
+  String get downloadVideoQuality => _downloadVideoQuality;
+
   // high | medium | low
-  String _downloadImageQuality = 'high';
+  String _downloadImageQuality = 'medium';
   String get downloadImageQuality => _downloadImageQuality;
 
-  bool _normalizeVolume = true;
+  bool _normalizeVolume = false;
   bool get normalizeVolume => _normalizeVolume;
 
   bool _explicitFilter = false;
@@ -65,6 +74,12 @@ class SettingsState extends ChangeNotifier {
   // 0 to 12 seconds crossfade (0 = off)
   int _crossfadeSeconds = 0;
   int get crossfadeSeconds => _crossfadeSeconds;
+
+  String _crossfadeStyle = 'smooth';
+  String get crossfadeStyle => _crossfadeStyle;
+
+  bool _crossfadeAutoFx = true;
+  bool get crossfadeAutoFx => _crossfadeAutoFx;
 
   bool _autoplaySimilar = true;
   bool get autoplaySimilar => _autoplaySimilar;
@@ -100,7 +115,7 @@ class SettingsState extends ChangeNotifier {
   bool _fluidMeshBg = true;
   bool get fluidMeshBg => _fluidMeshBg;
 
-  bool _fullBleedArtworkPlayer = true;
+  bool _fullBleedArtworkPlayer = false;
   bool get fullBleedArtworkPlayer => _fullBleedArtworkPlayer;
 
   bool _reduceMotion = false;
@@ -157,6 +172,18 @@ class SettingsState extends ChangeNotifier {
   bool _notifyProductNews = false;
   bool get notifyProductNews => _notifyProductNews;
 
+  bool _notifyUpdates = true;
+  bool get notifyUpdates => _notifyUpdates;
+
+  bool _notifyDiscovery = true;
+  bool get notifyDiscovery => _notifyDiscovery;
+
+  bool _notifyWeeklyDigest = true;
+  bool get notifyWeeklyDigest => _notifyWeeklyDigest;
+
+  bool _notifyDownloads = true;
+  bool get notifyDownloads => _notifyDownloads;
+
   // ==================== PRIVACY & PERSONALIZATION ====================
   bool _personalizationEnabled = true;
   bool get personalizationEnabled => _personalizationEnabled;
@@ -181,7 +208,7 @@ class SettingsState extends ChangeNotifier {
   bool get shareAnonymousErrors => _shareAnonymousErrors;
 
   // ==================== DOWNLOADS & STORAGE ====================
-  bool _downloadWifiOnly = true;
+  bool _downloadWifiOnly = false;
   bool get downloadWifiOnly => _downloadWifiOnly;
 
   double _maxCacheGb = 0.25; // 0.1 to 1.0 GB live streaming cache cap
@@ -210,18 +237,25 @@ class SettingsState extends ChangeNotifier {
 
     // 1. Load local SharedPreferences immediately
     _audioQuality = _prefs.getString('zen_audio_quality') ?? 'high';
+    _videoQuality = _prefs.getString('zen_video_quality') ?? '720p';
     _imageQuality = _prefs.getString('zen_image_quality') ?? 'medium';
     _wifiQuality = _prefs.getString('zen_wifi_quality') ?? 'lossless';
     _cellularQuality = _prefs.getString('zen_cellular_quality') ?? 'high';
     _downloadQuality = _prefs.getString('zen_download_quality') ?? 'lossless';
     _downloadAudioQuality = _prefs.getString('zen_download_audio_quality') ?? 'high';
-    _downloadImageQuality = _prefs.getString('zen_download_image_quality') ?? 'high';
-    _normalizeVolume = _prefs.getBool('zen_normalize_volume') ?? true;
+    _downloadVideoQuality = _prefs.getString('zen_download_video_quality') ?? '720p';
+    _downloadImageQuality = _prefs.getString('zen_download_image_quality') ?? 'medium';
+    _normalizeVolume = _prefs.getBool('zen_normalize_volume') ?? false;
     _explicitFilter = _prefs.getBool('zen_explicit_filter') ?? false;
     _monoAudio = _prefs.getBool('zen_mono_audio') ?? false;
     _gaplessPlayback = _prefs.getBool('zen_gapless_playback') ?? true;
+    AudioPlayer.setGlobalAudioQuality(_audioQuality);
+    AudioPlayer.setGlobalVideoQuality(_videoQuality);
 
     _crossfadeSeconds = _prefs.getInt('zen_crossfade_sec') ?? 0;
+    _crossfadeStyle = _prefs.getString('zen_crossfade_style') ?? _prefs.getString('crossfadeStyle') ?? 'smooth';
+    _crossfadeAutoFx = _prefs.getBool('zen_crossfade_auto_fx') ?? true;
+    _pushCrossfade();
     _autoplaySimilar = _prefs.getBool('zen_autoplay_similar') ?? true;
     _autoHideDetails = _prefs.getBool('zen_auto_hide_details') ?? true;
     _pauseOnDisconnect = _prefs.getBool('zen_pause_on_disconnect') ?? true;
@@ -232,7 +266,7 @@ class SettingsState extends ChangeNotifier {
     _accentColor = _prefs.getString('zen_accent_color') ?? 'crimson';
     _dynamicAlbumColors = _prefs.getBool('zen_dynamic_album_colors') ?? true;
     _fluidMeshBg = _prefs.getBool('zen_fluid_mesh_bg') ?? true;
-    _fullBleedArtworkPlayer = _prefs.getBool('zen_full_bleed_artwork_player') ?? true;
+    _fullBleedArtworkPlayer = _prefs.getBool('zen_full_bleed_artwork_player') ?? false;
     _reduceMotion = _prefs.getBool('zen_reduce_motion') ?? false;
     _themeMode = _prefs.getString('zen_theme_mode') ?? 'dark';
     _glassEffects = _prefs.getBool('zen_glass_effects') ?? true;
@@ -250,6 +284,10 @@ class SettingsState extends ChangeNotifier {
     _notifyBlendUpdates = _prefs.getBool('zen_notify_blend') ?? true;
     _notifyTogetherInvites = _prefs.getBool('zen_notify_together') ?? true;
     _notifyProductNews = _prefs.getBool('zen_notify_product') ?? false;
+    _notifyUpdates = _prefs.getBool('zen_notify_updates') ?? true;
+    _notifyDiscovery = _prefs.getBool('zen_notify_discovery') ?? true;
+    _notifyWeeklyDigest = _prefs.getBool('zen_notify_weekly_digest') ?? true;
+    _notifyDownloads = _prefs.getBool('zen_notify_downloads') ?? true;
 
     _personalizationEnabled = _prefs.getBool('zen_personalization') ?? true;
     _listeningActivityOnProfile = _prefs.getBool('zen_listening_activity') ?? true;
@@ -259,8 +297,11 @@ class SettingsState extends ChangeNotifier {
     _showTopArtists = _prefs.getBool('zen_show_top_artists') ?? true;
     _shareAnonymousErrors = _prefs.getBool('zen_share_errors') ?? true;
 
-    _downloadWifiOnly = _prefs.getBool('zen_download_wifi_only') ?? true;
+    _downloadWifiOnly = _prefs.getBool('zen_download_wifi_only') ?? false;
     _maxCacheGb = _prefs.getDouble('zen_max_cache_gb') ?? 0.25;
+    const MethodChannel('zenify/audio').invokeMethod('setMaxCacheSize', {
+      'bytes': (_maxCacheGb * 1024 * 1024 * 1024).round(),
+    }).catchError((_) {});
 
     _musicCountry = _prefs.getString('zen_music_country') ?? 'IN';
     _preferredLanguages = _prefs.getStringList('zen_preferred_langs') ?? ['ta', 'en', 'hi'];
@@ -422,12 +463,19 @@ class SettingsState extends ChangeNotifier {
     if (_audioQuality == q) return;
     _audioQuality = q;
     _prefs.setString('zen_audio_quality', q);
-    _wifiQuality = q;
-    _cellularQuality = q;
-    _downloadQuality = q;
     StreamResolverService.instance.clearCache();
     AudioPlayer.setGlobalAudioQuality(q);
     _recordChange('audioQuality', q);
+    notifyListeners();
+  }
+
+  void setVideoQuality(String q) {
+    if (_videoQuality == q) return;
+    _videoQuality = q;
+    _prefs.setString('zen_video_quality', q);
+    StreamResolverService.instance.clearCache();
+    AudioPlayer.setGlobalVideoQuality(q);
+    _recordChange('videoQuality', q);
     notifyListeners();
   }
 
@@ -437,6 +485,7 @@ class SettingsState extends ChangeNotifier {
     _prefs.setString('zen_image_quality', q);
     PaintingBinding.instance.imageCache.clear();
     PaintingBinding.instance.imageCache.clearLiveImages();
+    DefaultCacheManager().emptyCache();
     _recordChange('imageQuality', q);
     notifyListeners();
   }
@@ -473,6 +522,14 @@ class SettingsState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setDownloadVideoQuality(String q) {
+    if (_downloadVideoQuality == q) return;
+    _downloadVideoQuality = q;
+    _prefs.setString('zen_download_video_quality', q);
+    _recordChange('downloadVideoQuality', q);
+    notifyListeners();
+  }
+
   void setDownloadImageQuality(String q) {
     if (_downloadImageQuality == q) return;
     _downloadImageQuality = q;
@@ -486,6 +543,7 @@ class SettingsState extends ChangeNotifier {
     _normalizeVolume = val;
     _prefs.setBool('zen_normalize_volume', val);
     _recordChange('normalizeVolume', val);
+    ZenPlayer.instance.setNormalizeVolume(val);
     notifyListeners();
   }
 
@@ -501,6 +559,8 @@ class SettingsState extends ChangeNotifier {
     if (_monoAudio == val) return;
     _monoAudio = val;
     _prefs.setBool('zen_mono_audio', val);
+    _recordChange('monoAudio', val);
+    ZenPlayer.instance.setMono(val);
     notifyListeners();
   }
 
@@ -517,8 +577,27 @@ class SettingsState extends ChangeNotifier {
     _crossfadeSeconds = sec;
     _prefs.setInt('zen_crossfade_sec', sec);
     _recordChange('crossfade', sec > 0);
+    _pushCrossfade();
     notifyListeners();
   }
+
+  Future<void> setCrossfadeStyle(String id) async {
+    if (_crossfadeStyle == id) return;
+    _crossfadeStyle = id;
+    notifyListeners();
+    _prefs.setString('zen_crossfade_style', id);
+    _prefs.setString('crossfadeStyle', id);
+    _pushCrossfade();
+  }
+
+  void setCrossfadeAutoFx(bool val) {
+    if (_crossfadeAutoFx == val) return;
+    _crossfadeAutoFx = val;
+    _prefs.setBool('zen_crossfade_auto_fx', val);
+    notifyListeners();
+  }
+
+  void _pushCrossfade() => AudioPlayer.setGlobalCrossfade(crossfadeSeconds * 1000, _crossfadeStyle);
 
   void setAutoplaySimilar(bool val) {
     if (_autoplaySimilar == val) return;
@@ -764,6 +843,38 @@ class SettingsState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setNotifyUpdates(bool val) {
+    if (_notifyUpdates == val) return;
+    _notifyUpdates = val;
+    _prefs.setBool('zen_notify_updates', val);
+    _recordChange('notifyUpdates', val);
+    notifyListeners();
+  }
+
+  void setNotifyDiscovery(bool val) {
+    if (_notifyDiscovery == val) return;
+    _notifyDiscovery = val;
+    _prefs.setBool('zen_notify_discovery', val);
+    _recordChange('notifyDiscovery', val);
+    notifyListeners();
+  }
+
+  void setNotifyWeeklyDigest(bool val) {
+    if (_notifyWeeklyDigest == val) return;
+    _notifyWeeklyDigest = val;
+    _prefs.setBool('zen_notify_weekly_digest', val);
+    _recordChange('notifyWeeklyDigest', val);
+    notifyListeners();
+  }
+
+  void setNotifyDownloads(bool val) {
+    if (_notifyDownloads == val) return;
+    _notifyDownloads = val;
+    _prefs.setBool('zen_notify_downloads', val);
+    _recordChange('notifyDownloads', val);
+    notifyListeners();
+  }
+
   void setPersonalizationEnabled(bool val) {
     if (_personalizationEnabled == val) return;
     _personalizationEnabled = val;
@@ -828,6 +939,9 @@ class SettingsState extends ChangeNotifier {
     if (_maxCacheGb == val) return;
     _maxCacheGb = val;
     _prefs.setDouble('zen_max_cache_gb', val);
+    const MethodChannel('zenify/audio').invokeMethod('setMaxCacheSize', {
+      'bytes': (val * 1024 * 1024 * 1024).round(),
+    }).catchError((_) {});
     notifyListeners();
   }
 

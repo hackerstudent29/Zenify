@@ -250,8 +250,9 @@ class SearchDataService {
       required String streamName,
       Map<String, dynamic> body = const {},
     }) async {
+      final queryParam = (body['query'] as String?)?.trim() ?? q;
       final rawKey = SearchRawProviderCache.buildKey(
-        query: q,
+        query: queryParam,
         stream: streamName,
         country: country,
         language: language,
@@ -262,7 +263,7 @@ class SearchDataService {
         if (cachedRaw != null) {
           return SearchParser.parse(
             cachedRaw,
-            query: q,
+            query: queryParam,
             sourceStream: streamName,
           );
         }
@@ -284,7 +285,7 @@ class SearchDataService {
         _rawProviderCache.put(rawKey, raw);
         return SearchParser.parse(
           raw,
-          query: q,
+          query: queryParam,
           sourceStream: streamName,
         );
       } catch (e) {
@@ -295,6 +296,18 @@ class SearchDataService {
     }
 
     // ── ADAPTIVE MULTI-QUERY YOUTUBE MUSIC SEARCH PIPELINE ───────────────────
+    List<String> querySuggestions = [];
+    if (q.length >= 2) {
+      try {
+        querySuggestions = await getSuggestions(q).timeout(
+          const Duration(milliseconds: 400),
+          onTimeout: () => getInstantLocalSuggestions(q),
+        );
+      } catch (_) {
+        querySuggestions = getInstantLocalSuggestions(q);
+      }
+    }
+
     try {
       if (filter == SearchFilter.all) {
         final prelim = SearchIntentDetector.detectPreliminaryIntent(q);
@@ -550,6 +563,7 @@ class SearchDataService {
       didYouMean: didYouMean,
       continuation: continuation,
       streamLatenciesMs: latencies,
+      querySuggestions: querySuggestions,
     );
     if (kDebugMode) {
       debugPrint(
@@ -609,6 +623,7 @@ class SearchDataService {
         initialTopResult: currentResult.topResult,
         didYouMean: currentResult.correctedQuery,
         continuation: parsed.continuation,
+        querySuggestions: currentResult.suggestions,
       );
 
       return ranked;

@@ -1214,11 +1214,13 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
       ('Messages', CupertinoIcons.text_bubble_fill, StoryLinkTarget.sms),
       ('Email', CupertinoIcons.mail_solid, StoryLinkTarget.email),
     ];
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      builder: (ctx) => BackdropFilter(
+    await DockVisibility.runModal(
+      () => showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black.withValues(alpha: 0.5),
+        builder: (ctx) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
         child: Container(
           decoration: BoxDecoration(
@@ -1273,7 +1275,8 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   List<ShareDestination> _destinations() => [

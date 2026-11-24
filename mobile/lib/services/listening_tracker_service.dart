@@ -128,8 +128,9 @@ class ListeningTrackerService {
       drainJournal();
     });
 
-    // Attempt early sync
-    drainJournal();
+    // Attempt early sync & cloud history restoration
+    unawaited(drainJournal());
+    unawaited(restoreHistoryFromServer());
   }
 
   void startTrack({
@@ -222,8 +223,10 @@ class ListeningTrackerService {
       final line = '${jsonEncode(event)}\n';
       await _journalFile!.writeAsString(line, mode: FileMode.append, flush: true);
 
-      // Trigger sync
-      unawaited(drainJournal());
+      // Trigger sync only for online events (keep offline listening 100% disconnected from network)
+      if (event['offline'] != true) {
+        unawaited(drainJournal());
+      }
     } catch (e) {
       debugPrint('[ListeningTracker] Failed writing to journal: $e');
     }
@@ -294,6 +297,13 @@ class ListeningTrackerService {
           _isSyncing = false;
           unawaited(drainJournal());
           return;
+        } else if (lines.length >= 200) {
+          // Log compaction: Retain the most recent 100 events to prevent unbounded disk & RAM bloat
+          try {
+            final retained = lines.sublist(lines.length - 100);
+            await _journalFile!.writeAsString('${retained.join('\n')}\n', flush: true);
+            await prefs.setInt(_journalSyncOffsetKey, 100);
+          } catch (_) {}
         }
       }
     } catch (e) {
@@ -301,6 +311,103 @@ class ListeningTrackerService {
     } finally {
       _isSyncing = false;
     }
+  }
+
+  /// Restores cloud listening events from the user's account into the local Replay journal.
+  /// Solves the missing history issue on fresh install or app update.
+  Future<bool> restoreHistoryFromServer({bool force = false}) async {
+    final token = await AuthService.instance.getAccessToken();
+    if (token == null || token.isEmpty) return false;
+
+    try {
+      if (_journalFile == null) {
+        final docDir = await getApplicationDocumentsDirectory();
+        _journalFile = File('${docDir.path}/listen_journal.jsonl');
+      }
+
+      final exists = await _journalFile!.exists();
+      if (!force && exists) {
+        final lines = await _journalFile!.readAsLines();
+        if (lines.length >= 5) {
+          // Already populated with events
+          return true;
+        }
+      }
+
+      final res = await http.get(
+        Uri.parse('${ApiService.baseUrl}/api/me/history?limit=200'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final events = data['events'] as List? ?? [];
+        if (events.isEmpty) return false;
+
+        final linesToWrite = <String>[];
+        for (final raw in events) {
+          if (raw is! Map) continue;
+          final m = Map<String, dynamic>.from(raw);
+          final eventMap = <String, dynamic>{
+            'eventId': m['eventId']?.toString() ?? 'ev_${DateTime.now().millisecondsSinceEpoch}',
+            'startedAt': m['startedAt']?.toString() ?? DateTime.now().toUtc().toIso8601String(),
+            'endedAt': m['endedAt']?.toString() ?? DateTime.now().toUtc().toIso8601String(),
+            'tzOffsetMin': (m['tzOffsetMin'] as num?)?.toInt() ?? 0,
+            'listenedMs': (m['listenedMs'] as num?)?.toInt() ?? 0,
+            'trackDurationMs': (m['trackDurationMs'] as num?)?.toInt() ?? 0,
+            'endReason': m['endReason']?.toString() ?? 'completed',
+            'trackSource': m['trackSource']?.toString() ?? 'youtube',
+            'trackId': m['trackId']?.toString() ?? '',
+            'trackTitle': m['trackTitle']?.toString() ?? 'Track',
+            if (m['trackAlbum'] != null && m['trackAlbum'].toString().isNotEmpty)
+              'trackAlbum': m['trackAlbum'].toString(),
+            if (m['language'] != null && m['language'].toString().isNotEmpty)
+              'language': m['language'].toString(),
+            if (m['genre'] != null && m['genre'].toString().isNotEmpty)
+              'genre': m['genre'].toString(),
+            if (m['contextType'] != null && m['contextType'].toString().isNotEmpty)
+              'contextType': m['contextType'].toString(),
+            if (m['contextId'] != null && m['contextId'].toString().isNotEmpty)
+              'contextId': m['contextId'].toString(),
+            'offline': false,
+            'source': 'stream',
+            'loopOne': false,
+            'quality': 256,
+            'artists': [
+              {
+                'artistName': m['artistName']?.toString() ?? 'Artist',
+                'isPrimary': true,
+              }
+            ],
+            'schemaVersion': 2,
+          };
+
+          linesToWrite.add(jsonEncode(eventMap));
+          unawaited(ListeningHistoryService.instance.recordCompletedListen(eventMap));
+          try {
+            final ev = ListenEvent.fromJson(eventMap);
+            unawaited(AllTimeIndexStore.instance.recordEvent(ev));
+          } catch (_) {}
+        }
+
+        if (linesToWrite.isNotEmpty) {
+          await _journalFile!.writeAsString(
+            '${linesToWrite.join('\n')}\n',
+            mode: FileMode.write,
+            flush: true,
+          );
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt(_journalSyncOffsetKey, linesToWrite.length);
+          return true;
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[ListeningTracker] restoreHistoryFromServer error: $e');
+    }
+    return false;
   }
 
   void dispose() {

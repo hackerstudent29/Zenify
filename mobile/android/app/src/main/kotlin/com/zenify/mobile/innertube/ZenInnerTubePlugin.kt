@@ -21,6 +21,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * ZenInnerTubePlugin connects the Android Metrolist InnerTube Kotlin pipeline
@@ -726,6 +728,55 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                         } catch (e: Exception) {
                             Log.e("ZenInnerTube", "getSong error for $videoId: ${e.message}")
                             replyError(result, "SONG_ERROR", e.message, null)
+                        }
+                    }
+
+                    "getVideoDetails" -> {
+                        val videoId = call.argument<String>("videoId")?.removePrefix("yt-")?.trim() ?: ""
+                        if (videoId.isBlank()) {
+                            replyError(result, "BAD_ARGS", "videoId cannot be blank", null)
+                            return@launch
+                        }
+                        try {
+                            val jsonBody = """{"context":{"client":{"clientName":"WEB","clientVersion":"2.20240101.01.00","hl":"en","gl":"IN"}},"videoId":"$videoId"}"""
+                            val request = okhttp3.Request.Builder()
+                                .url("https://www.youtube.com/youtubei/v1/player?prettyPrint=false")
+                                .post(jsonBody.toRequestBody("application/json".toMediaTypeOrNull()))
+                                .header("Content-Type", "application/json")
+                                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                                .header("Origin", "https://www.youtube.com")
+                                .header("Referer", "https://www.youtube.com/")
+                                .build()
+                            val response = com.zenify.mobile.yt.Net.api.newCall(request).execute()
+                            val body = response.body.string()
+                            val json = org.json.JSONObject(body)
+                            val mf = json.optJSONObject("microformat")?.optJSONObject("playerMicroformatRenderer")
+                            val vd = json.optJSONObject("videoDetails")
+                            val publishDate = mf?.optString("publishDate")
+                            val uploadDate = mf?.optString("uploadDate")
+                            var year = ""
+                            if (!publishDate.isNullOrBlank() && publishDate.length >= 4) {
+                                year = publishDate.substring(0, 4)
+                            } else if (!uploadDate.isNullOrBlank() && uploadDate.length >= 4) {
+                                year = uploadDate.substring(0, 4)
+                            }
+                            val author = vd?.optString("author") ?: ""
+                            val title = vd?.optString("title") ?: ""
+                            val desc = vd?.optString("shortDescription") ?: ""
+                            val map = mapOf(
+                                "videoId" to videoId,
+                                "title" to title,
+                                "author" to author,
+                                "publishDate" to (publishDate ?: ""),
+                                "uploadDate" to (uploadDate ?: ""),
+                                "year" to year,
+                                "description" to desc
+                            )
+                            replySuccess(result, map)
+                            return@launch
+                        } catch (e: Exception) {
+                            Log.w("ZenInnerTube", "getVideoDetails error for $videoId: ${e.message}")
+                            replyError(result, "VIDEO_DETAILS_FAILED", e.message, null)
                         }
                     }
 

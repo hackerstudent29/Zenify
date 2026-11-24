@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -105,17 +106,25 @@ class OnboardingPrefs {
     final rawAge = json['age'];
     final parsedAge = rawAge is num ? rawAge.toInt() : int.tryParse(rawAge?.toString() ?? '');
     final rawGender = (json['gender'] as String?)?.trim();
+    final countryRaw = (json['countryName'] ?? json['country']) as String? ?? 'India';
+    final countryCodeRaw = (json['countryCode'] as String?) ??
+        (CountryService.supportedCountries
+            .firstWhere(
+              (c) => c.name.toLowerCase() == countryRaw.toLowerCase(),
+              orElse: () => CountryService.instance.currentCountry,
+            )
+            .code);
     return OnboardingPrefs(
       displayName: (json['displayName'] as String?) ?? '',
       age: (parsedAge != null && parsedAge >= 13 && parsedAge <= 100) ? parsedAge : null,
       gender: (rawGender != null && rawGender.isNotEmpty) ? rawGender : null,
-      countryCode: (json['countryCode'] as String?) ?? 'IN',
-      countryName: (json['countryName'] as String?) ?? 'India',
+      countryCode: countryCodeRaw,
+      countryName: countryRaw,
       languages: (json['languages'] as List? ?? const [])
           .map((e) => e.toString())
           .where((e) => e.isNotEmpty)
           .toList(),
-      genres: (json['genres'] as List? ?? const [])
+      genres: ((json['genres'] ?? json['preferredGenres']) as List? ?? const [])
           .map((e) => e.toString())
           .where((e) => e.isNotEmpty)
           .toList(),
@@ -124,7 +133,7 @@ class OnboardingPrefs {
           .map((m) => OnboardingArtist.fromJson(Map<String, dynamic>.from(m)))
           .where((a) => a.name.isNotEmpty)
           .toList(),
-      completed: json['completed'] == true,
+      completed: json['completed'] == true || json['onboardingCompleted'] == true,
     );
   }
 }
@@ -603,6 +612,44 @@ class UserPreferencesService {
     } catch (e) {
       if (kDebugMode) debugPrint('[UserPreferencesService] init error: $e');
     }
+
+    // If local was empty or incomplete, and token is available, restore from cloud
+    if (prefsNotifier.value == null || !prefsNotifier.value!.completed) {
+      unawaited(fetchFromBackend());
+    }
+  }
+
+  /// Restores user onboarding taste preferences from the authenticated cloud account.
+  Future<bool> fetchFromBackend() async {
+    final token = ApiService.authToken;
+    if (token == null || token.isEmpty) return false;
+
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiService.baseUrl}/api/preferences'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map<String, dynamic>) {
+          final prefs = OnboardingPrefs.fromJson(decoded);
+          if (prefs.completed ||
+              prefs.languages.isNotEmpty ||
+              prefs.favoriteArtists.isNotEmpty ||
+              prefs.genres.isNotEmpty) {
+            await save(prefs, syncRemote: false);
+            return true;
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[UserPreferencesService] fetchFromBackend error: $e');
+    }
+    return false;
   }
 
   Future<void> save(OnboardingPrefs next, {bool syncRemote = true}) async {

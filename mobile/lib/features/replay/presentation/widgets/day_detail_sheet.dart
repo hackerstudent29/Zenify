@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../services/dock_visibility.dart';
 import '../../domain/replay_aggregate.dart';
 
 /// Modal bottom sheet displaying detailed stats for a tapped day on the Heatmap.
@@ -25,15 +26,18 @@ class DayDetailSheet extends StatelessWidget {
     SongStat? topSong,
     void Function(SongStat song)? onPlaySong,
   }) {
-    return showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => DayDetailSheet(
-        date: date,
-        minutes: minutes,
-        topSong: topSong,
-        onPlaySong: onPlaySong,
+    return DockVisibility.runModal(
+      () => showModalBottomSheet(
+        context: context,
+        useRootNavigator: true,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (ctx) => DayDetailSheet(
+          date: date,
+          minutes: minutes,
+          topSong: topSong,
+          onPlaySong: onPlaySong,
+        ),
       ),
     );
   }

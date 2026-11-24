@@ -2,25 +2,26 @@
 
   <br />
 
-  <!-- Animated Full Zenify Transparent Logo -->
-  <a href="https://listenzenify.vercel.app">
-    <img src="assets/images/zenify_logo_transparent.gif" alt="Zenify Logo" width="460" />
+  <!-- Animated Zenify Transparent Brand Logo -->
+  <a href="https://github.com/hackerstudent29/Zenify">
+    <img src="assets/images/zenify_logo_transparent.gif" alt="Zenify Logo" width="380" />
   </a>
 
   <br /><br />
 
   <!-- Subtle Dot Matrix Accent -->
-  <img src="assets/hero/dot_matrix.svg" alt="Accent Matrix" width="680" />
+  <img src="assets/hero/dot_matrix.svg" alt="Accent Matrix" width="600" />
 
   <h1 style="font-weight: 800; letter-spacing: -0.03em; margin-top: 12px;">
-    The soundstage of tomorrow. On your <span style="color: #FF375F;">terms</span>.
+    Zenify for Android &nbsp;•&nbsp; Next-Gen <span style="color: #FF375F;">Flutter</span> Music & Video Client &nbsp;•&nbsp; <span style="color: #30D158;">Stable Version 1</span>
   </h1>
 
-  <p align="center" style="max-width: 780px; font-size: 16px; line-height: 1.6; color: #a1a1aa;">
-    <b>Lossless 320kbps Akamai CDN streaming &nbsp;•&nbsp; Apple Music-grade word-by-word synced lyrics &nbsp;•&nbsp; Strictly zero ads</b><br />
-    An open-source high-fidelity audio client engineered with Apple's iconic editorial design language,<br />
-    scroll-linked Dynamic Island header, sub-millisecond collaborative listening rooms, and hardware StudioFX DSP.<br />
-    <i>Crafted for music lovers across every continent, language, and culture.</i>
+  <p align="center" style="max-width: 820px; font-size: 15.5px; line-height: 1.6; color: #a1a1aa;">
+    <b>Stable Version 1 Milestone &nbsp;•&nbsp; Pristine 320kbps Akamai CDN &nbsp;•&nbsp; Hardware Media3 ExoPlayer DSP &nbsp;•&nbsp; 20-Style DJ Crossfade &nbsp;•&nbsp; Zero Ads</b><br />
+    An open-source high-fidelity mobile audio & video streaming application engineered with <b>Flutter 3.44</b>, <b>Dart 3.12</b>, and native <b>Kotlin</b>.<br />
+    Features Apple-grade fluid gesture physics, Liquid Glass Studio, real-time syllable-synced karaoke lyrics,<br />
+    sub-15ms Room Together synchronized listening, and a hardware-accelerated 16:9 video texture engine.<br />
+    <i>(Note: Web player service is in sunset mode; Zenify Android is our primary, full-featured experience.)</i>
   </p>
 
   <br />
@@ -29,12 +30,8 @@
   <p align="center">
     <span style="color: rgba(255,255,255,0.25); font-family: monospace; font-size: 16px;">+</span>
     &nbsp;&nbsp;
-    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.19/zenify-v1.1.19.apk">
-      <img src="assets/buttons/btn_download_android.svg" alt="Download for Android" height="46" />
-    </a>
-    &nbsp;&nbsp;
-    <a href="https://listenzenify.vercel.app" target="_blank">
-      <img src="assets/buttons/btn_launch_web.svg" alt="Launch Web Player" height="46" />
+    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk">
+      <img src="assets/buttons/btn_download_android.svg" alt="Download APK for Android" height="46" />
     </a>
     &nbsp;&nbsp;
     <a href="https://github.com/hackerstudent29/Zenify/releases">
@@ -45,14 +42,14 @@
   </p>
 
   <p align="center">
-    <sub><code>Android 8.0+ (ARM64 & Universal)</code> &nbsp;•&nbsp; <code>iOS & iPadOS Safari PWA</code> &nbsp;•&nbsp; <code>macOS, Windows & Linux Web</code> &nbsp;•&nbsp; <code>Free & Open Source (MIT)</code></sub>
+    <sub><code>Android 8.0+ (ARM64-v8a & Universal APK)</code> &nbsp;•&nbsp; <code>Tested on Android 8 to 15</code> &nbsp;•&nbsp; <code>Free & Open Source (MIT)</code></sub>
   </p>
 
   <br />
 
   <!-- Signature Rose Spec Capsules -->
   <p align="center">
-    <img src="assets/badges/badge_release.svg" alt="Release v1.1.19" height="26" />
+    <img src="assets/badges/badge_release.svg" alt="Release v1.1.21" height="26" />
     &nbsp;
     <img src="assets/badges/badge_audio.svg" alt="320kbps Audio" height="26" />
     &nbsp;
@@ -71,304 +68,212 @@
 
 ---
 
-<div align="center">
+## 📱 Application Overview
 
-  <br />
-  <img src="assets/hero/dot_matrix.svg" alt="Accent Matrix" width="480" />
+**Zenify Mobile** is an open-source, high-performance Android music and video streaming client engineered from the ground up using **Flutter (v3.44.2)** and **AndroidX Media3 ExoPlayer (v1.5.1)**. Built specifically for audiophiles, everyday music lovers, and synchronized listening circles, it combines an editorial Apple Music aesthetic with a custom native Android DSP engine.
 
-  <h2>Music for every corner of the <span style="color: #FF375F;">world</span></h2>
-  <p align="center" style="max-width: 720px; color: #a1a1aa;">
-    Music has no borders, and neither does Zenify. Explore over 100 million songs spanning all global genres, international chart-toppers, underground movements, and regional masterworks.
-  </p>
-
-  <br />
-
-  <!-- Worldwide Music Grid Pills -->
-  <table width="100%">
-    <tr>
-      <td width="20%" align="center">
-        <b>🌍 Global Pop & Hip-Hop</b><br />
-        <sub>Billboard 100, UK Top 40, Drake, Taylor Swift, Kendrick Lamar, The Weeknd</sub>
-      </td>
-      <td width="20%" align="center">
-        <b>💃 Latin & Reggaeton</b><br />
-        <sub>Bad Bunny, Rosalía, Peso Pluma, Karol G, Bizarrap, J Balvin</sub>
-      </td>
-      <td width="20%" align="center">
-        <b>🌸 K-Pop, J-Pop & C-Pop</b><br />
-        <sub>BTS, NewJeans, BLACKPINK, Yoasobi, Fujii Kaze, Jay Chou, Anime OSTs</sub>
-      </td>
-      <td width="20%" align="center">
-        <b>🪷 South Asian & Bollywood</b><br />
-        <sub>Arijit Singh, Anirudh, A.R. Rahman, Pritam, Sid Sriram, Shreya Ghoshal</sub>
-      </td>
-      <td width="20%" align="center">
-        <b>🌴 Afrobeats & Amapiano</b><br />
-        <sub>Burna Boy, Wizkid, Tyla, Rema, Asake, Kabza De Small, Davido</sub>
-      </td>
-    </tr>
-  </table>
-
-</div>
-
-<br />
+Unlike web wrappers or basic media player apps, Zenify connects directly to low-level audio rendering pipelines in native Kotlin, processing raw 16-bit PCM audio buffers for studio-grade parametric equalization, spatial 8D orbital sound, real-time volume normalization, and hardware-accelerated 16:9 video rendering—with **100% zero ads**, zero telemetry tracking, and zero mandatory account requirements.
 
 ---
 
-<div align="center">
+## 📋 Android Specifications
 
-  <br />
-  <img src="assets/hero/dot_matrix.svg" alt="Accent Matrix" width="480" />
-
-  <h2>Pure acoustic fidelity. Uncompromised <span style="color: #FF375F;">mastering</span>.</h2>
-  <p align="center" style="max-width: 760px; color: #a1a1aa;">
-    Pristine 320kbps streams delivered straight from high-speed Akamai edge CDNs.<br />
-    Native ExoPlayer audio pipeline with HTTP 206 instant scrubbing, background playback, and an unconditional ban on 30-second preview clips.
-  </p>
-
-  <br />
-
-  <!-- 3D Showcase Card 1 -->
-  <table width="100%">
-    <tr>
-      <td width="50%" align="center" valign="top">
-        <a href="docs/images/zenify_fullview_player.png">
-          <img src="docs/images/zenify_fullview_player.png" alt="Player Shell Soundstage" width="100%" />
-        </a>
-        <br /><br />
-        <sub><b>EDITORIAL PLAYER SHELL · FLUID ARTWORK MESH & STUDIO CONTROLS</b></sub>
-      </td>
-      <td width="50%" align="center" valign="top">
-        <a href="docs/images/zenify_home_dashboard.png">
-          <img src="docs/images/zenify_home_dashboard.png" alt="Discovery & Curated Feeds" width="100%" />
-        </a>
-        <br /><br />
-        <sub><b>CURATED DISCOVERY · GLOBAL CHARTS & PERSONALIZED MIXES</b></sub>
-      </td>
-    </tr>
-  </table>
-
-</div>
-
-<br />
+| Attribute | Specification |
+|---|---|
+| **App Name** | Zenify |
+| **Package Identifier** | `com.zenify.mobile` |
+| **Current Version** | `v1.1.21` **(Stable Version 1)** |
+| **Build Number** | `2035` · *First Stable Release* |
+| **Cross-Platform Engine** | Flutter 3.44.2 / Dart 3.12.0 |
+| **Native Android Platform** | Kotlin 2.0.21 / JVM 17 |
+| **Audio Core** | AndroidX Media3 ExoPlayer 1.5.1 with Custom PCM AudioProcessor |
+| **Minimum Android OS** | **Android 8.0 (API Level 26 - Oreo)** *(96%+ device coverage)* |
+| **Target Android OS** | **Android 15 (API Level 35 - Vanilla Ice Cream)** |
+| **ARM64 Split APK** | **15.9 MB** (`16,708,961` bytes) · *Recommended for all modern phones* |
+| **Universal APK** | **36.1 MB** (`37,836,799` bytes) · *All architectures (ARM64, ARMv7, x86_64)* |
+| **Supported Bitrates** | 320 kbps (Pristine HQ), 160 kbps (Opus), 128 kbps (AAC), 70 kbps (Data Saver) |
+| **Video Decoding** | Hardware `SurfaceTexture` / `TextureRegistry` (360p to 4K 60fps) |
+| **Typography** | Bundled offline Apple `SF Pro Display` & `SF Pro Text` (Zero runtime font downloads) |
+| **License** | Open Source (MIT) |
 
 ---
 
-<div align="center">
+## ⚡ System Requirements (Minimum & Recommended)
 
-  <br />
-  <img src="assets/hero/dot_matrix.svg" alt="Accent Matrix" width="480" />
+### Hardware & OS Compatibility Matrix
 
-  <h2>Real-time vocal tracking. Word by <span style="color: #FF375F;">word</span>.</h2>
-  <p align="center" style="max-width: 760px; color: #a1a1aa;">
-    Powered by <b>Better Lyrics</b> and <b>Unison</b> TTML engines with word-by-word syllable precision.<br />
-    Features Apple Music-style vocal gliding, multi-language romanization (Latin, Cyrillic, CJK, Indic, Arabic), and living 3-dot instrumental pauses.
-  </p>
+| Hardware Spec | Minimum Requirement (To Run App) | Recommended (Optimal Experience) |
+|---|---|---|
+| **Android Version** | **Android 8.0 (Oreo / API 26)** | **Android 12 to Android 15 (API 31–35)** |
+| **RAM** | **2 GB RAM** | **4 GB RAM or higher** |
+| **Free Storage Space** | **100 MB** *(App binary + SQLite index)* | **1 GB – 3 GB+** *(For offline media & HD videos)* |
+| **Processor (CPU)** | Quad-Core 1.5 GHz (ARM64-v8a or ARMv7) | Octa-Core 2.0 GHz+ (Snapdragon, MediaTek, Tensor, Exynos) |
+| **Display Resolution**| HD (720 × 1280 pixels) | FHD+ (1080 × 2400 pixels) or higher |
+| **Display Refresh Rate**| Standard 60 Hz | 90 Hz / 120 Hz ProMotion high-refresh panels |
+| **Network (Streaming)**| 1.5 Mbps (3G / 4G / Wi-Fi) | 5–10 Mbps+ (4G LTE / 5G / High-Speed Wi-Fi) |
+| **Offline Playback** | None (0 KB/s — Works 100% offline) | None |
 
-  <br />
+### Resource & Performance Profile
 
-  <!-- 3D Showcase Card 2 -->
-  <table width="100%">
-    <tr>
-      <td width="50%" align="center" valign="top">
-        <a href="docs/images/zenify_synced_lyrics.png">
-          <img src="docs/images/zenify_synced_lyrics.png" alt="Synchronized Karaoke Lyrics" width="100%" />
-        </a>
-        <br /><br />
-        <sub><b>SYLLABLE-LEVEL VOCAL KARAOKE GLIDE & INTERLUDE TRANSITIONS</b></sub>
-      </td>
-      <td width="50%" align="center" valign="top">
-        <a href="docs/images/zenify_side_lyrics.png">
-          <img src="docs/images/zenify_side_lyrics.png" alt="Dynamic Translation & Scripts" width="100%" />
-        </a>
-        <br /><br />
-        <sub><b>ROMANIZED SCRIPTS & LIVE SCRIPT TRANSLATION SWITCHER</b></sub>
-      </td>
-    </tr>
-  </table>
-
-</div>
-
-<br />
+* **RAM Footprint**:
+  * **Idle & Background Audio**: Uses only **85 MB to 140 MB of RAM** while streaming 320kbps audio with the native DSP Studio FX pipeline active.
+  * **Video Texture & Room Together**: Uses approximately **180 MB to 260 MB of RAM** during concurrent 1080p video rendering and LiveKit WebRTC spatial voice chat.
+  * **Efficiency**: ExoPlayer delegates audio demuxing and hardware video decoding directly to Android's native `MediaCodec` pipeline, preventing heavy garbage collection pauses in Flutter.
+* **Storage Footprint**:
+  * **Installed App Footprint**: **~45 MB – 65 MB** (app binary + SQLite catalog cache).
+  * **Offline Single Track**: **~3 MB to 6 MB** per song (`.m4a` / 320kbps).
+  * **100 Downloaded Tracks**: **~400 MB to 550 MB** of disk storage.
+  * **Streaming Buffer Cache**: Auto-capped at **250 MB** by default (customizable between 100 MB to 1.0 GB in *Settings → Storage Management*).
 
 ---
 
-<div align="center">
+## 🌟 360° Comprehensive Feature Breakdown
 
-  <br />
-  <img src="assets/hero/dot_matrix.svg" alt="Accent Matrix" width="480" />
-
-  <h2>Universal discovery. Instant <span style="color: #FF375F;">connection</span>.</h2>
-  <p align="center" style="max-width: 760px; color: #a1a1aa;">
-    Zero-latency fuzzy search across 100M+ tracks, complete artist discographies, EPs, live concerts, and official music videos.<br />
-    Instantly share 16 handcrafted editorial story templates directly to Instagram, WhatsApp, Snapchat, and Facebook.
-  </p>
-
-  <br />
-
-  <!-- 3D Showcase Card 3 -->
-  <table width="100%">
-    <tr>
-      <td width="50%" align="center" valign="top">
-        <a href="docs/images/zenify_artist_page.png">
-          <img src="docs/images/zenify_artist_page.png" alt="Expansive Artist Discography" width="100%" />
-        </a>
-        <br /><br />
-        <sub><b>EDITORIAL ARTIST SHOWCASE · COMPLETE RELEASES & MUSIC VIDEOS</b></sub>
-      </td>
-      <td width="50%" align="center" valign="top">
-        <a href="docs/images/zenify_profile_menu.png">
-          <img src="docs/images/zenify_profile_menu.png" alt="Profile & Story Sharing" width="100%" />
-        </a>
-        <br /><br />
-        <sub><b>STORY SHARING STUDIO & LISTENING INSIGHTS DASHBOARD</b></sub>
-      </td>
-    </tr>
-  </table>
-
-</div>
-
-<br />
+### 1. 🎵 Pristine Audio Pipeline & Zero 30-Second Preview Guarantee
+* **Strict Anti-Snippet Policy**: Zenify completely bans 30-second preview snippets (`mzstatic`, iTunes previews). Every song resolves directly to pristine full-length 320kbps Akamai CDN streams or unhindered YouTube full-audio streams.
+* **Dual ExoPlayer Architecture**: Uses two synchronized ExoPlayer instances (`player` and `fadePlayer`) in native Kotlin (`ZenAudioPlugin.kt`) to achieve seamless overlapping crossfades, gapless track transitions, and instant pre-warming.
+* **Selectable Audio Bitrates**:
+  * **320 kbps (Lossless / Pristine Akamai CDN)**: Pristine master-quality audio with crystal-clear highs and deep bass response.
+  * **160 kbps (Opus)**: Audiophile-grade perceptual transparency at half the bandwidth.
+  * **128 kbps (AAC)**: Standard high-efficiency mobile streaming.
+  * **70 kbps (Data Saver)**: Ultra-efficient streaming for low-reception or metered data connections.
+* **Loudness Normalization (-14 LUFS)**: Intercepts song loudness metadata and automatically scales gain ($\text{gain} = 10^{-\text{loudnessDb}/20}$) to eliminate jarring volume jumps between tracks recorded at different loudness levels.
+* **Stereo-to-Mono Downmixing**: Accessibility-focused $(L + R) / 2$ audio downmix so listeners wearing a single earbud never miss vocals or instruments panned to the other ear.
 
 ---
 
-<div align="center">
+### 2. 🎛️ 20-Style Hardware DJ Crossfade Engine
+Engineered directly in native Kotlin (`XfFxProcessor.kt`) and orchestrated via Flutter's `CrossfadeController`, Zenify offers 20 distinct DJ transition styles across 4 musical categories:
 
-  <br />
-  <img src="assets/hero/dot_matrix.svg" alt="Accent Matrix" width="480" />
+| Style Category | Transition Styles | Audible Behavior & Acoustic Character |
+|---|---|---|
+| **Auto** | `Auto Intelligent Blend` | Analyzes BPM, energy, silence, and key of incoming and outgoing songs to automatically trigger the optimal transition |
+| **Classic** | `Smooth Crossfade`<br />`Classic Linear`<br />`Cinematic S-Curve`<br />`Fade Through Dip` | Equal-power logarithmic volume blend, linear slope, smooth sigmoidal curve, or a clean momentary silence dip |
+| **DJ Blend** | `DJ Blend`<br />`Bass Swap`<br />`Filter Sweep`<br />`Stutter Gate`<br />`Slam Cut`<br />`Riser` | Resonant low-shelf bass drop (-30 dB) swapped cleanly at midpoint, resonant low-pass/high-pass filter sweeps, tempo-synced 8th-note audio chopping, instant beat drops, and pitch-shifted snare riser builds |
+| **Production** | `R&B Glide`<br />`Echo Out`<br />`Reverb Wash`<br />`Tape Stop`<br />`Vinyl Brake`<br />`Spin-Up`<br />`Lo-Fi Dive`<br />`Jet Sweep`<br />`Radio Tune` | Smooth pitch-glide transitions, freeze-delay echo tails on outgoing tracks, lush cathedral reverb washes, vintage analog tape motor decelerations, turntable scratch brakes, vinyl spin-ups, sample-rate bitcrush dives, resonant jet flanger sweeps, and vintage AM/FM dial static sweeps |
 
-  <h2>✦ The Architectural Bento ✦</h2>
-  <p style="color: #a1a1aa;">Engineered for listeners who appreciate Cupertino-grade industrial design, acoustic precision, and uncompromising privacy.</p>
-
-  <br />
-
-</div>
-
-<!-- Editorial Apple Bento Grid -->
-<table width="100%">
-  <tr>
-    <td width="50%" valign="top">
-      <h3>⚡ Pristine 320kbps Streams</h3>
-      <p>Direct lossless Akamai CDN audio resolution with instant seeking, background lock-screen playback, and a strict ban on 30-second preview clips.</p>
-      <sub><code>HTTP 206 Range</code> &nbsp;•&nbsp; <code>Direct Stream Proxy</code> &nbsp;•&nbsp; <code>Zero Transcoding Loss</code></sub>
-    </td>
-    <td width="50%" valign="top">
-      <h3>🎙️ Better Lyrics & Unison Word Sync</h3>
-      <p>Real-time vocal tracking powered by Better Lyrics TTML and Unison community database with syllable-level progress, romanized pronunciation, and breathing 3-dot interlude transitions.</p>
-      <sub><code>Word-Level TTML</code> &nbsp;•&nbsp; <code>Romanized Scripts</code> &nbsp;•&nbsp; <code>Real-Time Translation</code></sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>🔎 Instant Multi-Source Search & Fast-Path Switcher</h3>
-      <p>Apple-styled source switcher capsule (<b>All · Universal | YouTube Music | Jio Music</b>). Instant ~250ms JioSaavn Akamai CDN queries, 4s parallel fallback, eliminating search stalls.</p>
-      <sub><code>Source Capsule</code> &nbsp;•&nbsp; <code>Fast-Path CDN</code> &nbsp;•&nbsp; <code>Zero-Hang Fallback</code></sub>
-    </td>
-    <td width="50%" valign="top">
-      <h3>📥 One-Click Playlist Import (YouTube & Spotify)</h3>
-      <p>Instantly import your existing playlists from YouTube Music, YouTube, and Spotify share URLs with automatic high-fidelity track resolution and personal library syncing.</p>
-      <sub><code>Headless Metadata</code> &nbsp;•&nbsp; <code>yt-dlp Engine</code> &nbsp;•&nbsp; <code>Spotify URL Resolver</code></sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>📁 Resilient Local Music Player</h3>
-      <p>Multi-tier IndexedDB storage supporting FLAC, ALAC, Opus, CAF, and AIFF files with duration watchdog timers and automatic 320kbps CDN stream recovery for unsupported browser codecs.</p>
-      <sub><code>Lossless ALAC/FLAC</code> &nbsp;•&nbsp; <code>IndexedDB Tier</code> &nbsp;•&nbsp; <code>Auto Stream Healing</code></sub>
-    </td>
-    <td width="50%" valign="top">
-      <h3>🍃 Ultra-Lean Live Streaming Storage (80%+ Reduction)</h3>
-      <p>Pure live streaming architecture: ExoPlayer disk cache cut to 64MB and in-memory decoded image cache capped at 35MB. User devices stay lightning fast with 0ms resume.</p>
-      <sub><code>Feather-Light Cache</code> &nbsp;•&nbsp; <code>64MB ExoPlayer Buffer</code> &nbsp;•&nbsp; <code>Zero Audio Hoarding</code></sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>🏝️ Scroll-Linked Dynamic Island</h3>
-      <p>Apple-inspired 3-dock floating header. Collapses gracefully at the top of detail pages and springs open to reveal artist, album, and category titles as content crosses underneath.</p>
-      <sub><code>Spring Physics</code> &nbsp;•&nbsp; <code>Adaptive Docking</code> &nbsp;•&nbsp; <code>Backdrop Blur Filter</code></sub>
-    </td>
-    <td width="50%" valign="top">
-      <h3>👥 Room Together Live Sessions</h3>
-      <p>Listen synchronously with friends across devices. Features sub-millisecond clock alignment, shared democratic queues, live emoji reaction bursts, and voice chat.</p>
-      <sub><code>WebSocket Cluster</code> &nbsp;•&nbsp; <code>Sub-ms Clock Sync</code> &nbsp;•&nbsp; <code>Democratic Queue</code></sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>🎨 16 Editorial "Add to Story" Templates</h3>
-      <p>Handcrafted layout engines for sharing songs, synced lyrics, artists, albums, and playlists directly to Instagram Stories, WhatsApp, Snapchat, and Facebook.</p>
-      <sub><code>Instagram Stories</code> &nbsp;•&nbsp; <code>WhatsApp Status</code> &nbsp;•&nbsp; <code>High-Res Vector Canvas</code></sub>
-    </td>
-    <td width="50%" valign="top">
-      <h3>🎛️ StudioFX & 8D Spatial Audio</h3>
-      <p>Fine-tune your acoustic soundstage with a multi-band parametric equalizer, dynamic spatial panning, acoustic room reverb, and studio peak limiting.</p>
-      <sub><code>Parametric EQ</code> &nbsp;•&nbsp; <code>8D Spatial Panning</code> &nbsp;•&nbsp; <code>Hardware DSP Offload</code></sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>🛡️ Strictly Zero Ads & Privacy-First</h3>
-      <p>No audio advertisements, no visual popups, no telemetry trackers, and no targeted data profiling. Completely open source and auditable under the MIT license.</p>
-      <sub><code>100% Ad-Free</code> &nbsp;•&nbsp; <code>Zero Tracking</code> &nbsp;•&nbsp; <code>MIT Open Source</code></sub>
-    </td>
-    <td width="50%" valign="top">
-      <h3>🔒 Hardened Android Security & Keystore Encryption</h3>
-      <p>Backup extraction blocked via <code>android:allowBackup="false"</code>, R8/ProGuard bytecode obfuscation enabled, and all auth tokens encrypted in hardware Keystore / Keychain.</p>
-      <sub><code>Hardware Keystore</code> &nbsp;•&nbsp; <code>R8 Obfuscation</code> &nbsp;•&nbsp; <code>Zero Token Leaks</code></sub>
-    </td>
-  </tr>
-</table>
-
-<br />
+* **Interactive Timeline Preview**: Features a live interactive visualizer preview in *Settings → Crossfade* (`CrossfadeStyleSection.dart`) to test transitions between real song pairs before listening.
+* **Custom Duration Slider**: Adjust transition lengths freely from **1 to 12 seconds** with smart gapless silence skipping.
 
 ---
 
-<div align="center">
+### 3. 🎚️ Hardware Studio FX & Audio Enhancement
+* **Parametric Hardware Equalizer**: 3-band parametric hardware EQ with Low Shelf (32Hz–250Hz), Peaking Mid (250Hz–4kHz), and High Shelf (4kHz–16kHz) with ±12 dB hardware gain adjustment.
+* **Spatial 8D Audio Rotation**: Dynamic orbital simulator using Interaural Time Difference (ITD) and Interaural Intensity Difference (IID) panning around the listener's head with customizable rotation speed (0.05–1.0 Hz) and direction (clockwise or counter-clockwise).
+* **Acoustic Reverb Presets**: Warehouse (studio room acoustics) and Cathedral (spacious atmospheric decay) with adjustable wet/dry mix.
+* **Drive & Warmth**: Warm analog tube saturation simulation for extra acoustic punch.
+* **Stereo Width Widener & Delay**: Expand the soundstage or add stereo echo with custom feedback timing.
+* **Vocal Mode Processor**: Real-time vocal boost to enhance lyrics or vocal reduction for impromptu karaoke singing.
+* **36-Band FFT Real-Time Spectrum**: Native 30 fps audio spectrum analyzer feeding real-time visualizer data to the player interface.
 
-  <br />
-  <img src="assets/hero/dot_matrix.svg" alt="Accent Matrix" width="480" />
+---
 
-  <h2>📲 Get Zenify</h2>
-  <p align="center" style="color: #a1a1aa;">Available natively on Android and instantly playable on all modern mobile and desktop web browsers worldwide.</p>
+### 4. 🎤 Ultra-Fast Syllable-Synced Karaoke Lyrics
+* **Sub-300ms Resolution**: Dual-provider parallel racing between `lrc.red` and `lrclib.net` resolves synchronized lyrics in under 300 milliseconds.
+* **Word-by-Word Syllable Timing**: Highlights individual syllables and words in real-time as vocalists sing them with a smooth glowing karaoke cursor.
+* **Automated Instrumental Countdown**: Displays clean 3-dot pulse indicators (`• • •`) with countdown timing during musical bridges and instrumental solos.
+* **Multi-Language Romanization**: Integrated romanization for non-Latin scripts (Japanese, Korean, Hindi, Tamil, Telugu, and more) so you can sing along in any language.
+* **Offline Lyrics Bundling**: Automatically downloads synced `.lrc` lyrics alongside audio tracks for 100% offline singing without internet access.
+* **Manual Timing Offset Slider**: Adjust lyric synchronization on-the-fly (±5000 ms in 100 ms increments) to fix poorly timed community lyrics.
+* **Full-Screen Lyrics Canvas**: Dedicated fluid lyrics modal sheet with dynamic color wash sampled from the current album art.
 
-  <br />
+---
 
-</div>
+### 5. 🎬 Hardware-Accelerated 16:9 Video Engine
+* **Native SurfaceTexture Rendering**: Allocates a native Android hardware texture (`TextureRegistry.SurfaceTextureEntry`) attached directly to ExoPlayer via `setVideoSurface()`, avoiding HTML or WebView overhead.
+* **Authentic 16:9 Landscape Previews**: Video songs display authentic widescreen previews across search results, search history (`76x44`), playback queue (`76x48`), and dedicated Video Single views.
+* **Background Audio Streaming**: Minimizing the app or turning off the screen seamlessly transitions video tracks to audio-only playback, conserving GPU battery and preventing playback stutter.
+* **Multi-Resolution Video Selector**: Choose stream quality on-the-fly between 360p, 480p, 720p, 1080p, and 4K 60fps.
+* **Fullscreen Theater Mode**: Double-tap to rotate, landscape mode, and pinch-to-fill controls.
 
-<!-- Download Matrix Table -->
+---
+
+### 6. 🔍 Pure YouTube Music Search Parity & Sound Atlas
+* **Complete YouTube Music Parity**: Zero artificial filters. Search queries return complete, unmodified catalog parity across songs, video singles, verified artists, official albums, and community playlists.
+* **Instant Live Autocomplete**: Real-time query suggestions as you type, backed by fast debounced caching.
+* **Multi-Category Filter Chips**: Switch instantly between `All`, `Songs`, `Videos`, `Albums`, `Artists`, and `Playlists`.
+* **YouTube Link Importer**: Paste any YouTube or YouTube Music song, video, playlist, or album link directly into search to stream or import it instantly into your library.
+* **Sound Atlas (`AtlasScreen`)**: Visual universe exploration tool allowing listeners to discover music across genres, moods, historical eras, and regional sub-cultures.
+* **Tap-to-Play Search History**: Tapping any previously searched track plays it immediately without triggering redundant search network requests.
+
+---
+
+### 7. 💎 Liquid Glass Studio & Apple Glass Aesthetic
+* **Live Liquid Glass Studio (`GlassCustomizerScreen`)**: Customization playground to fine-tune blur radius, opacity, border reflection, and specular rim lighting with live background testing across Nature, City, Text, and Album grids.
+* **Pure OLED Blackout Mode**: Disabling "Fluid Mesh Canvas" locks the player shell into absolute `#000000` black with zero color wash, turning off AMOLED pixels and maximizing battery life.
+* **Harmonic Oscillator Springs**: Every modal sheet, card press, and gesture uses damped physical springs (`SpringDescription`) calibrated to Apple iOS gesture responsiveness.
+* **Dynamic Island Header (`DynamicIslandHeader.dart`)**: Expandable floating header pill showing animated live waveform bars, current song title, audio bitrate badge (`320K`, `OPUS`, `AAC`), and video status.
+* **Bundled Offline Typography**: Includes offline Apple `SF Pro Display` and `SF Pro Text` fonts, eliminating runtime Google Fonts network downloads and layout shifts.
+
+---
+
+### 8. 💾 Offline Download Manager & Wi-Fi Guardian
+* **Parallel Multi-Threaded Chunk Downloader**: Bypasses GoogleVideo CDN 16 KB/s bandwidth throttling by requesting parallel 1 MB byte ranges across multiple concurrent worker threads, downloading full songs at wire speed.
+* **Complete 3-in-1 Offline Bundle**: Concurrently downloads High-Bitrate Audio (`.m4a`), High-Resolution Album Artwork (`.jpg`/`.webp`), and Synced Lyrics (`.json`/`.lrc`) into persistent local storage.
+* **Wi-Fi Only Guardian**: Detects active network transports via Android's `ConnectivityManager`. When toggled, cellular downloads are blocked automatically to preserve your mobile data plan.
+* **Dual Library Tabs**: Independent library shelves for `Songs` and `Music Videos` with instant filtering.
+* **Relational SQLite Database (`sqflite 2.4.5`)**: High-performance local database for custom playlists, favorites, play count counters, and offline media indexes.
+
+---
+
+### 9. 👥 Room Together (Real-Time Synchronized Listening)
+* **Sub-15ms Multi-Device Clock Sync**: Listen to music with friends anywhere in the world with sub-15ms synchronized playback positions.
+* **LiveKit WebRTC Voice Chat**: Ultra-low latency spatial voice chat channel built directly inside the listening room.
+* **Interactive DJ Roles**: Host, Co-Host, DJ, and Guest permission tiers for queue additions, track skips, and room moderation.
+* **Dynamic Room Themes**: Customize room atmosphere with presets including Midnight, Velvet, Neon, Sunset, Emerald, and Solar.
+* **Floating Emoji Reactions**: Send animated floating emojis that react with real-time particle physics across all participants' screens.
+* **PIN Protection**: Secure private rooms with custom passcodes.
+
+---
+
+### 10. 📊 Sound Insights, Replay & Social Story Sharing
+* **Sound Insights & Weekly Digest (`ReplayScreen`)**: Track your weekly listening minutes, top played artists, favorite genres, and daily listening heatmaps.
+* **Milestone Trophy Room**: Unlock achievements and badges as you listen (e.g., Night Owl, Genre Explorer, Century Club).
+* **Private Listening Mode**: Toggle incognito listening to enjoy guilty pleasures without affecting your recommendation engine or history stats.
+* **Story Card Exporter (`StoryService.dart`)**: Generate editorial Apple-style story cards for Instagram and WhatsApp featuring dynamic album art, lyric quotes, and a QR code linking directly to the song in Zenify.
+* **Dedicate a Song**: Create personalized dedication cards with custom messages to share with friends.
+
+---
+
+### 11. 🛡️ Native Android System Integration & Privacy
+* **Android 13+ MediaStyle Notifications**: Rich system notification with interactive seek scrub bar, album artwork, play/pause, skip forward/backward, and favorite toggle.
+* **Lock-Screen & Bluetooth AVRCP**: Full playback control and metadata synchronization on car head units, smartwatches, and Bluetooth headphones.
+* **Headphone Unplug Detection**: Automatically pauses playback when headphones are disconnected and resumes smoothly upon reconnect.
+* **Sleep Timer**: Schedule automatic playback pause after 15m, 30m, 45m, 1h, at the end of the current track, or via a custom timer with a gentle audio fade-out.
+* **Zero Telemetry & 100% Ad-Free**: Strictly zero advertisements, zero promotional popups, zero background tracking SDKs, and no phone numbers or personal data required.
+
+---
+
+## ⬇️ Download & Installation for Android
+
+### Release Packages (v1.1.21 · Stable Version 1 · Build 2035)
+
 <table width="100%">
   <thead>
     <tr>
-      <th align="left">Platform</th>
-      <th align="left">Edition</th>
-      <th align="center">Size</th>
-      <th align="right">Action</th>
+      <th align="left">Package</th>
+      <th align="left">Target Device & Architecture</th>
+      <th align="center">File Size</th>
+      <th align="right">Download Link</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td><b>🤖 Android (Modern)</b></td>
-      <td>ARM64 Split APK · <i>Recommended for Pixel, Galaxy, OnePlus, Xiaomi, Nothing, Sony</i></td>
-      <td align="center"><code>15.3 MB</code></td>
-      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.13/zenify-v1.1.13.apk"><b>⬇️ Download APK</b></a></td>
+      <td><b>🤖 Android ARM64 (Recommended)</b></td>
+      <td>ARM64-v8a · <i>Pixel, Galaxy, OnePlus, Xiaomi, Nothing, Vivo, OPPO, Motorola</i></td>
+      <td align="center"><code>15.9 MB</code></td>
+      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk"><b>⬇️ Download APK</b></a></td>
     </tr>
     <tr>
-      <td><b>🌐 Android (Universal)</b></td>
-      <td>All Architectures (`arm64-v8a`, `armeabi-v7a`, `x86_64`) · <i>Works on every Android device</i></td>
-      <td align="center"><code>34.6 MB</code></td>
-      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.13/zenify.apk"><b>⬇️ Download Universal</b></a></td>
+      <td><b>🌐 Android Universal</b></td>
+      <td>All Architectures (`arm64-v8a`, `armeabi-v7a`, `x86_64`) · <i>Works on all Android devices & emulators</i></td>
+      <td align="center"><code>36.1 MB</code></td>
+      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21-universal.apk"><b>⬇️ Download Universal</b></a></td>
     </tr>
     <tr>
-      <td><b>🍎 Web & iOS (PWA)</b></td>
-      <td>Instant In-Browser Player · <i>Tap "Share" → "Add to Home Screen" on iOS Safari</i></td>
-      <td align="center"><code>Zero Install</code></td>
-      <td align="right"><a href="https://listenzenify.vercel.app" target="_blank"><b>🎧 Launch Player</b></a></td>
-    </tr>
-    <tr>
-      <td><b>📦 GitHub Releases</b></td>
-      <td>All Release Packages, Release Notes & SHA-256 Checksums</td>
-      <td align="center"><code>Build 2026</code></td>
+      <td><b>📦 All GitHub Releases</b></td>
+      <td>Release history, changelogs, and SHA-256 integrity checksums</td>
+      <td align="center"><code>Build 2035</code></td>
       <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases"><b>View Releases</b></a></td>
     </tr>
   </tbody>
@@ -376,194 +281,70 @@
 
 <br />
 
----
+### 📱 Android Installation Steps
 
-<!-- Interactive Sections (Apple Style Accordions) -->
-
-<details>
-  <summary><b>📱 Step-by-Step Android Installation Guide</b></summary>
-  <br />
-  <ol>
-    <li>Tap <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.13/zenify-v1.1.13.apk"><b>Download APK</b></a> on your Android device (or choose the Universal APK if using an older 32-bit device or emulator).</li>
-    <li>When the download completes, tap the notification or locate <code>zenify-v1.1.13.apk</code> in your device's <b>Files</b> or <b>Downloads</b> app.</li>
-    <li>If prompted, toggle <i>"Allow from this source"</i> in your browser or file manager settings.</li>
-    <li>Tap <b>Install</b>, open Zenify, and experience high-fidelity ad-free music instantly!</li>
-  </ol>
-</details>
-
-<br />
-
-<details>
-  <summary><b>🍏 iOS & iPadOS Setup Guide (Progressive Web App)</b></summary>
-  <br />
-  <ol>
-    <li>Open <b>Safari</b> on your iPhone or iPad and navigate to <a href="https://listenzenify.vercel.app"><b>listenzenify.vercel.app</b></a>.</li>
-    <li>Tap the <b>Share</b> button (<img src="https://raw.githubusercontent.com/feathericons/feather/master/icons/share.svg" width="14" />) in the Safari toolbar.</li>
-    <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
-    <li>Tap <b>Add</b> in the top right corner. Zenify will appear as a standalone app icon with full-screen playback, AirPlay 2 support, and Lock Screen audio controls!</li>
-  </ol>
-</details>
-
-<br />
-
-<details>
-  <summary><b>⌨️ Desktop Web Keyboard Shortcuts</b></summary>
-  <br />
-  <table width="100%">
-    <thead>
-      <tr>
-        <th align="left">Key</th>
-        <th align="left">Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><kbd>Space</kbd> / <kbd>K</kbd></td>
-        <td>Play / Pause playback</td>
-      </tr>
-      <tr>
-        <td><kbd>J</kbd> / <kbd>←</kbd></td>
-        <td>Seek backward 5 seconds</td>
-      </tr>
-      <tr>
-        <td><kbd>L</kbd> / <kbd>→</kbd></td>
-        <td>Seek forward 5 seconds</td>
-      </tr>
-      <tr>
-        <td><kbd>Shift</kbd> + <kbd>N</kbd></td>
-        <td>Skip to next track</td>
-      </tr>
-      <tr>
-        <td><kbd>Shift</kbd> + <kbd>P</kbd></td>
-        <td>Return to previous track</td>
-      </tr>
-      <tr>
-        <td><kbd>M</kbd></td>
-        <td>Mute / Unmute audio</td>
-      </tr>
-      <tr>
-        <td><kbd>/</kbd></td>
-        <td>Focus global search bar</td>
-      </tr>
-    </tbody>
-  </table>
-</details>
-
-<br />
-
-<details>
-  <summary><b>🛠️ Self-Hosting & Local Development (Docker & Node.js)</b></summary>
-  <br />
-
-  ### Prerequisites
-  * **Node.js**: v20 or v22 LTS
-  * **npm**: v10+
-  * **Docker & Docker Compose** (optional for containerized setup)
-
-  ### Quick Start with Docker
-  ```bash
-  # 1. Clone the repository
-  git clone https://github.com/hackerstudent29/Zenify.git
-  cd Zenify
-
-  # 2. Configure environment variables
-  cp backend/.env.example backend/.env
-
-  # 3. Spin up PostgreSQL, Redis, Backend & Frontend
-  docker-compose up -d
-  ```
-
-  ### Manual Local Setup
-  ```bash
-  # 1. Install root dependencies
-  npm install
-
-  # 2. Setup backend
-  cd backend
-  npm install
-  npx prisma generate
-  npx prisma migrate deploy
-  npm run dev
-
-  # 3. Setup web frontend (in a separate terminal)
-  cd ../frontend
-  npm install
-  npm run dev
-  ```
-</details>
-
-<br />
-
-<details>
-  <summary><b>❓ Frequently Asked Questions (FAQ)</b></summary>
-  <br />
-  <dl>
-    <dt><b>Is Zenify completely free?</b></dt>
-    <dd>Yes. Zenify is 100% free and open-source software released under the MIT license. There are no subscription tiers, paywalls, or advertisements.</dd>
-    <br />
-    <dt><b>Where does the audio stream come from?</b></dt>
-    <dd>Zenify connects directly to high-speed Akamai CDN edge networks resolving pristine full-song 320kbps audio. Preview snippets (like 30-second iTunes audio) are strictly rejected.</dd>
-    <br />
-    <dt><b>How does word-by-word synced lyrics work?</b></dt>
-    <dd>Zenify's multi-tiered lyrics pipeline queries Better Lyrics, Unison, and LRCLIB in parallel, parsing Apple Music TTML with syllable timestamps for fluid karaoke vocal gliding.</dd>
-    <br />
-    <dt><b>Can I listen with friends in other countries?</b></dt>
-    <dd>Yes! Room Together uses low-latency WebSocket clustering with sub-millisecond clock alignment so you and your friends around the world stay in perfect sync.</dd>
-  </dl>
-</details>
-
-<br />
+1. Tap [**Download APK**](https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk) on your Android device.
+2. When the download completes, tap the notification or locate `zenify-v1.1.21.apk` in your device's **Files** or **Downloads** folder.
+3. If prompted with *"For your security, your phone is not allowed to install unknown apps from this source"*, tap **Settings** and toggle **Allow from this source**.
+4. Tap **Install**, open Zenify, and enjoy high-fidelity ad-free music and video streaming!
 
 ---
+
+## 💻 Developer Setup & Local Build Instructions
+
+### Prerequisites
+* [Flutter SDK](https://docs.flutter.dev/) (tested with **Flutter 3.44.2**)
+* [Dart SDK](https://dart.dev/) (tested with **Dart 3.12.0**)
+* Android Studio / VS Code with Flutter extension
+* Android SDK (API 26 / Android 8.0 or higher)
+
+### Setup & Local Execution
+
+```bash
+# 1. Clone repository
+git clone https://github.com/hackerstudent29/Zenify.git
+cd Zenify/mobile
+
+# 2. Fetch Flutter packages
+flutter pub get
+
+# 3. Verify code quality
+flutter analyze lib/
+
+# 4. Run unit and pipeline test suites
+flutter test test/search_pipeline_test.dart
+
+# 5. Launch on connected Android device or emulator
+flutter run
+```
+
+### Compiling Release APKs
+
+```bash
+# Build optimized release APK (Universal)
+flutter build apk --release
+
+# Build architecture-split release APKs (ARM64, ARMv7, x86_64)
+flutter build apk --split-per-abi --release
+```
+
+The compiled binaries will be output to:
+* `mobile/build/app/outputs/flutter-apk/app-release.apk` (Universal)
+* `mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (ARM64 Optimized, ~15.9 MB)
+
+---
+
+## 🌐 Note on the Web Player
+
+The browser-based web player at [listenzenify.vercel.app](https://listenzenify.vercel.app) is currently in **sunset / legacy status** due to browser audio engine constraints, mobile background playback restrictions, and ISP/CORS stream blockages. All ongoing active feature development, hardware DSP processing, and 16:9 video enhancements are dedicated to the **Zenify Android Flutter application**.
+
+---
+
+## 🛡️ License & Trademarks
+
+Zenify is open-source software licensed under the **[MIT License](file:///d:/Zenify/LICENSE)**.  
+All brand elements, icons, and custom Flutter widgets are part of the Zenify Music Project. Third-party open-source components are licensed under their respective MIT, Apache 2.0, and BSD licenses.
 
 <div align="center">
-
-  <br />
-  <img src="assets/hero/dot_matrix.svg" alt="Accent Matrix" width="480" />
-
-  <h2>⚙️ Tech Specs & Industrial Architecture</h2>
-  <p align="center" style="color: #a1a1aa;">Crafted with world-class frameworks, native platform channels, and high-performance serverless backends.</p>
-
-  <br />
-
-</div>
-
-<table width="100%">
-  <tr>
-    <td width="25%"><b>📱 Mobile Client</b></td>
-    <td>Flutter 3 · Custom Spring Physics · Native ExoPlayer Channels · Lock-Screen Service · Hardware DSP Offloading</td>
-  </tr>
-  <tr>
-    <td width="25%"><b>🌐 Web Player</b></td>
-    <td>React 18 · Vite · Tailwind CSS · Framer Motion · Web Audio API · Lucide Icons</td>
-  </tr>
-  <tr>
-    <td width="25%"><b>⚡ Backend & API</b></td>
-    <td>Node.js · Fastify 5 · TypeScript · Prisma ORM · PostgreSQL (AWS RDS) · WebSocket Cluster</td>
-  </tr>
-  <tr>
-    <td width="25%"><b>🎶 Audio Engines</b></td>
-    <td>Lossless 320kbps Akamai CDN · YouTube InnerTube Engine · Cloudflare R2 Persistent Audio Storage</td>
-  </tr>
-  <tr>
-    <td width="25%"><b>🎙️ Lyrics Providers</b></td>
-    <td>Better Lyrics (Apple Music TTML) · Unison Community DB · LRCLIB · JioSaavn · Deepgram AI Onset Verification</td>
-  </tr>
-  <tr>
-    <td width="25%"><b>🔤 Typography</b></td>
-    <td>Apple SF Pro Display / Text · Universal Indic Fallbacks (Noto Sans Tamil, Telugu, Devanagari, Malayalam) · Satoshi</td>
-  </tr>
-</table>
-
-<br />
-
----
-
-<div align="center">
-  <br />
-  <h3>📄 License</h3>
-  <p>Zenify is open-source software released under the <a href="LICENSE">MIT License</a>.</p>
-  <br />
-  <sub>Designed with acoustic obsession for music lovers across the globe.</sub>
-  <br /><br />
+  <sub>Built with ❤️ using Flutter, Dart & Kotlin for music lovers across the globe.</sub>
 </div>

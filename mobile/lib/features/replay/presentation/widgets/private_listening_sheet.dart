@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../services/dock_visibility.dart';
 import '../../data/exclusion_store.dart';
 
 /// F26: Private Listening & Replay Exclusions Sheet.
@@ -23,42 +24,48 @@ class PrivateListeningSheet extends StatefulWidget {
     required ExclusionStore exclusionStore,
     VoidCallback? onExclusionsChanged,
   }) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.75,
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
-        builder: (ctx, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: AppTheme.canvas,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: PrivateListeningSheet(
-                    exclusionStore: exclusionStore,
-                    onExclusionsChanged: onExclusionsChanged,
+    return DockVisibility.runModal(
+      () => showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (ctx, scrollController) => Container(
+            decoration: const BoxDecoration(
+              color: AppTheme.canvas,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 8,
+                    ),
+                    child: PrivateListeningSheet(
+                      exclusionStore: exclusionStore,
+                      onExclusionsChanged: onExclusionsChanged,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -160,7 +167,11 @@ class _PrivateListeningSheetState extends State<PrivateListeningSheet> {
               Expanded(
                 child: Text(
                   'Excluded items will never affect your Replay stats, top artists, or year-end digests. You can unhide them at any time.',
-                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                    height: 1.4,
+                  ),
                 ),
               ),
             ],
@@ -186,13 +197,22 @@ class _PrivateListeningSheetState extends State<PrivateListeningSheet> {
             Expanded(
               child: TextField(
                 controller: _trackController,
-                style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textPrimary,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Enter Track ID to exclude',
-                  hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                  hintStyle: const TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textMuted,
+                  ),
                   filled: true,
                   fillColor: Colors.white.withValues(alpha: 0.05),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(color: AppTheme.border),
@@ -222,10 +242,18 @@ class _PrivateListeningSheetState extends State<PrivateListeningSheet> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.brand,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
               ),
-              child: const Text('Exclude', style: TextStyle(fontWeight: FontWeight.w700)),
+              child: const Text(
+                'Exclude',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
           ],
         ),
@@ -272,7 +300,8 @@ class _PrivateListeningSheetState extends State<PrivateListeningSheet> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: excludedTracks.length,
-            separatorBuilder: (_, _) => const Divider(color: AppTheme.border, height: 1),
+            separatorBuilder: (_, _) =>
+                const Divider(color: AppTheme.border, height: 1),
             itemBuilder: (context, index) {
               final trackId = excludedTracks[index];
               return ListTile(
@@ -280,10 +309,17 @@ class _PrivateListeningSheetState extends State<PrivateListeningSheet> {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                 title: Text(
                   trackId,
-                  style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
                 trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Colors.redAccent,
+                    size: 18,
+                  ),
                   onPressed: () async {
                     await store.unexcludeTrack(trackId);
                     setState(() {});
@@ -336,7 +372,8 @@ class _PrivateListeningSheetState extends State<PrivateListeningSheet> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: excludedPlaylists.length,
-            separatorBuilder: (_, _) => const Divider(color: AppTheme.border, height: 1),
+            separatorBuilder: (_, _) =>
+                const Divider(color: AppTheme.border, height: 1),
             itemBuilder: (context, index) {
               final plId = excludedPlaylists[index];
               return ListTile(
@@ -344,10 +381,17 @@ class _PrivateListeningSheetState extends State<PrivateListeningSheet> {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                 title: Text(
                   plId,
-                  style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
                 trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Colors.redAccent,
+                    size: 18,
+                  ),
                   onPressed: () async {
                     await store.unexcludePlaylist(plId);
                     setState(() {});

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -14,6 +15,9 @@ import '../services/player_state.dart';
 import '../services/room_deep_links.dart';
 import '../services/search_nav.dart';
 import '../services/update_service.dart';
+import '../services/system_notification_service.dart';
+import '../features/replay/presentation/replay_screen.dart';
+import '../features/replay/data/replay_journal_reader.dart';
 import '../utils/media_normalizer.dart';
 import 'details/album_screen.dart';
 import 'details/artist_screen.dart';
@@ -106,6 +110,7 @@ class _ShellScreenState extends State<ShellScreen>
   DateTime? _lastBackPress;
   final GlobalKey<PlayerShellState> _playerShellKey =
       GlobalKey<PlayerShellState>();
+  StreamSubscription<String>? _notifSub;
 
   final List<GlobalKey<NavigatorState>> _navKeys = [
     GlobalKey<NavigatorState>(),
@@ -178,7 +183,11 @@ class _ShellScreenState extends State<ShellScreen>
     RoomDeepLinks.instance.start().then((_) {
       if (mounted) _onRoomDeepLink();
     });
-    // Automatic background update verification: prompts older version users with the changelog sheet
+
+    _notifSub = SystemNotificationService.instance.onDeepLinkOpened
+        .listen(_handleNotificationDeepLink);
+
+    // Automatic background update verification & smart engagement checks
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await Future.delayed(const Duration(seconds: 2));
       if (!mounted) return;
@@ -189,7 +198,67 @@ class _ShellScreenState extends State<ShellScreen>
           !UpdateService.instance.hasDismissedPrompt) {
         UpdateService.instance.showUpdateSheet(context, info);
       }
+
+      _runPeriodicEngagementChecks();
     });
+  }
+
+  void _handleNotificationDeepLink(String uri) {
+    if (!mounted) return;
+    final u = uri.trim();
+    if (u == 'zenify://atlas') {
+      _select(1);
+      SystemNotificationService.instance.recordAtlasVisit();
+    } else if (u == 'zenify://replay') {
+      _openInActiveTab(const ReplayScreen());
+      SystemNotificationService.instance.recordReplayVisit();
+    } else if (u == 'zenify://update') {
+      UpdateService.instance.checkForUpdate(silent: false).then((info) {
+        if (mounted && info != null && info.hasUpdate) {
+          UpdateService.instance.showUpdateSheet(context, info);
+        }
+      });
+    } else if (u == 'zenify://downloads') {
+      _select(2); // Library tab
+    } else if (u.startsWith('zenify://room/')) {
+      _openInActiveTab(const RoomTogetherScreen());
+    }
+  }
+
+  Future<void> _runPeriodicEngagementChecks() async {
+    await Future.delayed(const Duration(seconds: 4));
+    if (!mounted) return;
+
+    // 1. App Update system notification check
+    final info = UpdateService.instance.availableUpdate;
+    if (info != null && info.hasUpdate) {
+      await SystemNotificationService.instance.notifyAppUpdate(
+        latestVersion: info.latestVersion,
+        releaseNotes: info.releaseNotes,
+      );
+    }
+
+    if (!mounted) return;
+
+    // 2. Unexplored Music Atlas discovery check
+    await SystemNotificationService.instance.notifyAtlasDiscovery();
+
+    if (!mounted) return;
+
+    // 3. Replay Insights & Sunday Digest check
+    try {
+      final events = await ReplayJournalReader.readAll();
+      final totalMins = events.fold<int>(
+        0,
+        (sum, e) => sum + (e.listenedMs ~/ 60000),
+      );
+      await SystemNotificationService.instance.notifyReplayInsights(
+        totalMinutes: totalMins,
+      );
+      await SystemNotificationService.instance.notifySundayDigest(
+        hours: totalMins / 60.0,
+      );
+    } catch (_) {}
   }
 
   void _onRoomDeepLink() {
@@ -202,6 +271,7 @@ class _ShellScreenState extends State<ShellScreen>
 
   @override
   void dispose() {
+    _notifSub?.cancel();
     RoomDeepLinks.instance.removeListener(_onRoomDeepLink);
     _dockController.dispose();
     super.dispose();
@@ -276,6 +346,9 @@ class _ShellScreenState extends State<ShellScreen>
     _tabHistory.remove(_currentIndex);
     _tabHistory.add(_currentIndex);
     setState(() => _currentIndex = index);
+    if (index == 1) {
+      SystemNotificationService.instance.recordAtlasVisit();
+    }
     DockVisibility.reset();
     if (_dockController.value != 1.0) {
       _dockController.value = 1.0;
@@ -422,24 +495,53 @@ class _ShellScreenState extends State<ShellScreen>
 
   void _goToAlbum(dynamic track) {
     final Track? t = track is Track ? track : null;
+    final bool isVideoTrack = (t != null && (t.isVideo || Track.detectIsVideo(t.title, t.album) || t.album.toLowerCase() == 'music video')) ||
+        (track != null && Track.detectIsVideo(track.title?.toString() ?? '', track.album?.toString() ?? ''));
+
     final String rawTitle;
     final dynamic rawArtist;
     final String? cover;
     if (t != null) {
-      rawTitle = (t.album.isNotEmpty && t.album != 'Single')
-          ? t.album
-          : t.title;
+      rawTitle = isVideoTrack
+          ? t.title
+          : ((t.album.isNotEmpty && t.album != 'Single') ? t.album : t.title);
       rawArtist = t.artist;
       cover = t.coverUrl;
     } else {
       final a = track?.album?.toString();
       final trTitle = track?.title?.toString() ?? 'Album';
-      rawTitle = (a != null && a.isNotEmpty && a != 'Single') ? a : trTitle;
+      rawTitle = isVideoTrack
+          ? trTitle
+          : ((a != null && a.isNotEmpty && a != 'Single') ? a : trTitle);
       rawArtist = track?.artist;
       cover = track?.coverUrl?.toString();
     }
-    final title = MediaNormalizer.cleanAlbumTitle(rawTitle);
+    final title = isVideoTrack ? MediaNormalizer.cleanTitle(rawTitle) : MediaNormalizer.cleanAlbumTitle(rawTitle);
     final artist = MediaNormalizer.formatArtists(rawArtist);
+
+    if (isVideoTrack) {
+      final vidTrack = (t ??
+              Track(
+                id: track?.id?.toString() ?? '',
+                title: title,
+                artist: artist,
+                coverUrl: cover ?? '',
+                album: 'Music Video',
+                isVideo: true,
+              ))
+          .copyWith(isVideo: true);
+      _openInActiveTab(
+        AlbumScreen(
+          albumTitle: vidTrack.title,
+          artistName: vidTrack.artist,
+          coverUrl: vidTrack.coverUrl,
+          browseId: null,
+          initialTracks: [vidTrack],
+          isVideo: true,
+        ),
+      );
+      return;
+    }
 
     // CRITICAL: A song's album browseId MUST be an album (MPREb_... or OLAK5uy_...),
     // NEVER a user or curated playlist (PL..., VLPL..., RD...).

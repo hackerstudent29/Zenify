@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
+import 'package:flutter/services.dart';
 
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/apple_glass.dart';
@@ -452,9 +453,12 @@ class _PopLikeButtonState extends State<PopLikeButton>
 
   @override
   Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: widget.onToggle,
-      scale: 0.88,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        widget.onToggle();
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic,
@@ -501,9 +505,12 @@ class PlayerMoreButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: onTap,
-      scale: 0.88,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic,
@@ -523,6 +530,11 @@ class PlayerMoreButton extends StatelessWidget {
 /*  Palette extraction (no extra package)                               */
 /* ------------------------------------------------------------------ */
 final Map<String, List<Color>> _paletteCache = {};
+
+List<Color>? peekPalette(String url) {
+  if (url.isEmpty) return null;
+  return _paletteCache[url];
+}
 
 Color _vivid(Color c) {
   final hsl = HSLColor.fromColor(c);
@@ -586,6 +598,10 @@ Future<List<Color>?> extractPalette(String url) async {
       );
     }).toList();
     _paletteCache[url] = colors;
+    final clean = upgradeArtworkUrl(url);
+    if (clean.isNotEmpty && clean != url) {
+      _paletteCache[clean] = colors;
+    }
     return colors;
   } catch (_) {
     return null;

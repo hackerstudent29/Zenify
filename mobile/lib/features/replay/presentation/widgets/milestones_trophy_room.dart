@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../services/dock_visibility.dart';
 import '../../domain/all_time_index.dart';
 import '../../domain/replay_aggregate.dart';
 
@@ -29,8 +30,9 @@ class ReplayBadge {
   final String unit;
   final DateTime? unlockedAt;
 
-  double get progressRatio =>
-      target > 0 ? (currentProgress / target).clamp(0.0, 1.0) : (isUnlocked ? 1.0 : 0.0);
+  double get progressRatio => target > 0
+      ? (currentProgress / target).clamp(0.0, 1.0)
+      : (isUnlocked ? 1.0 : 0.0);
 
   int get progressPercent => (progressRatio * 100).round();
 }
@@ -61,42 +63,48 @@ class MilestonesTrophyRoom extends StatefulWidget {
     required ReplayAggregate aggregate,
     AllTimeIndex? allTimeIndex,
   }) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (ctx, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: AppTheme.canvas,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: MilestonesTrophyRoom(
-                    aggregate: aggregate,
-                    allTimeIndex: allTimeIndex,
+    return DockVisibility.runModal(
+      () => showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => DraggableScrollableSheet(
+          initialChildSize: 0.9,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (ctx, scrollController) => Container(
+            decoration: const BoxDecoration(
+              color: AppTheme.canvas,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: MilestonesTrophyRoom(
+                      aggregate: aggregate,
+                      allTimeIndex: allTimeIndex,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -121,8 +129,10 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
 
     final isNightOwl = agg.daypart.dominantDaypart == 'Night';
     final isEarlyBird = agg.daypart.dominantDaypart == 'Morning';
-    final hasHeavyRotation = agg.heavyRotation.isNotEmpty || agg.loops.isNotEmpty;
-    final isMarathoner = agg.marathon != null && agg.marathon!.durationMinutes >= 60;
+    final hasHeavyRotation =
+        agg.heavyRotation.isNotEmpty || agg.loops.isNotEmpty;
+    final isMarathoner =
+        agg.marathon != null && agg.marathon!.durationMinutes >= 60;
     final isLoyal = agg.loyalty != null && agg.loyalty!.daysLoyal >= 30;
 
     return [
@@ -182,7 +192,8 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
       ReplayBadge(
         id: 'night_owl',
         title: 'Night Owl',
-        description: 'Spend your dominant listening hours between 10 PM and 5 AM.',
+        description:
+            'Spend your dominant listening hours between 10 PM and 5 AM.',
         icon: Icons.nightlight_round,
         category: 'Habits & Streaks',
         isUnlocked: isNightOwl,
@@ -195,7 +206,8 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
       ReplayBadge(
         id: 'early_bird',
         title: 'Early Bird',
-        description: 'Spend your dominant listening hours in the morning sunshine.',
+        description:
+            'Spend your dominant listening hours in the morning sunshine.',
         icon: Icons.wb_sunny_rounded,
         category: 'Habits & Streaks',
         isUnlocked: isEarlyBird,
@@ -212,7 +224,9 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
         icon: Icons.repeat_one_rounded,
         category: 'Habits & Streaks',
         isUnlocked: hasHeavyRotation,
-        currentProgress: agg.heavyRotation.isNotEmpty ? agg.heavyRotation.first.qualifiedPlays : 0,
+        currentProgress: agg.heavyRotation.isNotEmpty
+            ? agg.heavyRotation.first.qualifiedPlays
+            : 0,
         target: 5,
         unit: 'plays',
       ),
@@ -221,7 +235,8 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
       ReplayBadge(
         id: 'marathoner',
         title: 'Marathoner',
-        description: 'Listen continuously for 60+ minutes without interruption.',
+        description:
+            'Listen continuously for 60+ minutes without interruption.',
         icon: Icons.directions_run_rounded,
         category: 'Habits & Streaks',
         isUnlocked: isMarathoner,
@@ -247,7 +262,8 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
       ReplayBadge(
         id: 'loyal_fan',
         title: 'True Loyalist',
-        description: 'Maintain 30+ days of unwavering devotion to your #1 artist.',
+        description:
+            'Maintain 30+ days of unwavering devotion to your #1 artist.',
         icon: Icons.favorite_rounded,
         category: 'Collection',
         isUnlocked: isLoyal,
@@ -265,7 +281,12 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
     final totalCount = badges.length;
     final overallRatio = totalCount > 0 ? unlockedCount / totalCount : 0.0;
 
-    final categories = ['All', 'Listening Time', 'Habits & Streaks', 'Collection'];
+    final categories = [
+      'All',
+      'Listening Time',
+      'Habits & Streaks',
+      'Collection',
+    ];
     final displayedBadges = _selectedCategory == 'All'
         ? badges
         : badges.where((b) => b.category == _selectedCategory).toList();
@@ -335,11 +356,16 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.brand.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.brand.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: AppTheme.brand.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Text(
                       '$unlockedCount / $totalCount',
@@ -352,7 +378,10 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, color: AppTheme.textMuted),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: AppTheme.textMuted,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -389,7 +418,10 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
                     onTap: () => setState(() => _selectedCategory = cat),
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppTheme.brand
@@ -403,8 +435,12 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
                         cat,
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected ? Colors.white : AppTheme.textSecondary,
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: isSelected
+                              ? Colors.white
+                              : AppTheme.textSecondary,
                         ),
                       ),
                     ),
@@ -477,14 +513,18 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
                         : Colors.white.withValues(alpha: 0.06),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: badge.isUnlocked ? AppTheme.brand : AppTheme.border,
+                      color: badge.isUnlocked
+                          ? AppTheme.brand
+                          : AppTheme.border,
                       width: 1.5,
                     ),
                   ),
                   child: Icon(
                     badge.icon,
                     size: 26,
-                    color: badge.isUnlocked ? AppTheme.brand : AppTheme.textMuted,
+                    color: badge.isUnlocked
+                        ? AppTheme.brand
+                        : AppTheme.textMuted,
                   ),
                 ),
                 if (badge.isUnlocked)
@@ -519,7 +559,9 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: badge.isUnlocked ? AppTheme.textPrimary : AppTheme.textSecondary,
+                color: badge.isUnlocked
+                    ? AppTheme.textPrimary
+                    : AppTheme.textSecondary,
               ),
             ),
 
@@ -531,10 +573,7 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 10,
-                color: AppTheme.textMuted,
-              ),
+              style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
             ),
 
             const Spacer(),
@@ -565,8 +604,9 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
                       value: badge.progressRatio,
                       minHeight: 4,
                       backgroundColor: Colors.white.withValues(alpha: 0.08),
-                      valueColor:
-                          const AlwaysStoppedAnimation<Color>(AppTheme.textMuted),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppTheme.textMuted,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -665,7 +705,10 @@ class _MilestonesTrophyRoomState extends State<MilestonesTrophyRoom> {
             onPressed: () => Navigator.of(ctx).pop(),
             child: const Text(
               'Close',
-              style: TextStyle(color: AppTheme.brand, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: AppTheme.brand,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

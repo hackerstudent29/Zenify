@@ -376,11 +376,11 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
               style: PillStyle.tinted,
               compact: true,
               onTap: () {
-                Navigator.of(context).push(
+                Navigator.of(context, rootNavigator: true).push(
                   MaterialPageRoute(
                     builder: (_) => WelcomeScreen(
                       onFinished: () {
-                        Navigator.of(context).pop();
+                        Navigator.of(context, rootNavigator: true).pop();
                         _fetchInsights();
                       },
                     ),

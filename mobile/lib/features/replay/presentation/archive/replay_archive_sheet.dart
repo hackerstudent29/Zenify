@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../services/dock_visibility.dart';
 import '../../domain/replay_aggregate.dart';
 import '../../domain/services/replay_archive_service.dart';
 
@@ -23,14 +24,17 @@ class ReplayArchiveSheet extends StatefulWidget {
     ReplayAggregate? currentSnapshot,
     ValueChanged<ReplayAggregate>? onSelectSnapshot,
   }) {
-    return showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => ReplayArchiveSheet(
-        archiveService: archiveService,
-        currentSnapshot: currentSnapshot,
-        onSelectSnapshot: onSelectSnapshot,
+    return DockVisibility.runModal(
+      () => showModalBottomSheet(
+        context: context,
+        useRootNavigator: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => ReplayArchiveSheet(
+          archiveService: archiveService,
+          currentSnapshot: currentSnapshot,
+          onSelectSnapshot: onSelectSnapshot,
+        ),
       ),
     );
   }

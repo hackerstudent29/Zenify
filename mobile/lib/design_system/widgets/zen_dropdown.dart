@@ -16,6 +16,7 @@ import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/lyrics_service.dart';
 import '../../services/player_state.dart';
+import '../../services/settings_service.dart';
 import '../../utils/media_normalizer.dart';
 import '../../views/details/album_screen.dart';
 import '../../views/details/artist_popup.dart';
@@ -148,6 +149,67 @@ class ZenDropdown {
     return confirmed;
   }
 
+  /// Landscape: right-side glass panel (slides in), instead of a bottom sheet.
+  static Future<T?> showLandscapePanel<T>(
+    BuildContext context, {
+    required WidgetBuilder builder,
+  }) {
+    return showGeneralDialog<T>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Close',
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      transitionDuration: const Duration(milliseconds: 320),
+      pageBuilder: (ctx, _, _) {
+        final mq = MediaQuery.of(ctx);
+        final w = math.min(380.0, mq.size.width * 0.46);
+        return SafeArea(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: SizedBox(
+                width: w,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                    child: Material(
+                      color: const Color(0xE61C1C1E),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: mq.size.height - mq.padding.vertical - 24,
+                        ),
+                        child: builder(ctx),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (ctx, a, _, child) {
+        final c = CurvedAnimation(
+          parent: a,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: c,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.12, 0),
+              end: Offset.zero,
+            ).animate(c),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
   /// Flagship: Apple Music Contextual Song Action Sheet.
   /// Features:
   /// - Liquid glass sheet background (#1C1C1E with 25px blur and top 30px corner radius)
@@ -172,6 +234,7 @@ class ZenDropdown {
     VoidCallback? onToggleLike,
     bool? isLiked,
     List<ZenDropdownItem>? extraItems,
+    bool landscape = false,
   }) {
     HapticFeedback.mediumImpact();
 
@@ -197,6 +260,38 @@ class ZenDropdown {
         : (durationSeconds ?? 0);
 
     final callerNav = Navigator.of(context);
+    final isLandscape = landscape;
+
+    Widget buildSheetContent(BuildContext ctx) => _TrackActionSheetContent(
+      track: track,
+      callerContext: context,
+      callerNav: callerNav,
+      title: resolvedTitle,
+      artist: resolvedArtist,
+      album: resolvedAlbum,
+      coverUrl: resolvedCover,
+      durationSeconds: resolvedDur,
+      onPlayNext: onPlayNext,
+      onPlayLater: onPlayLater,
+      onAddToPlaylist: onAddToPlaylist,
+      onGoToArtist: onGoToArtist,
+      onGoToAlbum: onGoToAlbum,
+      onStartMix: onStartMix,
+      onReport: onReport,
+      onToggleLike: onToggleLike,
+      initialLiked: isLiked,
+      extraItems: extraItems,
+      isLandscape: isLandscape,
+    );
+
+    if (isLandscape) {
+      return DockVisibility.runModal(
+        () => showLandscapePanel<void>(
+          context,
+          builder: buildSheetContent,
+        ),
+      );
+    }
 
     return DockVisibility.runModal(
       () => showModalBottomSheet<void>(
@@ -206,28 +301,7 @@ class ZenDropdown {
         barrierColor: Colors.black.withValues(alpha: 0.50),
         isScrollControlled: true,
         enableDrag: true,
-        builder: (ctx) {
-          return _TrackActionSheetContent(
-            track: track,
-            callerContext: context,
-            callerNav: callerNav,
-            title: resolvedTitle,
-            artist: resolvedArtist,
-            album: resolvedAlbum,
-            coverUrl: resolvedCover,
-            durationSeconds: resolvedDur,
-            onPlayNext: onPlayNext,
-            onPlayLater: onPlayLater,
-            onAddToPlaylist: onAddToPlaylist,
-            onGoToArtist: onGoToArtist,
-            onGoToAlbum: onGoToAlbum,
-            onStartMix: onStartMix,
-            onReport: onReport,
-            onToggleLike: onToggleLike,
-            initialLiked: isLiked,
-            extraItems: extraItems,
-          );
-        },
+        builder: buildSheetContent,
       ),
     );
   }
@@ -508,6 +582,7 @@ class _TrackActionSheetContent extends StatefulWidget {
     this.onToggleLike,
     this.initialLiked,
     this.extraItems,
+    this.isLandscape = false,
   });
 
   final Track? track;
@@ -528,6 +603,7 @@ class _TrackActionSheetContent extends StatefulWidget {
   final VoidCallback? onToggleLike;
   final bool? initialLiked;
   final List<ZenDropdownItem>? extraItems;
+  final bool isLandscape;
 
   @override
   State<_TrackActionSheetContent> createState() =>
@@ -707,29 +783,41 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
         )
       else if (isDownloading)
         ZenDropdownItem(
-          title: 'Downloading...',
+          title: effectiveTrack.isVideo
+              ? 'Downloading Video...'
+              : 'Downloading...',
           subtitle:
-              '${(dl.getDownloadProgress(effectiveTrack.id) * 100).toInt()}% • Saving Audio & Lyrics',
-          icon: CupertinoIcons.arrow_down_circle,
+              '${(dl.getDownloadProgress(effectiveTrack.id) * 100).toInt()}% • Saving ${effectiveTrack.isVideo ? "Video & Audio" : "Audio & Lyrics"}',
+          icon: effectiveTrack.isVideo
+              ? CupertinoIcons.videocam_circle
+              : CupertinoIcons.arrow_down_circle,
           iconColor: const Color(0xFFE11D48),
           onTap: () {},
         )
       else
         ZenDropdownItem(
-          title: 'Download Song',
-          subtitle: 'Audio · Lyrics · Artwork (< 5 MB)',
-          icon: CupertinoIcons.arrow_down_circle,
+          title: effectiveTrack.isVideo ? 'Download Video' : 'Download Song',
+          subtitle: effectiveTrack.isVideo
+              ? 'Video (${SettingsState.instance.downloadVideoQuality}) · Audio · Artwork'
+              : 'Audio · Lyrics · Artwork (< 5 MB)',
+          icon: effectiveTrack.isVideo
+              ? CupertinoIcons.videocam_circle
+              : CupertinoIcons.arrow_down_circle,
           iconColor: const Color(0xFFE11D48),
           onTap: () async {
             HapticFeedback.lightImpact();
             IslandNotifier.instance.show(
               IslandNotification(
                 id: 'start_dl_${effectiveTrack.id}',
-                title: 'Downloading',
+                title: effectiveTrack.isVideo
+                    ? 'Downloading Video'
+                    : 'Downloading',
                 body: effectiveTrack.title,
-                leading: const Icon(
-                  CupertinoIcons.arrow_down_circle,
-                  color: Color(0xFFE11D48),
+                leading: Icon(
+                  effectiveTrack.isVideo
+                      ? CupertinoIcons.videocam_circle
+                      : CupertinoIcons.arrow_down_circle,
+                  color: const Color(0xFFE11D48),
                   size: 18,
                 ),
               ),
@@ -738,11 +826,13 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
             if (ok) {
               final sz =
                   dl.getDownloaded(effectiveTrack.id)?.formattedSize ??
-                  '3.5 MB';
+                  (effectiveTrack.isVideo ? '15.0 MB' : '3.5 MB');
               IslandNotifier.instance.show(
                 IslandNotification(
                   id: 'done_dl_${effectiveTrack.id}',
-                  title: 'Downloaded Offline',
+                  title: effectiveTrack.isVideo
+                      ? 'Video Downloaded'
+                      : 'Downloaded Offline',
                   body: '${effectiveTrack.title} · $sz',
                   leading: const Icon(
                     CupertinoIcons.checkmark_circle_fill,
@@ -755,7 +845,9 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
               IslandNotifier.instance.show(
                 IslandNotification(
                   id: 'fail_dl_${effectiveTrack.id}',
-                  title: 'Download Failed',
+                  title: effectiveTrack.isVideo
+                      ? 'Video Download Failed'
+                      : 'Download Failed',
                   body: effectiveTrack.title,
                   leading: const Icon(
                     CupertinoIcons.exclamationmark_circle,
@@ -882,6 +974,237 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
       if (widget.extraItems != null) ...widget.extraItems!,
     ];
 
+    final headerWidget = Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: widget.isLandscape ? 16 : 20,
+        vertical: 8,
+      ),
+      child: Row(
+        children: [
+          // Squircle Artwork
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 50,
+              height: 50,
+              color: const Color(0xFF2C2C2E),
+              child: widget.coverUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: widget.coverUrl,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, _, _) => MonogramAvatar(
+                        name: widget.title,
+                        size: 50,
+                      ),
+                    )
+                  : MonogramAvatar(name: widget.title, size: 50),
+            ),
+          ),
+          const SizedBox(width: 14),
+
+          // Title & Artist + Duration
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _buildSubtitle(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFFA1A1A6),
+                    letterSpacing: -0.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          // Favorite / Star Button
+          PressableScale(
+            onTap: _handleLikeToggle,
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              child: Icon(
+                _liked
+                    ? CupertinoIcons.star_fill
+                    : CupertinoIcons.star,
+                color: _liked ? Zen.rose : Colors.white,
+                size: 24,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final quickShareRow = Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: widget.isLandscape ? 12 : 16,
+        vertical: 12,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          // Copy Link
+          _QuickShareBtn(
+            icon: CupertinoIcons.link,
+            label: 'Copy Link',
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: _shareUrl));
+              HapticFeedback.lightImpact();
+              Navigator.of(context).pop();
+              IslandNotifier.instance.show(
+                IslandNotification(
+                  id: 'copy_link_${DateTime.now().millisecondsSinceEpoch}',
+                  title: 'Copied',
+                  body: IslandNotification.artistOrTitle(
+                    artist: widget.artist,
+                    title: widget.title,
+                  ),
+                  leading: const Icon(
+                    CupertinoIcons.link,
+                    color: Color(0xFFE11D48),
+                    size: 18,
+                  ),
+                ),
+              );
+            },
+          ),
+          // Stories (Instagram / Social Story)
+          _QuickShareBtn(
+            icon: CupertinoIcons.paperplane_fill,
+            label: 'Stories',
+            gradient: const LinearGradient(
+              begin: Alignment.bottomLeft,
+              end: Alignment.topRight,
+              colors: [
+                Color(0xFFF58529),
+                Color(0xFFDD2A7B),
+                Color(0xFF8134AF),
+              ],
+            ),
+            onTap: () {
+              Navigator.of(context).pop();
+              if (widget.callerContext.mounted) {
+                StoryOptionsSheet.show(
+                  context: widget.callerContext,
+                  track: effectiveTrack,
+                );
+              }
+            },
+          ),
+          // WhatsApp
+          _QuickShareBtn(
+            icon: CupertinoIcons.chat_bubble_fill,
+            label: 'WhatsApp',
+            color: const Color(0xFF25D366),
+            onTap: () {
+              Navigator.of(context).pop();
+              if (widget.callerContext.mounted) {
+                Navigator.of(
+                  widget.callerContext,
+                  rootNavigator: true,
+                ).push(
+                  CupertinoPageRoute(
+                    builder: (_) => StoryPreviewScreen(
+                      content: SongStoryContent(
+                        track: effectiveTrack,
+                      ),
+                      initialShareTarget: StoryShareTarget.whatsapp,
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+          // Facebook Stories
+          _QuickShareBtn(
+            icon: CupertinoIcons.paperplane_fill,
+            label: 'Facebook',
+            color: const Color(0xFF1877F2),
+            onTap: () {
+              Navigator.of(context).pop();
+              if (widget.callerContext.mounted) {
+                Navigator.of(
+                  widget.callerContext,
+                  rootNavigator: true,
+                ).push(
+                  CupertinoPageRoute(
+                    builder: (_) => StoryPreviewScreen(
+                      content: SongStoryContent(
+                        track: effectiveTrack,
+                      ),
+                      initialShareTarget: StoryShareTarget.facebook,
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
+
+    final menuItemsList = [
+      for (int i = 0; i < rows.length; i++) ...[
+        _ActionMenuRow(item: rows[i]),
+        // Rule: Line under each item except the last item; line above each item except the first item.
+        if (i < rows.length - 1)
+          const Divider(
+            height: 0.5,
+            thickness: 0.5,
+            indent: 56,
+            color: Color(0xFF38383A),
+          ),
+      ],
+    ];
+
+    if (widget.isLandscape) {
+      return SafeArea(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              headerWidget,
+              const SizedBox(height: 2),
+              quickShareRow,
+              const SizedBox(height: 6),
+              const Divider(
+                height: 0.5,
+                thickness: 0.5,
+                color: Color(0xFF38383A),
+              ),
+              ...menuItemsList,
+            ],
+          ),
+        ),
+      );
+    }
+
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
       child: Container(
@@ -924,200 +1247,12 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
               ),
 
               // ── B. Song Information Header ──
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
-                child: Row(
-                  children: [
-                    // Squircle Artwork
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        width: 50,
-                        height: 50,
-                        color: const Color(0xFF2C2C2E),
-                        child: widget.coverUrl.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: widget.coverUrl,
-                                fit: BoxFit.cover,
-                                errorWidget: (_, _, _) => MonogramAvatar(
-                                  name: widget.title,
-                                  size: 50,
-                                ),
-                              )
-                            : MonogramAvatar(name: widget.title, size: 50),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-
-                    // Title & Artist + Duration
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            widget.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: 'SF Pro Display',
-                              fontSize: 16.5,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            _buildSubtitle(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: 'SF Pro',
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFFA1A1A6),
-                              letterSpacing: -0.1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-
-                    // Favorite / Star Button
-                    PressableScale(
-                      onTap: _handleLikeToggle,
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        alignment: Alignment.center,
-                        child: Icon(
-                          _liked
-                              ? CupertinoIcons.star_fill
-                              : CupertinoIcons.star,
-                          color: _liked ? Zen.rose : Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              headerWidget,
 
               const SizedBox(height: 6),
 
               // ── C. Quick Sharing Actions ──
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    // Copy Link
-                    _QuickShareBtn(
-                      icon: CupertinoIcons.link,
-                      label: 'Copy Link',
-                      onTap: () {
-                        Clipboard.setData(ClipboardData(text: _shareUrl));
-                        HapticFeedback.lightImpact();
-                        Navigator.of(context).pop();
-                        IslandNotifier.instance.show(
-                          IslandNotification(
-                            id: 'copy_link_${DateTime.now().millisecondsSinceEpoch}',
-                            title: 'Copied',
-                            body: IslandNotification.artistOrTitle(
-                              artist: widget.artist,
-                              title: widget.title,
-                            ),
-                            leading: const Icon(
-                              CupertinoIcons.link,
-                              color: Color(0xFFE11D48),
-                              size: 18,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    // Stories (Instagram / Social Story)
-                    _QuickShareBtn(
-                      icon: CupertinoIcons.paperplane_fill,
-                      label: 'Stories',
-                      gradient: const LinearGradient(
-                        begin: Alignment.bottomLeft,
-                        end: Alignment.topRight,
-                        colors: [
-                          Color(0xFFF58529),
-                          Color(0xFFDD2A7B),
-                          Color(0xFF8134AF),
-                        ],
-                      ),
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        if (widget.callerContext.mounted) {
-                          StoryOptionsSheet.show(
-                            context: widget.callerContext,
-                            track: effectiveTrack,
-                          );
-                        }
-                      },
-                    ),
-                    // WhatsApp
-                    _QuickShareBtn(
-                      icon: CupertinoIcons.chat_bubble_fill,
-                      label: 'WhatsApp',
-                      color: const Color(0xFF25D366),
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        if (widget.callerContext.mounted) {
-                          Navigator.of(
-                            widget.callerContext,
-                            rootNavigator: true,
-                          ).push(
-                            CupertinoPageRoute(
-                              builder: (_) => StoryPreviewScreen(
-                                content: SongStoryContent(
-                                  track: effectiveTrack,
-                                ),
-                                initialShareTarget: StoryShareTarget.whatsapp,
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                    // Facebook Stories
-                    _QuickShareBtn(
-                      icon: CupertinoIcons.paperplane_fill,
-                      label: 'Facebook',
-                      color: const Color(0xFF1877F2),
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        if (widget.callerContext.mounted) {
-                          Navigator.of(
-                            widget.callerContext,
-                            rootNavigator: true,
-                          ).push(
-                            CupertinoPageRoute(
-                              builder: (_) => StoryPreviewScreen(
-                                content: SongStoryContent(
-                                  track: effectiveTrack,
-                                ),
-                                initialShareTarget: StoryShareTarget.facebook,
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
+              quickShareRow,
 
               const SizedBox(height: 8),
 
@@ -1130,19 +1265,7 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (int i = 0; i < rows.length; i++) ...[
-                        _ActionMenuRow(item: rows[i]),
-                        // Rule: Line under each item except the last item; line above each item except the first item.
-                        if (i < rows.length - 1)
-                          const Divider(
-                            height: 0.5,
-                            thickness: 0.5,
-                            indent: 56,
-                            color: Color(0xFF38383A),
-                          ),
-                      ],
-                    ],
+                    children: menuItemsList,
                   ),
                 ),
               ),
@@ -1204,14 +1327,18 @@ class _QuickShareBtn extends StatelessWidget {
             child: Icon(icon, color: Colors.white, size: 22),
           ),
           const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontFamily: 'SF Pro',
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFFA1A1A6),
-              letterSpacing: -0.1,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: const TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFA1A1A6),
+                letterSpacing: -0.1,
+              ),
             ),
           ),
         ],

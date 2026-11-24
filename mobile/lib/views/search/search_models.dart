@@ -170,17 +170,34 @@ class SearchSongItem extends SearchItem {
   bool get isOfficialAudio => musicVideoType == 'ATV' || musicVideoType == 'MUSIC_VIDEO_TYPE_ATV';
 
   Track toTrack() {
+    final tLower = title.toLowerCase();
+    final isVid = !isOfficialAudio && (
+      musicVideoType == 'MUSIC_VIDEO_TYPE_OMV' ||
+      musicVideoType == 'OMV' ||
+      musicVideoType == 'MUSIC_VIDEO_TYPE_OFFICIAL_SOURCE_MUSIC_VIDEO' ||
+      musicVideoType == 'MUSIC_VIDEO_TYPE_UGC' ||
+      tLower.contains('video song') ||
+      tLower.contains('music video') ||
+      tLower.contains('official video') ||
+      tLower.contains('full video') ||
+      tLower.contains('4k video') ||
+      tLower.contains('lyric video') ||
+      tLower.contains('visualizer') ||
+      tLower.contains('(video)') ||
+      tLower.contains('[video]')
+    );
     return Track(
       id: id.startsWith('yt-') ? id : 'yt-$id',
       title: title,
       artist: subtitle,
       artists: artists,
-      album: albumName ?? 'Single',
+      album: isVid && (albumName == null || albumName == 'Single') ? 'Music Video' : (albumName ?? 'Single'),
       albumBrowseId: albumBrowseId,
       coverUrl: thumbnailUrlHiRes.isNotEmpty ? thumbnailUrlHiRes : thumbnailUrl,
       durationSeconds: durationSeconds,
       language: Track.detectLanguage(title, subtitle, albumName ?? '') ?? '',
       source: 'youtube',
+      isVideo: isVid,
     );
   }
 
@@ -703,6 +720,7 @@ class SearchResult {
     this.continuation,
     required this.intent,
     this.diagnostics,
+    this.suggestions = const [],
   });
 
   final SearchTopResult? topResult;
@@ -712,6 +730,7 @@ class SearchResult {
   final String? continuation;
   final SearchIntent intent;
   final SearchDiagnostics? diagnostics;
+  final List<String> suggestions;
 
   List<SearchSongItem> get songs =>
       sections[SearchItemType.song]?.whereType<SearchSongItem>().toList() ?? const [];

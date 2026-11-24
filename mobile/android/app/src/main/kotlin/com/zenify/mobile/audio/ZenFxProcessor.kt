@@ -90,12 +90,15 @@ class ZenFxProcessor : BaseAudioProcessor() {
     @Volatile var bands: FloatArray = FloatArray(BANDS)
     @Volatile var loudnessDb: Double? = null
         private set
+    @Volatile var isMono: Boolean = false
+        private set
     @Volatile var hasSpectrumListener: Boolean = false
 
     private var engine: Engine? = null
     private var inCh = 2
 
     fun hasActiveProcessing(): Boolean {
+        if (isMono) return true
         if (hasSpectrumListener) return true
         if (params.hasActiveEffects()) return true
         val lDb = loudnessDb
@@ -108,6 +111,11 @@ class ZenFxProcessor : BaseAudioProcessor() {
         engine?.setLoudnessDb(db)
     }
 
+    fun setMono(mono: Boolean) {
+        isMono = mono
+        engine?.setMono(mono)
+    }
+
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT || inputAudioFormat.channelCount !in 1..2) {
             return AudioProcessor.AudioFormat.NOT_SET // leave unusual formats untouched
@@ -115,6 +123,7 @@ class ZenFxProcessor : BaseAudioProcessor() {
         inCh = inputAudioFormat.channelCount
         engine = Engine(inputAudioFormat.sampleRate.toFloat()) { bands = it.copyOf() }.also {
             it.setLoudnessDb(loudnessDb)
+            it.setMono(isMono)
         }
         return AudioProcessor.AudioFormat(inputAudioFormat.sampleRate, 2, C.ENCODING_PCM_16BIT)
     }
@@ -692,6 +701,11 @@ private class Engine(val fs: Float, onBands: (FloatArray) -> Unit) {
     private val limRel = exp(-1f / (fs * 0.060f))
     private var targetLoudnessGain = 1f
     private var currentLoudnessGain = 1f
+    private var isMono: Boolean = false
+
+    fun setMono(enabled: Boolean) {
+        isMono = enabled
+    }
 
     fun setLoudnessDb(db: Double?) {
         targetLoudnessGain = if (db != null) {
@@ -731,13 +745,22 @@ private class Engine(val fs: Float, onBands: (FloatArray) -> Unit) {
     }
 
     private fun frame() {
+        if (isMono) {
+            val m = (io[0] + io[1]) * 0.5f
+            io[0] = m
+            io[1] = m
+        }
         if (abs(currentLoudnessGain - 1f) > 0.001f) {
             io[0] *= currentLoudnessGain
             io[1] *= currentLoudnessGain
         }
         vocal.process(io)
         for (i in order.indices) { val m = order[i]; if (m.active) m.process(io) }
-        if (abs(width - 1f) > 0.01f) {
+        if (isMono) {
+            val m = (io[0] + io[1]) * 0.5f
+            io[0] = m
+            io[1] = m
+        } else if (abs(width - 1f) > 0.01f) {
             val mid = (io[0] + io[1]) * 0.5f
             val side = (io[0] - io[1]) * 0.5f * width
             io[0] = mid + side; io[1] = mid - side
@@ -745,6 +768,11 @@ private class Engine(val fs: Float, onBands: (FloatArray) -> Unit) {
         spatial.process(io)
         comp.run(io)
         limit(io)
+        if (isMono) {
+            val m = (io[0] + io[1]) * 0.5f
+            io[0] = m
+            io[1] = m
+        }
     }
 
     private fun limit(io: FloatArray) {

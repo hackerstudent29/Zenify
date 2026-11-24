@@ -20,6 +20,7 @@ import '../../features/story_sharing/story_sharing.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/artist_service.dart';
+import '../../services/dock_visibility.dart';
 import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
@@ -637,9 +638,19 @@ class _Shelf extends StatelessWidget {
 }
 
 class _VideoCard extends StatelessWidget {
-  const _VideoCard({required this.track, required this.onTap});
+  const _VideoCard({
+    required this.track,
+    required this.onTap,
+    this.fallbackYear,
+  });
   final Track track;
   final VoidCallback onTap;
+  final String? fallbackYear;
+
+  static String extractYear(String text) {
+    final match = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(text);
+    return match != null ? match.group(0)! : '';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -650,6 +661,29 @@ class _VideoCard extends StatelessWidget {
         offset: const Offset(0, 5),
       ),
     ];
+    var displayYear = (track.year != null && track.year!.isNotEmpty)
+        ? track.year!
+        : extractYear(track.title);
+    if (displayYear.isEmpty && fallbackYear != null && fallbackYear!.isNotEmpty) {
+      displayYear = fallbackYear!;
+    }
+    final yearMatch = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(displayYear);
+    if (yearMatch != null) {
+      displayYear = yearMatch.group(0)!;
+    } else {
+      displayYear = '';
+    }
+
+    final artistLabel = (track.artist.isNotEmpty &&
+            track.artist.toLowerCase() != 'unknown artist' &&
+            !MediaNormalizer.isDistributorOrLabel(track.artist))
+        ? track.artist
+        : '';
+    final metaLine = [
+      if (artistLabel.isNotEmpty) artistLabel,
+      if (displayYear.isNotEmpty) displayYear,
+    ].join(' · ');
+
     return _Press(
       onTap: onTap,
       child: Column(
@@ -658,61 +692,41 @@ class _VideoCard extends StatelessWidget {
         children: [
           AspectRatio(
             aspectRatio: 16 / 9,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                DecoratedBox(
-                  decoration: ShapeDecoration(
-                    shape: _sq(16.0),
-                    shadows: shadow,
-                  ),
-                  child: _Img(track.coverUrl, radius: 16.0),
-                ),
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.52),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.25),
-                        width: 1,
-                      ),
-                    ),
-                    child: const Icon(
-                      CupertinoIcons.play_fill,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ],
+            child: DecoratedBox(
+              decoration: ShapeDecoration(
+                shape: _sq(14.0),
+                shadows: shadow,
+              ),
+              child: _Img(track.coverUrl, radius: 14.0),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 7),
           Text(
             MediaNormalizer.cleanCompactTitle(track.title),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 14.5,
-              height: 1.3,
+              fontSize: 14.0,
+              height: 1.25,
               fontWeight: FontWeight.w600,
               letterSpacing: -0.15,
             ),
           ),
-          Text(
-            track.artist.isNotEmpty ? track.artist : 'Music Video',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-              height: 1.3,
+          if (metaLine.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              metaLine,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12.5,
+                height: 1.25,
+                fontWeight: FontWeight.w400,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -727,9 +741,9 @@ class _VideoShelf extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
-    final ext = (w * 0.88).clamp(310.0, 440.0);
+    final ext = (w * 0.72).clamp(250.0, 350.0);
     final cw = ext - 14;
-    final shelfH = (cw * 9 / 16) + 70;
+    final shelfH = (cw * 9 / 16) + 52;
     return SizedBox(
       height: shelfH,
       child: ListView.builder(
@@ -1314,7 +1328,7 @@ class ArtistScreen extends StatefulWidget {
 }
 
 class _ArtistScreenState extends State<ArtistScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final _sc = ScrollController();
   List<Track> _tracks = [];
   ArtistProfile? _artistProfile;
@@ -1322,6 +1336,59 @@ class _ArtistScreenState extends State<ArtistScreen>
   String? _resolvedImage;
   String? _resolvedBanner;
   String? _resolvedBio;
+  final Map<String, String> _resolvedVideoYears = {};
+  final Map<String, String> _resolvedVideoArtists = {};
+  final Set<String> _resolvingVideoIds = {};
+
+  void _resolveVideosMetadata(List<Track> videos) {
+    if (videos.isEmpty) return;
+    for (final vt in videos) {
+      final cleanId = vt.id.replaceFirst(RegExp(r'^(yt-|yt:)'), '');
+      if (cleanId.isEmpty || _resolvingVideoIds.contains(cleanId)) {
+        continue;
+      }
+      if (vt.year != null && RegExp(r'\b(19\d{2}|20\d{2})\b').hasMatch(vt.year!)) {
+        _resolvedVideoYears[cleanId] ??= RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(vt.year!)!.group(0)!;
+      }
+      if (vt.artist.isNotEmpty &&
+          vt.artist.toLowerCase() != 'unknown artist' &&
+          !MediaNormalizer.isDistributorOrLabel(vt.artist)) {
+        _resolvedVideoArtists[cleanId] ??= vt.artist;
+      }
+
+      final needsYear = !_resolvedVideoYears.containsKey(cleanId);
+      final needsArtist = !_resolvedVideoArtists.containsKey(cleanId);
+      if (!needsYear && !needsArtist) continue;
+
+      _resolvingVideoIds.add(cleanId);
+      InnerTubeService.instance.getVideoDetails(cleanId).then((details) {
+        if (!mounted || details == null) return;
+        bool changed = false;
+        if (details.year != null && details.year!.isNotEmpty) {
+          _resolvedVideoYears[cleanId] = details.year!;
+          changed = true;
+        }
+        if (needsArtist) {
+          var realArtist = MediaNormalizer.extractArtistsFromDescription(details.description);
+          if (realArtist.isEmpty) {
+            realArtist = MediaNormalizer.extractArtistsFromVideoTitle(
+              details.title.isNotEmpty ? details.title : vt.title,
+              defaultArtist: _artistProfile?.name ?? widget.artistName,
+            );
+          }
+          if (realArtist.isNotEmpty) {
+            _resolvedVideoArtists[cleanId] = realArtist;
+            changed = true;
+          }
+        }
+        if (changed) {
+          setState(() {});
+        }
+      }).whenComplete(() {
+        _resolvingVideoIds.remove(cleanId);
+      });
+    }
+  }
 
   // ---- Living cover (same behaviour as the album page) ----
   /// Flip to -1 if the tilt parallax feels inverted on your device.
@@ -1342,6 +1409,7 @@ class _ArtistScreenState extends State<ArtistScreen>
   bool _animatedCover = false;
   bool _reduceMotion = false;
   bool _routeActive = true;
+  bool _appResumed = true;
   bool _scrolling = false;
   bool _heroVisible = true;
   double _heroH = 460;
@@ -1361,7 +1429,7 @@ class _ArtistScreenState extends State<ArtistScreen>
         ),
         '',
       );
-      return '$base=w1600-l90-rj';
+      return '$base=w900-l90-rj';
     }
     return MediaNormalizer.upgradeBannerUrl(u);
   }
@@ -1426,6 +1494,7 @@ class _ArtistScreenState extends State<ArtistScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.imageUrl != null && widget.imageUrl!.isNotEmpty) {
       _resolveImageDimensions(resolveFullArtistHeroUrl(widget.imageUrl!));
     }
@@ -1442,6 +1511,7 @@ class _ArtistScreenState extends State<ArtistScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     LibraryStore.instance.removeListener(_onLibrary);
     _sc.removeListener(_onScroll);
     _accel?.cancel();
@@ -1476,10 +1546,10 @@ class _ArtistScreenState extends State<ArtistScreen>
   }
 
   /// Nothing moves when reduce-motion is on, the screen is covered or the
-  /// hero is off-screen; drift/breathing also rest while scrolling.
+  /// hero is off-screen; drift/breathing also rest while scrolling or app is backgrounded.
   void _syncMotion() {
     if (!mounted) return;
-    final canRun = !_reduceMotion && _routeActive && _heroVisible;
+    final canRun = !_reduceMotion && _routeActive && _heroVisible && _appResumed;
     if (canRun && !_scrolling) {
       if (!_live.isAnimating) _live.repeat(reverse: true);
       if (!_glow.isAnimating) _glow.repeat(reverse: true);
@@ -1493,6 +1563,15 @@ class _ArtistScreenState extends State<ArtistScreen>
       _stopTilt();
     }
     if (_reduceMotion) _tilt.value = Offset.zero;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final isResumed = state == AppLifecycleState.resumed;
+    if (_appResumed != isResumed) {
+      _appResumed = isResumed;
+      _syncMotion();
+    }
   }
 
   void _startTilt() {
@@ -1620,6 +1699,7 @@ class _ArtistScreenState extends State<ArtistScreen>
             _loading = false;
           });
         }
+        _resolveVideosMetadata(info.musicVideos);
         _fillSongs();
         return;
       }
@@ -1714,118 +1794,142 @@ class _ArtistScreenState extends State<ArtistScreen>
   void _showAllSongs(List<Track> list, String name) {
     HapticFeedback.selectionClick();
     final player = context.read<PlayerState>();
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetCtx) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (_, sc) => Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF1C1C1E),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: ListenableBuilder(
-            listenable: player,
-            builder: (context, child) {
-              final cur = player.currentTrack?.id;
-              return CustomScrollView(
-                controller: sc,
-                physics: const BouncingScrollPhysics(
-                  parent: AlwaysScrollableScrollPhysics(),
+    DockVisibility.runModal(
+      () => showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black.withValues(alpha: 0.50),
+        builder: (sheetCtx) => DraggableScrollableSheet(
+          initialChildSize: 0.9,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, sc) => BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xF21C1C1E),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(30)),
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    width: 0.6,
+                  ),
                 ),
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 8),
-                        Container(
-                          width: 36,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: Colors.white24,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 14, 14, 8),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Top Songs',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: -0.5,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '$name · ${list.length} ${list.length == 1 ? 'song' : 'songs'}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: AppColors.textSecondary,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              _Press(
-                                scale: 0.88,
-                                onTap: () => Navigator.of(sheetCtx).pop(),
-                                child: Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.14),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    CupertinoIcons.xmark,
-                                    size: 14,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 20),
-                          height: 0.5,
-                          color: AppColors.hairline,
-                        ),
-                      ],
-                    ),
-                  ),
-                  SliverList.builder(
-                    itemCount: list.length,
-                    itemBuilder: (_, i) => _SongRow(
-                      track: list[i],
-                      current: cur == list[i].id,
-                      playing: cur == list[i].id && player.isPlaying,
-                      rightPad: 12,
-                      onTap: () => _play(list, i),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: MediaQuery.paddingOf(sheetCtx).bottom + 24,
-                    ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    blurRadius: 36,
+                    offset: const Offset(0, -6),
                   ),
                 ],
-              );
-            },
+              ),
+              child: ListenableBuilder(
+                listenable: player,
+                builder: (context, child) {
+                  final cur = player.currentTrack?.id;
+                  return CustomScrollView(
+                    controller: sc,
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 10),
+                            Container(
+                              width: 36,
+                              height: 4.5,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.22),
+                                borderRadius: BorderRadius.circular(2.5),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 14, 14, 8),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Top Songs',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: -0.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '$name · ${list.length} ${list.length == 1 ? 'song' : 'songs'}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  _Press(
+                                    scale: 0.88,
+                                    onTap: () => Navigator.of(sheetCtx).pop(),
+                                    child: Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Colors.white.withValues(alpha: 0.14),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        CupertinoIcons.xmark,
+                                        size: 14,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              height: 0.5,
+                              color: AppColors.hairline,
+                            ),
+                          ],
+                        ),
+                      ),
+                      SliverList.builder(
+                        itemCount: list.length,
+                        itemBuilder: (_, i) => _SongRow(
+                          track: list[i],
+                          current: cur == list[i].id,
+                          playing: cur == list[i].id && player.isPlaying,
+                          rightPad: 12,
+                          onTap: () => _play(list, i),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: SizedBox(
+                          height: MediaQuery.paddingOf(sheetCtx).bottom + 24,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
           ),
         ),
       ),
@@ -1839,20 +1943,39 @@ class _ArtistScreenState extends State<ArtistScreen>
   }) {
     if (entries.isEmpty) return;
     HapticFeedback.selectionClick();
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetCtx) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (_, sc) => Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF1C1C1E),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
+    DockVisibility.runModal(
+      () => showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black.withValues(alpha: 0.50),
+        builder: (sheetCtx) => DraggableScrollableSheet(
+          initialChildSize: 0.9,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, sc) => BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xF21C1C1E),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(30)),
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    width: 0.6,
+                  ),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    blurRadius: 36,
+                    offset: const Offset(0, -6),
+                  ),
+                ],
+              ),
           child: CustomScrollView(
             controller: sc,
             physics: const BouncingScrollPhysics(
@@ -2026,8 +2149,10 @@ class _ArtistScreenState extends State<ArtistScreen>
           ),
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   void _menu(String name, List<Track> songs, String img) {
     HapticFeedback.selectionClick();
@@ -2179,7 +2304,13 @@ class _ArtistScreenState extends State<ArtistScreen>
         .where((t) => t.artist.toLowerCase().contains(lower))
         .toList();
     final allSongs = own.isEmpty ? _tracks : own;
-    final songs = allSongs.take(_kSheetSongs).toList(); // sheet + queue
+    final audioSongs = allSongs
+        .where((t) =>
+            !t.isVideo &&
+            !Track.detectIsVideo(t.title, t.album) &&
+            t.album.toLowerCase() != 'music video')
+        .toList();
+    final songs = audioSongs.take(_kSheetSongs).toList(); // sheet + queue
     final stackSongs = songs.take(_kStackSongs).toList(); // first section
 
     final map = <String, _Release>{};
@@ -2227,23 +2358,74 @@ class _ArtistScreenState extends State<ArtistScreen>
               )
               .toList()
         : const <_Release>[];
-    final musicVideos = _artistProfile?.musicVideos ?? const <Track>[];
-    final videoTracks = musicVideos
-        .map((v) => v.copyWith(isVideo: true))
+    final _Release? latest = albums.isNotEmpty
+        ? albums.first
+        : (singles.isNotEmpty ? singles.first : null);
+    final profileVideos = _artistProfile?.musicVideos ?? const <Track>[];
+    final extraVideos = _tracks
+        .where((t) =>
+            t.isVideo ||
+            Track.detectIsVideo(t.title, t.album) ||
+            t.album.toLowerCase() == 'music video')
         .toList();
+    final seenVidIds = <String>{};
+    final musicVideos = <Track>[];
+    for (final v in [...profileVideos, ...extraVideos]) {
+      if (seenVidIds.add(v.id)) musicVideos.add(v);
+    }
+    final videoTracks = musicVideos.map((v) {
+      final cleanId = v.id.replaceFirst(RegExp(r'^(yt-|yt:)'), '');
+      var art = _resolvedVideoArtists[cleanId] ?? v.artist;
+      if (art.isEmpty ||
+          art.toLowerCase() == 'unknown artist' ||
+          MediaNormalizer.isDistributorOrLabel(art)) {
+        art = MediaNormalizer.extractArtistsFromVideoTitle(
+          v.title,
+          defaultArtist: name,
+        );
+      }
+      final resolvedYr = _resolvedVideoYears[cleanId] ?? v.year;
+      return v.copyWith(
+        isVideo: true,
+        artist: art,
+        year: resolvedYr,
+      );
+    }).toList();
     final featuredPlaylists = _artistProfile?.featuredPlaylists ?? const [];
 
-    _Release? latest;
-    final dated =
-        [
-          ...albums,
-          ...singles,
-        ].where((r) => (int.tryParse(r.year) ?? 0) > 0).toList()..sort(
-          (a, b) =>
-              (int.tryParse(b.year) ?? 0).compareTo(int.tryParse(a.year) ?? 0),
-        );
-    if (dated.isNotEmpty) {
-      latest = dated.first;
+    String resolveVideoYear(Track vt) {
+      final cleanId = vt.id.replaceFirst(RegExp(r'^(yt-|yt:)'), '');
+      if (_resolvedVideoYears.containsKey(cleanId) && _resolvedVideoYears[cleanId]!.isNotEmpty) {
+        return _resolvedVideoYears[cleanId]!;
+      }
+      if (vt.year != null && RegExp(r'\b(19\d{2}|20\d{2})\b').hasMatch(vt.year!)) {
+        return RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(vt.year!)!.group(0)!;
+      }
+      final cleanVid = MediaNormalizer.cleanCompactTitle(vt.title).toLowerCase();
+      for (final rel in [...singles, ...albums]) {
+        final relTitle = MediaNormalizer.cleanCompactTitle(rel.title).toLowerCase();
+        if (rel.year.isNotEmpty && (cleanVid.contains(relTitle) || relTitle.contains(cleanVid))) {
+          final m = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(rel.year);
+          if (m != null) return m.group(0)!;
+        }
+      }
+      for (final tr in _tracks) {
+        if (tr.year != null && tr.year!.isNotEmpty) {
+          final trTitle = MediaNormalizer.cleanCompactTitle(tr.title).toLowerCase();
+          if (cleanVid.contains(trTitle) || trTitle.contains(cleanVid)) {
+            final m = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(tr.year!);
+            if (m != null) return m.group(0)!;
+          }
+        }
+      }
+      final inTitle = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(vt.title);
+      if (inTitle != null) return inTitle.group(0)!;
+      final inAlbum = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(vt.album);
+      if (inAlbum != null) return inAlbum.group(0)!;
+
+      // Asynchronously resolve authentic upload/publish year from YouTube WEB player
+      _resolveVideosMetadata([vt]);
+      return '';
     }
 
     final related =
@@ -2442,7 +2624,7 @@ class _ArtistScreenState extends State<ArtistScreen>
                                       : (latest.tracks.length < 3
                                             ? 'Single'
                                             : 'Album · ${latest.tracks.length} songs'),
-                                  onTap: () => _openAlbum(latest!),
+                                  onTap: () => _openAlbum(latest),
                                 ),
                               ],
 
@@ -2549,22 +2731,24 @@ class _ArtistScreenState extends State<ArtistScreen>
                                           entries: [
                                             for (
                                               var idx = 0;
-                                              idx < musicVideos.length;
+                                              idx < videoTracks.length;
                                               idx++
                                             )
                                               _ArtistSheetEntry(
                                                 title:
                                                     MediaNormalizer.cleanCompactTitle(
-                                                      musicVideos[idx].title,
+                                                      videoTracks[idx].title,
                                                     ),
-                                                subtitle:
-                                                    musicVideos[idx]
-                                                        .artist
-                                                        .isNotEmpty
-                                                    ? musicVideos[idx].artist
-                                                    : 'Music Video',
+                                                subtitle: [
+                                                  if (videoTracks[idx].artist.isNotEmpty &&
+                                                      videoTracks[idx].artist.toLowerCase() != 'unknown artist' &&
+                                                      !MediaNormalizer.isDistributorOrLabel(videoTracks[idx].artist))
+                                                    videoTracks[idx].artist,
+                                                  if (resolveVideoYear(videoTracks[idx]).isNotEmpty)
+                                                    resolveVideoYear(videoTracks[idx]),
+                                                ].join(' · '),
                                                 coverUrl:
-                                                    musicVideos[idx].coverUrl,
+                                                    videoTracks[idx].coverUrl,
                                                 isVideo: true,
                                                 onTap: () =>
                                                     _play(videoTracks, idx),
@@ -2574,11 +2758,8 @@ class _ArtistScreenState extends State<ArtistScreen>
                                       : null,
                                 ),
                                 _VideoShelf(
-                                  count: musicVideos.length,
-                                  builder: (i) => _VideoCard(
-                                    track: musicVideos[i],
-                                    onTap: () => _play(videoTracks, i),
-                                  ),
+                                  count: videoTracks.length,
+                                  builder: (i) => _VideoCard(track: videoTracks[i], fallbackYear: resolveVideoYear(videoTracks[i]), onTap: () => _play(videoTracks, i)),
                                 ),
                               ],
 

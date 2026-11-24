@@ -75,21 +75,15 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
             items == null || items.isEmpty ? empty : items.join(', ');
 
         return AMPage(
-          title: 'Account',
+          title: 'Profile',
           trailing: widget.fromSettings
               ? null
-              : CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(32, 32),
-                  onPressed: () => Navigator.of(context).push(
+              : DynamicIslandActionButton(
+                  icon: CupertinoIcons.gear,
+                  onTap: () => Navigator.of(context, rootNavigator: true).push(
                     CupertinoPageRoute<void>(
                       builder: (_) => const SettingsScreen(),
                     ),
-                  ),
-                  child: const Icon(
-                    CupertinoIcons.gear,
-                    color: AM.rose,
-                    size: 22,
                   ),
                 ),
           children: [
@@ -101,9 +95,7 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
                   title: name,
                   subtitle: handle.isNotEmpty
                       ? handle
-                      : (auth.isLoggedIn
-                          ? 'Zenify Member'
-                          : 'Guest Listener'),
+                      : (auth.isLoggedIn ? 'Zenify Member' : 'Guest Listener'),
                   trailing: _edit,
                   onTap: () => showIdentityEditSheet(context),
                 ),
@@ -117,14 +109,18 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
                     subtitle:
                         'Sync your library and see your Replay stats on every device.',
                     chevron: true,
-                    onTap: () => Navigator.of(context).push(
-                      CupertinoPageRoute<void>(
-                        fullscreenDialog: true,
-                        builder: (_) => WelcomeScreen(
-                          onFinished: () => Navigator.of(context).pop(),
+                    onTap: () =>
+                        Navigator.of(context, rootNavigator: true).push(
+                          CupertinoPageRoute<void>(
+                            fullscreenDialog: true,
+                            builder: (_) => WelcomeScreen(
+                              onFinished: () => Navigator.of(
+                                context,
+                                rootNavigator: true,
+                              ).pop(),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
                   ),
                 ],
               ),
@@ -268,8 +264,8 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
                           'This is permanent. Playlists, favorites and preferences will be deleted.',
                       action: 'Delete',
                       onConfirm: () async {
-                        final token =
-                            await AuthService.instance.getAccessToken();
+                        final token = await AuthService.instance
+                            .getAccessToken();
                         if (token != null) {
                           await http.delete(
                             Uri.parse('${ApiService.baseUrl}/api/me/account'),
@@ -382,8 +378,7 @@ class _SessionsSheetState extends State<_SessionsSheet> {
         headers: _headers,
       );
       if (r.statusCode != 200) return null;
-      return (jsonDecode(r.body) as List<dynamic>)
-          .cast<Map<String, dynamic>>();
+      return (jsonDecode(r.body) as List<dynamic>).cast<Map<String, dynamic>>();
     } catch (_) {
       return null;
     }

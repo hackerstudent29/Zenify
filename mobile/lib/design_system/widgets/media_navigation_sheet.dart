@@ -13,6 +13,7 @@ import '../../views/shell_screen.dart' show ShellNavigationScope;
 import '../zen.dart';
 import 'monogram_avatar.dart';
 import 'pressable_scale.dart';
+import 'zen_dropdown.dart';
 
 /// Apple Music-style navigation sheet displaying "Go to Artist" (one row per artist)
 /// and "Go to Album" with high-res artwork, overriding the miniplayer, bottom dock,
@@ -28,6 +29,7 @@ class MediaNavigationSheet extends StatefulWidget {
     this.initialTracks,
     required this.onOpenArtist,
     this.onOpenAlbum,
+    this.isLandscape = false,
   });
 
   final List<ArtistRef> artists;
@@ -38,6 +40,7 @@ class MediaNavigationSheet extends StatefulWidget {
   final List<Track>? initialTracks;
   final ValueChanged<ArtistRef> onOpenArtist;
   final VoidCallback? onOpenAlbum;
+  final bool isLandscape;
 
   /// Primary entrypoint to show the media navigation sheet across the entire application.
   static Future<void> show({
@@ -54,6 +57,7 @@ class MediaNavigationSheet extends StatefulWidget {
     void Function(ArtistRef artist)? onOpenArtist,
     VoidCallback? onOpenAlbum,
     VoidCallback? onBeforeNavigate,
+    bool landscape = false,
   }) async {
     HapticFeedback.lightImpact();
     // Dismiss any active dynamic island notification so it does not distract
@@ -95,11 +99,14 @@ class MediaNavigationSheet extends StatefulWidget {
     }
 
     String? effectiveAlbum;
+    final isVidTrack = track != null && (track.isVideo || Track.detectIsVideo(track.title, track.album));
     if (showAlbum) {
       if (albumTitle != null && albumTitle.trim().isNotEmpty) {
         effectiveAlbum = albumTitle;
       } else if (track != null) {
-        if (track.album.isNotEmpty && track.album != 'Single') {
+        if (isVidTrack) {
+          effectiveAlbum = MediaNormalizer.cleanTitle(track.title);
+        } else if (track.album.isNotEmpty && track.album != 'Single') {
           effectiveAlbum = track.album;
         } else if (track.album == 'Single' || track.album.isEmpty) {
           effectiveAlbum = '${track.title} - Single';
@@ -114,84 +121,105 @@ class MediaNavigationSheet extends StatefulWidget {
 
     final token = DockVisibility.acquire(hideNav: true, hideMini: true);
 
-    try {
-      await showModalBottomSheet<void>(
-        context: context,
-        useRootNavigator: true,
-        backgroundColor: Colors.transparent,
-        barrierColor: Colors.black.withValues(alpha: 0.65),
-        isScrollControlled: true,
-        enableDrag: true,
-        builder: (sheetContext) => MediaNavigationSheet(
-          artists: effectiveArtists,
-          albumTitle: effectiveAlbum,
-          albumArtist: effectiveAlbumArtist,
-          albumCoverUrl: effectiveCover,
-          albumBrowseId: effectiveBrowseId,
-          initialTracks: initialTracks ?? (track != null ? [track] : null),
-          onOpenArtist: (a) {
-            DockVisibility.release(token);
-            Navigator.of(sheetContext).pop();
-            onBeforeNavigate?.call();
-            if (onOpenArtist != null) {
-              onOpenArtist(a);
-              return;
-            }
-            final page = ArtistScreen(
-              artistName: a.name,
-              browseId: a.id.isNotEmpty && !a.id.contains('_') ? a.id : null,
-              imageUrl: a.imageUrl,
-            );
-            final shell = ShellNavigationScope.of(context);
-            if (shell != null) {
-              shell.openInActiveTab(page);
-            } else {
-              final nav = callerNav.mounted ? callerNav : rootNav;
-              nav.push(
-                ZenPageRoute(
-                  builder: (_) => page,
-                ),
+    final isLandscape = landscape;
+
+    Widget buildSheet(BuildContext sheetContext) => MediaNavigationSheet(
+      artists: effectiveArtists,
+      albumTitle: effectiveAlbum,
+      albumArtist: effectiveAlbumArtist,
+      albumCoverUrl: effectiveCover,
+      albumBrowseId: effectiveBrowseId,
+      initialTracks: initialTracks ?? (track != null ? [track] : null),
+      isLandscape: isLandscape,
+      onOpenArtist: (a) {
+        DockVisibility.release(token);
+        Navigator.of(sheetContext).pop();
+        onBeforeNavigate?.call();
+        if (onOpenArtist != null) {
+          onOpenArtist(a);
+          return;
+        }
+        final page = ArtistScreen(
+          artistName: a.name,
+          browseId: a.id.isNotEmpty && !a.id.contains('_') ? a.id : null,
+          imageUrl: a.imageUrl,
+        );
+        final shell = ShellNavigationScope.of(context);
+        if (shell != null) {
+          shell.openInActiveTab(page);
+        } else {
+          final nav = callerNav.mounted ? callerNav : rootNav;
+          nav.push(
+            ZenPageRoute(
+              builder: (_) => page,
+            ),
+          );
+        }
+      },
+      onOpenAlbum: effectiveAlbum != null
+          ? () {
+              DockVisibility.release(token);
+              Navigator.of(sheetContext).pop();
+              onBeforeNavigate?.call();
+              if (onOpenAlbum != null) {
+                onOpenAlbum();
+                return;
+              }
+              String? browseId = effectiveBrowseId;
+              if (browseId != null &&
+                  (browseId.startsWith('VLPL') ||
+                   browseId.startsWith('PL') ||
+                   browseId.startsWith('RD'))) {
+                browseId = null;
+              }
+              final isVid = isVidTrack ||
+                  (effectiveAlbum != null &&
+                      (effectiveAlbum.toLowerCase() == 'music video' ||
+                          effectiveAlbum.toLowerCase() == 'video' ||
+                          Track.detectIsVideo(effectiveAlbum, effectiveAlbum)));
+              final page = AlbumScreen(
+                albumTitle: isVid ? MediaNormalizer.cleanTitle(track?.title ?? effectiveAlbum!) : effectiveAlbum!,
+                artistName: effectiveAlbumArtist,
+                coverUrl: effectiveCover,
+                browseId: isVid ? null : browseId,
+                initialTracks: initialTracks ??
+                    (track != null
+                        ? [track.copyWith(isVideo: isVid ? true : track.isVideo)]
+                        : null),
+                isVideo: isVid,
               );
+              final shell = ShellNavigationScope.of(context);
+              if (shell != null) {
+                shell.openInActiveTab(page);
+              } else {
+                final nav = callerNav.mounted ? callerNav : rootNav;
+                nav.push(
+                  ZenPageRoute(
+                    builder: (_) => page,
+                  ),
+                );
+              }
             }
-          },
-          onOpenAlbum: effectiveAlbum != null
-              ? () {
-                  DockVisibility.release(token);
-                  Navigator.of(sheetContext).pop();
-                  onBeforeNavigate?.call();
-                  if (onOpenAlbum != null) {
-                    onOpenAlbum();
-                    return;
-                  }
-                  String? browseId = effectiveBrowseId;
-                  if (browseId != null &&
-                      (browseId.startsWith('VLPL') ||
-                       browseId.startsWith('PL') ||
-                       browseId.startsWith('RD'))) {
-                    browseId = null;
-                  }
-                  final page = AlbumScreen(
-                    albumTitle: effectiveAlbum!,
-                    artistName: effectiveAlbumArtist,
-                    coverUrl: effectiveCover,
-                    browseId: browseId,
-                    initialTracks: initialTracks ?? (track != null ? [track] : null),
-                  );
-                  final shell = ShellNavigationScope.of(context);
-                  if (shell != null) {
-                    shell.openInActiveTab(page);
-                  } else {
-                    final nav = callerNav.mounted ? callerNav : rootNav;
-                    nav.push(
-                      ZenPageRoute(
-                        builder: (_) => page,
-                      ),
-                    );
-                  }
-                }
-              : null,
-        ),
-      );
+          : null,
+    );
+
+    try {
+      if (isLandscape) {
+        await ZenDropdown.showLandscapePanel<void>(
+          context,
+          builder: buildSheet,
+        );
+      } else {
+        await showModalBottomSheet<void>(
+          context: context,
+          useRootNavigator: true,
+          backgroundColor: Colors.transparent,
+          barrierColor: Colors.black.withValues(alpha: 0.65),
+          isScrollControlled: true,
+          enableDrag: true,
+          builder: buildSheet,
+        );
+      }
     } finally {
       DockVisibility.release(token);
     }
@@ -241,6 +269,35 @@ class _MediaNavigationSheetState extends State<MediaNavigationSheet> {
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.of(context).padding.bottom;
 
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Artists rows (one row per artist, list style)
+        for (final artist in widget.artists) ...[
+          _buildArtistRow(artist),
+          const SizedBox(height: 10),
+        ],
+
+        // Album row (if available and requested)
+        if (widget.albumTitle != null &&
+            widget.albumTitle!.trim().isNotEmpty &&
+            widget.onOpenAlbum != null) ...[
+          _buildAlbumRow(),
+        ],
+      ],
+    );
+
+    if (widget.isLandscape) {
+      return SafeArea(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: content,
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1C1C1E),
@@ -263,36 +320,27 @@ class _MediaNavigationSheetState extends State<MediaNavigationSheet> {
         top: false,
         child: Padding(
           padding: EdgeInsets.fromLTRB(18, 6, 18, 14 + bottomPad),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Grabber Handle
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 5,
-                  margin: const EdgeInsets.only(top: 8, bottom: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(2.5),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Grabber Handle
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 5,
+                    margin: const EdgeInsets.only(top: 8, bottom: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(2.5),
+                    ),
                   ),
                 ),
-              ),
-
-              // Artists rows (one row per artist, list style)
-              for (final artist in widget.artists) ...[
-                _buildArtistRow(artist),
-                const SizedBox(height: 10),
+                content,
               ],
-
-              // Album row (if available and requested)
-              if (widget.albumTitle != null &&
-                  widget.albumTitle!.trim().isNotEmpty &&
-                  widget.onOpenAlbum != null) ...[
-                _buildAlbumRow(),
-              ],
-            ],
+            ),
           ),
         ),
       ),

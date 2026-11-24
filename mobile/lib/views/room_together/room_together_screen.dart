@@ -1057,11 +1057,11 @@ class _QueueTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
       child: Row(children: [
         Container(
-          width: 48,
+          width: tr.isVideo ? 76 : 48,
           height: 48,
           clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(color: AT.surfaceHi, borderRadius: BorderRadius.circular(AT.rSm)),
-          child: tr.coverUrl.isNotEmpty ? Image.network(tr.coverUrl, fit: BoxFit.cover, cacheWidth: 144, errorBuilder: (_, _, _) => const Icon(CupertinoIcons.music_note, size: 20, color: AT.label3)) : const Icon(CupertinoIcons.music_note, size: 20, color: AT.label3),
+          decoration: BoxDecoration(color: AT.surfaceHi, borderRadius: BorderRadius.circular(tr.isVideo ? 6 : AT.rSm)),
+          child: tr.coverUrl.isNotEmpty ? Image.network(tr.coverUrl, fit: BoxFit.cover, cacheWidth: 200, errorBuilder: (_, _, _) => const Icon(CupertinoIcons.music_note, size: 20, color: AT.label3)) : const Icon(CupertinoIcons.music_note, size: 20, color: AT.label3),
         ),
         const SizedBox(width: 12),
         Expanded(

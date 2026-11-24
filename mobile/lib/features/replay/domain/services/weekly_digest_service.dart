@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../services/system_notification_service.dart';
 import '../replay_aggregate.dart';
 
 /// Service for F27: Weekly Replay Digest.
@@ -56,6 +57,18 @@ class WeeklyDigestService {
     final target = getNextSunday8PM(now);
     final sp = prefs ?? await SharedPreferences.getInstance();
     await sp.setInt(lastScheduledKey, target.millisecondsSinceEpoch);
+
+    if (weekAggregate != null) {
+      final hours = weekAggregate.totalMinutes / 60.0;
+      final topArtist = weekAggregate.topArtists.isNotEmpty
+          ? weekAggregate.topArtists.first.artistName
+          : null;
+      await SystemNotificationService.instance.notifySundayDigest(
+        hours: hours,
+        topArtist: topArtist,
+      );
+    }
+
     return true;
   }
 }

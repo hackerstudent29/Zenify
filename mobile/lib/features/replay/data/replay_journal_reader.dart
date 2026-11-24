@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path_provider/path_provider.dart';
+
 import '../domain/listen_event.dart';
 import '../domain/replay_period.dart';
 import 'exclusion_store.dart';
@@ -13,6 +15,20 @@ import 'exclusion_store.dart';
 /// - Supports v1 -> v2 automatic schema migration.
 class ReplayJournalReader {
   const ReplayJournalReader();
+
+  /// Reads all events from default journal file.
+  static Future<List<ListenEvent>> readAll() async {
+    File file;
+    try {
+      final docDir = await getApplicationDocumentsDirectory()
+          .timeout(const Duration(milliseconds: 300));
+      file = File('${docDir.path}/listen_journal.jsonl');
+    } catch (_) {
+      file = File('listen_journal.jsonl');
+    }
+    const reader = ReplayJournalReader();
+    return reader.readEvents(file).toList();
+  }
 
   /// Reads [ListenEvent] records from [file] as a stream.
   /// If [onCorruptLine] is provided, it receives the count of unparseable lines.

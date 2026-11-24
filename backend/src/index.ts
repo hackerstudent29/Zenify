@@ -352,33 +352,35 @@ const defaultRemoteConfig = {
         homeFeed: false,
     },
     minAppVersion: '1.0.9',
-    latestAppVersion: '1.1.19',
+    latestAppVersion: '1.1.21',
     isForceUpdate: false,
-    releaseDate: 'November 21, 2026',
-    releaseTime: '08:45 PM IST',
-    updateUrl: 'https://github.com/hackerstudent29/Zenify/releases/download/v1.1.19/zenify-v1.1.19.apk',
+    releaseDate: 'November 24, 2026',
+    releaseTime: '10:30 PM IST',
+    updateUrl: 'https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk',
     features: [
-        'Interactive Sound Atlas: Explore regional and global music cultures via 3D interactive globe, curated city and country charts, and Sound Passport',
-        'Apple Music Styled Sound Atlas UI: Integrated fluid iOS navigation, zero-delay single tap globe interactions, and rich musical identity badges',
-        'Optimized Search & Personalization Engine: Multi-factor ranking, category-specific retrieval, and unified listening insights',
+        'Strict YouTube Music Search Parity: Unrestricted access to official songs, video songs, albums, verified artists, and playlists',
+        '16:9 Landscape Video Thumbnails: Native widescreen video previews in search history, recent shelf, and player queue',
+        'Instant Search History Playback: Direct 1-tap playback of video and audio tracks directly from history without re-search delays',
+        'Ultra-Fast Parallel Lyrics Engine: Multi-provider parallel fetching (LRCLIB, lrc.red) with sub-300ms response and automatic video skip',
     ],
     fixes: [
-        'Fixed language server analyzer diagnostics and updated deprecated Flutter members',
-        'Resolved all builder callback warnings and eliminated obsolete dependencies',
-        'Cleaned and organized project structure',
+        'Fixed search catalog filters to prevent unintentional omission of video songs, playlists, or albums',
+        'Eliminated video song lyrics latency by immediately skipping unnecessary lyrical requests for video media',
+        'Optimized search history tap navigation to launch media immediately instead of triggering duplicate searches',
     ],
     improvements: [
-        'Compressed release build size with ProGuard and ABI-split optimization (15.7 MB)',
-        'Enhanced memory management and battery efficiency',
+        'Ultra-fast lyrics retrieval with multi-provider race and LRCLIB cache v12',
+        'Landscape 16:9 aspect ratio rendering across all video song queues and search rows',
+        'Compressed release build size with ProGuard and ABI-split optimization',
     ],
-    releaseNotes: '• Interactive Sound Atlas: 3D globe, city & country charts, musical journeys & battles\n• Sound Passport with stamped cities and milestones\n• Compressed APK release with ultra-fast startup (15.7 MB)',
-    message: 'Update to v1.1.19 for the brand new Interactive Sound Atlas, Sound Passport, and optimized audio performance',
+    releaseNotes: '• Strict YouTube Music search parity (unrestricted songs, videos, albums, playlists)\n• 16:9 landscape video previews in search history & queue\n• Ultra-fast parallel lyrics resolver with video skip',
+    message: 'Update to v1.1.21 for pure YouTube Music search parity, landscape video previews, and ultra-fast lyrics fetching',
 };
 
 server.get('/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.1.19.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.1.21.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }
@@ -388,7 +390,7 @@ server.get('/download/app', async (request, reply) => {
 server.get('/api/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.1.19.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.1.21.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }

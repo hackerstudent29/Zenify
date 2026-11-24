@@ -6,9 +6,12 @@ import 'package:provider/provider.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/models/playback_context.dart';
 import 'package:mobile/models/track.dart';
+import 'package:mobile/services/dock_visibility.dart';
 import 'package:mobile/services/library_store.dart';
 import 'package:mobile/services/listening_history_service.dart';
+import 'package:mobile/services/listening_tracker_service.dart';
 import 'package:mobile/services/player_state.dart';
+import 'package:mobile/services/system_notification_service.dart';
 import 'package:mobile/views/insights/widgets/history_view.dart';
 import '../data/all_time_index_store.dart';
 import '../data/exclusion_store.dart';
@@ -104,6 +107,7 @@ class _ReplayScreenState extends State<ReplayScreen> {
   @override
   void initState() {
     super.initState();
+    SystemNotificationService.instance.recordReplayVisit();
     _selectedKind = widget.initialPeriodKind;
     _referenceNow = DateTime.now();
 
@@ -228,10 +232,21 @@ class _ReplayScreenState extends State<ReplayScreen> {
       }
 
       const reader = ReplayJournalReader();
-      final stream = reader.readEvents(file);
-      final events = await stream.toList();
+      var stream = reader.readEvents(file);
+      var events = await stream.toList();
 
-      // If journal is empty, synthesize events from legacy listening history
+      // If journal is empty, attempt to restore history from authenticated cloud account
+      if (events.isEmpty && widget.journalFile == null) {
+        final restored = await ListeningTrackerService.instance
+            .restoreHistoryFromServer()
+            .timeout(const Duration(seconds: 4), onTimeout: () => false);
+        if (restored) {
+          final restoredStream = reader.readEvents(file);
+          events = await restoredStream.toList();
+        }
+      }
+
+      // If journal is still empty, synthesize events from legacy listening history
       if (events.isEmpty && widget.journalFile == null) {
         final legacySessions = ListeningHistoryService.instance.getLocalSessions();
         if (legacySessions.isNotEmpty) {
@@ -532,18 +547,21 @@ class _ReplayScreenState extends State<ReplayScreen> {
                     icon: const Icon(Icons.format_list_bulleted_rounded, color: AppTheme.textSecondary, size: 22),
                     tooltip: 'Listening History',
                     onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: AppTheme.canvas,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                        ),
-                        builder: (ctx) => SizedBox(
-                          height: MediaQuery.of(ctx).size.height * 0.85,
-                          child: Scaffold(
-                            backgroundColor: Colors.transparent,
-                            body: const HistoryView(),
+                      DockVisibility.runModal(
+                        () => showModalBottomSheet(
+                          context: context,
+                          useRootNavigator: true,
+                          isScrollControlled: true,
+                          backgroundColor: AppTheme.canvas,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (ctx) => SizedBox(
+                            height: MediaQuery.of(ctx).size.height * 0.85,
+                            child: Scaffold(
+                              backgroundColor: Colors.transparent,
+                              body: const HistoryView(),
+                            ),
                           ),
                         ),
                       );

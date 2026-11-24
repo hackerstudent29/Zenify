@@ -301,8 +301,12 @@ class StoryImageRenderer {
 
       final Uint8List pngBytes = byteData.buffer.asUint8List();
       final tempDir = await getTemporaryDirectory();
+      final storiesDir = Directory('${tempDir.path}/stories');
+      if (!storiesDir.existsSync()) {
+        storiesDir.createSync(recursive: true);
+      }
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final file = File('${tempDir.path}/${filePrefix}_$timestamp.png');
+      final file = File('${storiesDir.path}/${filePrefix}_$timestamp.png');
       await file.writeAsBytes(pngBytes, flush: true);
 
       return RenderResult(
@@ -315,6 +319,29 @@ class StoryImageRenderer {
       debugPrint('[StoryImageRenderer] Capture error: $e\n$stack');
       return null;
     }
+  }
+
+  /// Automatically purges stale story preview/share PNG files older than 24h from stories cache directory.
+  static Future<void> cleanupOldTempStoryFiles() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final storiesDir = Directory('${tempDir.path}/stories');
+      final now = DateTime.now();
+      final dirsToCheck = [tempDir, if (storiesDir.existsSync()) storiesDir];
+      for (final dir in dirsToCheck) {
+        final files = dir.listSync();
+        for (final f in files) {
+          if (f is File && (f.path.contains('story_') || f.path.contains('story_share_')) && f.path.endsWith('.png')) {
+            try {
+              final stat = f.statSync();
+              if (now.difference(stat.modified) > const Duration(hours: 24)) {
+                f.deleteSync();
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
   }
 }
 

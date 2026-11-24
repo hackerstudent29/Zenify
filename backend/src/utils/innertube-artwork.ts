@@ -104,3 +104,71 @@ export function upgradeInnerTubeArtwork(
     return url;
 }
 
+const DISTRIBUTOR_PATTERNS = [
+    /\bsony\s*music\b/i,
+    /\bt[- ]?series\b/i,
+    /\bsun\s*pictures\b/i,
+    /\bsun\s*tv\b/i,
+    /\bsun\s*nxt\b/i,
+    /\bthink\s*music\b/i,
+    /\bzee\s*music\b/i,
+    /\bsaregama\b/i,
+    /\baditya\s*music\b/i,
+    /\bmuzik247\b/i,
+    /\bdivo(?:\s*music)?\b/i,
+    /\btips(?:\s*official|\s*industries|\s*music)?\b/i,
+    /\byash\s*raj\s*films\b/i,
+    /\byrf\b/i,
+    /\bspeed\s*records\b/i,
+    /\bwhite\s*hill\s*music\b/i,
+    /\blahari\s*music\b/i,
+    /\bvevo\b/i,
+    /\bwarner\s*music\b/i,
+    /\buniversal\s*music\b/i,
+    /\bemi\s*music\b/i,
+    /\bvirgin\s*records\b/i,
+    /\bultra\s*bollywood\b/i,
+    /\bjunglee\s*music\b/i,
+    /\bmusic\s*company\b/i,
+    /\bmusic\s*label\b/i,
+    /\brecords\b/i,
+    /\bofficial\s*channel\b/i,
+    /\bchannel\b/i,
+    /\bentertainment\b/i,
+];
+
+export function isDistributorOrLabel(raw?: string | null): boolean {
+    if (!raw) return false;
+    const trimmed = raw.trim();
+    if (!trimmed) return false;
+    return DISTRIBUTOR_PATTERNS.some((pat) => pat.test(trimmed));
+}
+
+export function extractArtistsFromVideoTitle(rawTitle?: string | null, defaultArtist?: string): string {
+    if (!rawTitle) return defaultArtist || '';
+    let title = rawTitle
+        .replace(/\[[^\]]*\]/g, ' ')
+        .replace(/\((?:official|video|lyric|audio|4k|hd|remix|full|visualizer)[^)]*\)/gi, ' ')
+        .replace(/\b(?:official\s*(?:music\s*)?video|video\s*song|lyric\s*video|full\s*video)\b/gi, ' ')
+        .trim();
+
+    const singerMatch = title.match(/\b(?:singers?|vocals?|sung\s*by)\s*[:\-]\s*([^|,–—/]+)/i);
+    if (singerMatch && singerMatch[1]) {
+        const s = singerMatch[1].trim();
+        if (s.length > 2 && !isDistributorOrLabel(s)) return s;
+    }
+
+    const segments = title.split(/[|–—\-]/).map((s) => s.trim()).filter(Boolean);
+    for (const seg of segments.slice(1)) {
+        if (isDistributorOrLabel(seg)) continue;
+        if (/^(?:director|directed|producer|label|produced|dop|choreographer|music|composed)\b/i.test(seg)) continue;
+        if (/(?:official|video|4k|1080p|full\s*song|teaser|trailer)/i.test(seg)) continue;
+        if (seg.length > 2 && seg.length < 60) {
+            return seg;
+        }
+    }
+
+    return defaultArtist || '';
+}
+
+

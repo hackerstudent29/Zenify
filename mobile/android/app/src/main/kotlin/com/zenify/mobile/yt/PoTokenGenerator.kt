@@ -22,7 +22,7 @@ import kotlin.coroutines.resume
 class PoTokenGenerator(private val context: Context) : TokenProvider {
     companion object {
         private const val TAG = "PoTokenGenerator"
-        private const val TIMEOUT_MS = 1_500L
+        private const val TIMEOUT_MS = 12_000L
     }
 
     override val capabilities: TokenProviderCapabilities =
@@ -48,7 +48,7 @@ class PoTokenGenerator(private val context: Context) : TokenProvider {
             withTimeoutOrNull(TIMEOUT_MS) { withContext(Dispatchers.Main) { generateWebClientPoToken(videoId, visitorData) } }
         } catch (e: kotlinx.coroutines.CancellationException) { throw e }
           catch (e: Throwable) { null }
-        if (r == null) { if (++failures >= 2) disabledUntil = System.currentTimeMillis() + 10 * 60_000L }
+        if (r == null) { if (++failures >= 3) disabledUntil = System.currentTimeMillis() + 60_000L }
         else failures = 0
         return r
     }
@@ -86,13 +86,27 @@ class PoTokenGenerator(private val context: Context) : TokenProvider {
                                             try {
                                                 v.stopLoading()
                                                 v.pauseTimers()
-                                            } catch (_: Throwable) {}
+                                                v.clearCache(true)
+                                                v.loadUrl("about:blank")
+                                            } catch (e: Throwable) {}
                                             if (cont.isActive) cont.resume(result)
                                         } else {
+                                            try {
+                                                v?.stopLoading()
+                                                v?.pauseTimers()
+                                                v?.clearCache(true)
+                                                v?.loadUrl("about:blank")
+                                            } catch (_: Throwable) {}
                                             if (cont.isActive) cont.resume(null)
                                         }
                                     }
                                 } else {
+                                    try {
+                                        v?.stopLoading()
+                                        v?.pauseTimers()
+                                        v?.clearCache(true)
+                                        v?.loadUrl("about:blank")
+                                    } catch (_: Throwable) {}
                                     if (cont.isActive) cont.resume(null)
                                 }
                             }
@@ -109,7 +123,10 @@ class PoTokenGenerator(private val context: Context) : TokenProvider {
                 view.post {
                     try {
                         view.stopLoading()
-                    } catch (_: Throwable) {}
+                        view.pauseTimers()
+                        view.clearCache(true)
+                        view.loadUrl("about:blank")
+                    } catch (e: Throwable) {}
                 }
             }
         } catch (e: Throwable) {
@@ -119,7 +136,19 @@ class PoTokenGenerator(private val context: Context) : TokenProvider {
     }
 
     override suspend fun prewarm(cookie: String?) {
-        // Optional prewarm: load background webview if desired
+        try {
+            withContext(Dispatchers.Main) {
+                if (webView == null) {
+                    val view = WebView(context.applicationContext).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.cacheMode = WebSettings.LOAD_DEFAULT
+                    }
+                    webView = view
+                    view.loadUrl("https://www.youtube.com/embed")
+                }
+            }
+        } catch (e: Throwable) {}
     }
 
     override suspend fun invalidateAttestation() {
@@ -129,7 +158,13 @@ class PoTokenGenerator(private val context: Context) : TokenProvider {
     override suspend fun close() {
         withContext(Dispatchers.Main) {
             try {
-                webView?.destroy()
+                webView?.let {
+                    it.stopLoading()
+                    it.pauseTimers()
+                    it.clearCache(true)
+                    it.loadUrl("about:blank")
+                    it.destroy()
+                }
                 webView = null
             } catch (e: Throwable) {
                 Log.w(TAG, "Error releasing WebView: ${e.message}")

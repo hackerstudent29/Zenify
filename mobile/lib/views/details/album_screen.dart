@@ -313,6 +313,7 @@ class AlbumScreen extends StatefulWidget {
     this.initialTracks,
     this.browseId,
     this.motionUrl,
+    this.isVideo = false,
   });
 
   final String albumTitle;
@@ -320,6 +321,7 @@ class AlbumScreen extends StatefulWidget {
   final String? coverUrl;
   final List<Track>? initialTracks;
   final String? browseId;
+  final bool isVideo;
 
   /// Optional short muted video loop (Apple-style motion artwork).
   final String? motionUrl;
@@ -329,7 +331,7 @@ class AlbumScreen extends StatefulWidget {
 }
 
 class _AlbumScreenState extends State<AlbumScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final _sc = ScrollController();
   List<Track> _tracks = [];
   List<Track> _artistPool = [];
@@ -370,6 +372,7 @@ class _AlbumScreenState extends State<AlbumScreen>
   bool _animatedCover = false; // GIF / animated WebP: no fake drift on top
   bool _reduceMotion = false;
   bool _routeActive = true;
+  bool _appResumed = true;
   bool _scrolling = false;
   bool _heroVisible = true;
   double _heroH = 420;
@@ -379,6 +382,7 @@ class _AlbumScreenState extends State<AlbumScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final init = widget.initialTracks;
     if (init != null && init.isNotEmpty) {
       _tracks = init;
@@ -439,10 +443,10 @@ class _AlbumScreenState extends State<AlbumScreen>
 
   /// One place that decides what is allowed to move right now:
   /// nothing when reduce-motion is on, the screen is covered, or the hero is
-  /// off-screen; drift/breathing also rest while the finger is scrolling.
+  /// off-screen; drift/breathing also rest while the finger is scrolling or app is backgrounded.
   void _syncMotion() {
     if (!mounted) return;
-    final canRun = !_reduceMotion && _routeActive && _heroVisible;
+    final canRun = !_reduceMotion && _routeActive && _heroVisible && _appResumed;
     if (canRun && !_scrolling) {
       if (!_live.isAnimating) _live.repeat(reverse: true);
       if (!_glow.isAnimating) _glow.repeat(reverse: true);
@@ -463,6 +467,15 @@ class _AlbumScreenState extends State<AlbumScreen>
       } else {
         v.pause();
       }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final isResumed = state == AppLifecycleState.resumed;
+    if (_appResumed != isResumed) {
+      _appResumed = isResumed;
+      _syncMotion();
     }
   }
 
@@ -510,6 +523,7 @@ class _AlbumScreenState extends State<AlbumScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     LibraryStore.instance.removeListener(_onLibrary);
     _sc.removeListener(_onScroll);
     _accel?.cancel();
@@ -524,6 +538,28 @@ class _AlbumScreenState extends State<AlbumScreen>
   /* ---------------------------- data ---------------------------- */
   Future<void> _loadAlbum() async {
     try {
+      if (_isVideoAlbum) {
+        if (mounted) {
+          setState(() {
+            _tracks = (widget.initialTracks != null && widget.initialTracks!.isNotEmpty)
+                ? widget.initialTracks!.map((t) => t.copyWith(isVideo: true)).toList()
+                : [
+                    Track(
+                      id: '',
+                      title: widget.albumTitle,
+                      artist: widget.artistName,
+                      album: 'Music Video',
+                      coverUrl: widget.coverUrl ?? '',
+                      isVideo: true,
+                    ),
+                  ];
+            _loading = false;
+          });
+          _inspectTracksMetadata();
+        }
+        return;
+      }
+
       var bId = widget.browseId ?? '';
       final firstTrack = widget.initialTracks?.isNotEmpty == true
           ? widget.initialTracks!.first
@@ -701,6 +737,17 @@ class _AlbumScreenState extends State<AlbumScreen>
   }
 
   Future<void> _loadMore() async {
+    if (_isVideoAlbum) {
+      try {
+        final moreVids = await InnerTubeService.instance.searchVideos('${widget.artistName} music videos');
+        if (mounted && moreVids.isNotEmpty) {
+          setState(() {
+            _artistPool = moreVids.map((v) => v.copyWith(isVideo: true)).take(12).toList();
+          });
+        }
+      } catch (_) {}
+      return;
+    }
     try {
       final r = await InnerTubeService.instance.search(widget.artistName);
       if (mounted) setState(() => _artistPool = r);
@@ -1000,7 +1047,19 @@ class _AlbumScreenState extends State<AlbumScreen>
   }
 
   /* -------------------------- derived data ----------------------- */
+  bool get _isVideoAlbum =>
+      widget.isVideo ||
+      (_tracks.isNotEmpty && _tracks.first.isVideo) ||
+      (widget.albumTitle.toLowerCase() == 'music video' || widget.albumTitle.toLowerCase() == 'video') ||
+      Track.detectIsVideo(widget.albumTitle, widget.albumTitle);
+
   String get _displayAlbumTitle {
+    if (_isVideoAlbum) {
+      if (_tracks.isNotEmpty) {
+        return MediaNormalizer.cleanTitle(_tracks.first.title);
+      }
+      return MediaNormalizer.cleanTitle(widget.albumTitle);
+    }
     if (_resolvedAlbumTitle != null && _resolvedAlbumTitle!.isNotEmpty) {
       return _resolvedAlbumTitle!;
     }
@@ -1068,6 +1127,7 @@ class _AlbumScreenState extends State<AlbumScreen>
   }
 
   String get _computedAlbumType {
+    if (_isVideoAlbum) return 'Music Video';
     if (_albumType != null && _albumType!.isNotEmpty) return _albumType!;
     final lower = _displayAlbumTitle.toLowerCase();
     if (lower.contains('soundtrack') || RegExp(r'\bost\b').hasMatch(lower)) {
@@ -1102,8 +1162,12 @@ class _AlbumScreenState extends State<AlbumScreen>
     final player = context.watch<PlayerState>();
     final top = MediaQuery.paddingOf(context).top;
     final width = MediaQuery.sizeOf(context).width;
-    final insetSize = math.min(width * 0.68, 260.0);
-    final heroH = top + 56 + insetSize + 28;
+    final isVideoRelease = _isVideoAlbum;
+    final insetW = isVideoRelease
+        ? math.min(width * 0.88, 360.0)
+        : math.min(width * 0.68, 260.0);
+    final insetH = isVideoRelease ? (insetW * 9 / 16) : insetW;
+    final heroH = top + 56 + insetH + 28;
     _heroH = heroH;
     final saved = LibraryStore.instance.isAlbumSaved(
       widget.albumTitle,
@@ -1144,7 +1208,7 @@ class _AlbumScreenState extends State<AlbumScreen>
     final artists = _albumArtists.isNotEmpty
         ? _albumArtists
         : MediaNormalizer.splitArtistNames(_displayArtistName);
-    final heroSpace = top + 56 + insetSize + 18;
+    final heroSpace = top + 56 + insetH + 18;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -1157,7 +1221,7 @@ class _AlbumScreenState extends State<AlbumScreen>
           return Stack(
             children: [
               _backdrop(base, heroH),
-              _heroArt(base, top, heroH, insetSize, _hq(cover)),
+              _heroArt(base, top, heroH, insetW, insetH, _hq(cover)),
               NotificationListener<ScrollNotification>(
                 onNotification: _onScrollNote,
                 child: CustomScrollView(
@@ -1509,12 +1573,45 @@ class _AlbumScreenState extends State<AlbumScreen>
                                   songsCount: _tracks.length,
                                   duration: _footerDuration,
                                   year: _releaseYear,
-                                  label: _recordLabel,
+                                  label: _isVideoAlbum ? 'Music Video' : _recordLabel,
+                                  customCountLabel: _isVideoAlbum ? '1 Music Video' : null,
                                 ),
                               ),
                             ],
 
-                            if (moreBy.isNotEmpty) ...[
+                            if (_isVideoAlbum && _artistPool.isNotEmpty) ...[
+                              _Reveal(
+                                child: _SecHeader(
+                                  'More Music Videos by ${widget.artistName}',
+                                ),
+                              ),
+                              _Reveal(
+                                child: SizedBox(
+                                  height: (math.min(MediaQuery.sizeOf(context).width * 0.72, 320.0) * 9 / 16) + 54,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                                    physics: const BouncingScrollPhysics(),
+                                    itemCount: _artistPool.length,
+                                    itemBuilder: (ctx, i) {
+                                      final t = _artistPool[i];
+                                      final w = math.min(MediaQuery.sizeOf(context).width * 0.72, 320.0);
+                                      return Container(
+                                        width: w,
+                                        margin: const EdgeInsets.only(right: 14),
+                                        child: _AlbumVideoCard(
+                                          track: t,
+                                          onTap: () {
+                                            final pl = Provider.of<PlayerState>(context, listen: false);
+                                            pl.setQueue(_artistPool, startIndex: i);
+                                          },
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ] else if (moreBy.isNotEmpty) ...[
                               _Reveal(
                                 child: _SecHeader(
                                   'More by ${widget.artistName}',
@@ -1529,7 +1626,7 @@ class _AlbumScreenState extends State<AlbumScreen>
                               ),
                             ],
 
-                            if (similar.isNotEmpty) ...[
+                            if (!_isVideoAlbum && similar.isNotEmpty) ...[
                               const _Reveal(
                                 child: _SecHeader('You might also like'),
                               ),
@@ -1646,9 +1743,9 @@ class _AlbumScreenState extends State<AlbumScreen>
     );
   }
 
-  /// Inset square: 3D tilt (follows the phone), floating drift inside the
+  /// Inset square or 16:9 rectangle: 3D tilt (follows the phone), floating drift inside the
   /// frame and a glow behind it that breathes.
-  Widget _insetArt(double top, double heroH, double size, String url) {
+  Widget _insetArt(double top, double heroH, double width, double height, String url) {
     final media = _cover(url, 0);
     return SizedBox(
       key: const ValueKey('inset'),
@@ -1670,8 +1767,8 @@ class _AlbumScreenState extends State<AlbumScreen>
                   ..rotateX(-t.dy * 0.07)
                   ..rotateY(t.dx * 0.09),
                 child: Container(
-                  width: size,
-                  height: size,
+                  width: width,
+                  height: height,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
@@ -1721,13 +1818,14 @@ class _AlbumScreenState extends State<AlbumScreen>
     Color base,
     double top,
     double heroH,
-    double insetSize,
+    double insetW,
+    double insetH,
     String url,
   ) {
     final Widget art = AnimatedSwitcher(
       duration: const Duration(milliseconds: 600),
       switchInCurve: Curves.easeOutCubic,
-      child: _insetArt(top, heroH, insetSize, url),
+      child: _insetArt(top, heroH, insetW, insetH, url),
     );
 
     return Positioned(
@@ -1838,16 +1936,22 @@ class _TrackRow extends StatelessWidget {
                         : Align(
                             key: const ValueKey('n'),
                             alignment: Alignment.centerLeft,
-                            child: Text(
-                              '${index + 1}',
-                              style: const TextStyle(
-                                fontFamily: 'SF Pro',
-                                color: AppColors.textSecondary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w400,
-                                fontFeatures: [FontFeature.tabularFigures()],
-                              ),
-                            ),
+                            child: track.isVideo
+                                ? const Icon(
+                                    CupertinoIcons.play_rectangle_fill,
+                                    color: AppColors.textSecondary,
+                                    size: 15,
+                                  )
+                                : Text(
+                                    '${index + 1}',
+                                    style: const TextStyle(
+                                      fontFamily: 'SF Pro',
+                                      color: AppColors.textSecondary,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w400,
+                                      fontFeatures: [FontFeature.tabularFigures()],
+                                    ),
+                                  ),
                           ),
                   ),
                 ),
@@ -1934,12 +2038,14 @@ class _Footer extends StatelessWidget {
     required this.duration,
     required this.year,
     required this.label,
+    this.customCountLabel,
   });
 
   final int songsCount;
   final String duration;
   final int? year;
   final String? label;
+  final String? customCountLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1952,6 +2058,7 @@ class _Footer extends StatelessWidget {
     );
     final hasYear = year != null && year! > 0;
     final hasLabel = label != null && label!.isNotEmpty;
+    final countLabel = customCountLabel ?? '$songsCount ${songsCount == 1 ? 'song' : 'songs'}';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -1959,12 +2066,77 @@ class _Footer extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '$songsCount ${songsCount == 1 ? 'song' : 'songs'}${duration.isNotEmpty ? ', $duration' : ''}',
+            '$countLabel${duration.isNotEmpty ? ', $duration' : ''}',
             style: style,
           ),
           if (hasYear) Text('Released $year', style: style),
           if (hasLabel)
             Text('℗ ${hasYear ? '$year ' : ''}$label', style: style),
+        ],
+      ),
+    );
+  }
+}
+
+/// 16:9 widescreen video card for album screen (replaces square albums for video singles).
+class _AlbumVideoCard extends StatelessWidget {
+  const _AlbumVideoCard({
+    required this.track,
+    required this.onTap,
+  });
+  final Track track;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Press(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: _Img(track.coverUrl, radius: 0),
+              ),
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            MediaNormalizer.cleanCompactTitle(track.title),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.15,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            MediaNormalizer.formatArtists(track.artist),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12.0,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
         ],
       ),
     );

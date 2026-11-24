@@ -1,4 +1,7 @@
 // lib/services/innertube_service.dart
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -306,17 +309,69 @@ class InnerTubeService {
               videoId: id,
             );
             final duration = (item['duration'] as num?)?.toInt() ?? 210;
+            final bool isVid =
+                Track.detectIsVideo(title, album, coverUrl: thumb);
             tracks.add(
               Track(
                 id: 'yt-$id',
                 title: title,
                 artist: artists,
                 artists: artistRefs,
-                album: album,
+                album: isVid ? 'Music Video' : album,
                 coverUrl: thumb,
                 durationSeconds: duration,
                 language: Track.detectLanguage(title, artists, album) ?? '',
                 source: 'youtube',
+                isVideo: isVid,
+              ),
+            );
+          } else if (item['type'] == 'video') {
+            final id = item['id'] as String?;
+            if (id == null || id.isEmpty || !seen.add(id)) continue;
+            final rawTitle = item['title'] as String? ?? '';
+            final title = MediaNormalizer.cleanTitle(rawTitle);
+            final rawArtists = item['artists'] as List? ?? [item['author']];
+            final artistRefs = parseArtistRefs(rawArtists);
+            var artists = artistRefs.isNotEmpty
+                ? ArtistRef.formatList(artistRefs)
+                : MediaNormalizer.formatArtists(
+                    rawArtists.map((a) => (a is Map ? a['name'] : a)).toList(),
+                  );
+            if (artists.isEmpty ||
+                artists.toLowerCase() == 'unknown artist' ||
+                MediaNormalizer.isDistributorOrLabel(artists)) {
+              final extracted = MediaNormalizer.extractArtistsFromVideoTitle(rawTitle);
+              if (extracted.isNotEmpty) artists = extracted;
+            }
+            final thumb = MediaNormalizer.upgradeArtworkUrl(
+              item['thumbnail'] as String?,
+              videoId: id,
+            );
+            final duration = (item['duration'] as num?)?.toInt() ?? 210;
+            String? vidYear = item['year']?.toString();
+            if (vidYear == null || vidYear.isEmpty) {
+              final pub = item['publishDate']?.toString() ?? item['uploadDate']?.toString();
+              if (pub != null && pub.length >= 4) {
+                vidYear = pub.substring(0, 4);
+              } else {
+                final ym = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(rawTitle);
+                if (ym != null) vidYear = ym.group(0);
+              }
+            }
+            tracks.add(
+              Track(
+                id: 'yt-$id',
+                title: title,
+                artist: artists,
+                artists: artistRefs,
+                album: 'Music Video',
+                coverUrl: thumb,
+                durationSeconds: duration,
+                language:
+                    Track.detectLanguage(title, artists, 'Music Video') ?? '',
+                source: 'youtube',
+                isVideo: true,
+                year: vidYear,
               ),
             );
           }
@@ -372,7 +427,26 @@ class InnerTubeService {
         'query': q,
         'params': _videosFilter,
       }, ttl: _tSearch);
-      return _parseSearchTracks(res);
+      final list = _parseSearchTracks(res);
+      return list.map((t) {
+        var a = t.artist;
+        if (a.isEmpty ||
+            a.toLowerCase() == 'unknown artist' ||
+            MediaNormalizer.isDistributorOrLabel(a)) {
+          final extracted = MediaNormalizer.extractArtistsFromVideoTitle(t.title);
+          if (extracted.isNotEmpty) a = extracted;
+        }
+        var y = t.year;
+        if (y == null || y.isEmpty) {
+          final ym = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(t.title);
+          if (ym != null) y = ym.group(0);
+        }
+        return t.copyWith(
+          isVideo: true,
+          artist: a,
+          year: y,
+        );
+      }).toList();
     } catch (e) {
       if (kDebugMode) debugPrint('[InnerTube] searchVideos error: $e');
       return const [];
@@ -444,15 +518,17 @@ class InnerTubeService {
             final thumbs =
                 card['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails']
                     as List?;
+            final bool isCardVid = Track.detectIsVideo(cardTitle, cardArtist);
             final t = Track(
               id: 'yt-$cardVideoId',
               title: cardTitle,
               artist: cardArtist,
-              album: 'Single',
+              album: isCardVid ? 'Music Video' : 'Single',
               coverUrl: _cover(thumbs, cardVideoId),
               durationSeconds: 210,
               language: Track.detectLanguage(cardTitle, cardArtist, '') ?? '',
               source: 'youtube',
+              isVideo: isCardVid,
             );
             if (seen.add(t.id)) out.insert(0, t);
           }
@@ -469,7 +545,7 @@ class InnerTubeService {
   String _cover(List? thumbs, String? videoId) {
     final raw = (thumbs != null && thumbs.isNotEmpty)
         ? thumbs.last['url'] as String
-        : 'https://i.ytimg.com/vi/$videoId/maxresdefault.jpg';
+        : 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';
     return upgradeArtworkUrl(raw, videoId: videoId);
   }
 
@@ -586,17 +662,53 @@ class InnerTubeService {
           item['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails']
               as List?;
 
+      final navEndpoint =
+          item['overlay']?['musicItemThumbnailOverlayRenderer']?['content']?['musicPlayButtonRenderer']?['playNavigationEndpoint'] ??
+          item['navigationEndpoint'] ??
+          item['playlistItemData'];
+      final mvt = navEndpoint?['watchEndpoint']?['watchEndpointMusicSupportedConfigs']?['watchEndpointMusicConfig']?['musicVideoType']?.toString() ??
+          item['musicVideoType']?.toString();
+      final bool isOmvOrUgc = mvt == 'MUSIC_VIDEO_TYPE_OMV' ||
+          mvt == 'OMV' ||
+          mvt == 'MUSIC_VIDEO_TYPE_UGC' ||
+          mvt == 'MUSIC_VIDEO_TYPE_OFFICIAL_SOURCE_MUSIC_VIDEO';
+
+      bool has16x9Thumb = false;
+      if (thumbs != null && thumbs.isNotEmpty) {
+        for (final t in thumbs) {
+          if (t is Map) {
+            final w = (t['width'] as num?)?.toDouble() ?? 0;
+            final h = (t['height'] as num?)?.toDouble() ?? 0;
+            if (w > 0 && h > 0 && (w / h) > 1.35) {
+              has16x9Thumb = true;
+              break;
+            }
+          }
+        }
+      }
+
+      final bool subSaysVideo = subRuns != null &&
+          subRuns.any((r) {
+            final txt =
+                (r is Map ? r['text']?.toString() : null)?.toLowerCase().trim();
+            return txt == 'video' || txt == 'music video';
+          });
+
+      final bool isVid =
+          norm.isVideo || isOmvOrUgc || subSaysVideo || has16x9Thumb;
+
       return Track(
         id: norm.id,
         title: norm.title,
         artist: norm.subtitle,
-        album: cleanAlbum,
+        album: isVid ? 'Music Video' : cleanAlbum,
         albumBrowseId: albumBrowseId,
         coverUrl: _cover(thumbs, videoId),
         durationSeconds: duration,
         language:
             Track.detectLanguage(norm.title, norm.subtitle, cleanAlbum) ?? '',
         source: 'youtube',
+        isVideo: isVid,
       );
     } catch (_) {
       return null;
@@ -617,6 +729,35 @@ class InnerTubeService {
       final thumbs =
           item['thumbnailRenderer']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails']
               as List?;
+
+      final navEndpoint = nav;
+      final mvt = navEndpoint?['watchEndpoint']?['watchEndpointMusicSupportedConfigs']?['watchEndpointMusicConfig']?['musicVideoType']?.toString() ??
+          item['musicVideoType']?.toString();
+      final bool isOmvOrUgc = mvt == 'MUSIC_VIDEO_TYPE_OMV' ||
+          mvt == 'OMV' ||
+          mvt == 'MUSIC_VIDEO_TYPE_UGC' ||
+          mvt == 'MUSIC_VIDEO_TYPE_OFFICIAL_SOURCE_MUSIC_VIDEO';
+
+      bool has16x9Thumb = false;
+      if (thumbs != null && thumbs.isNotEmpty) {
+        for (final t in thumbs) {
+          if (t is Map) {
+            final w = (t['width'] as num?)?.toDouble() ?? 0;
+            final h = (t['height'] as num?)?.toDouble() ?? 0;
+            if (w > 0 && h > 0 && (w / h) > 1.35) {
+              has16x9Thumb = true;
+              break;
+            }
+          }
+        }
+      }
+
+      final bool subSaysVideo = subRuns != null &&
+          subRuns.any((r) {
+            final txt =
+                (r is Map ? r['text']?.toString() : null)?.toLowerCase().trim();
+            return txt == 'video' || txt == 'music video';
+          });
 
       String? albumName;
       String? albumBrowseId;
@@ -645,21 +786,25 @@ class InnerTubeService {
         videoId: videoId,
       );
 
+      final bool isVid =
+          norm.isVideo || isOmvOrUgc || subSaysVideo || has16x9Thumb;
+
       final cleanAlbum = (albumName != null && albumName.isNotEmpty)
           ? MediaNormalizer.cleanAlbumTitle(albumName)
-          : 'Single';
+          : (isVid ? 'Music Video' : 'Single');
 
       return Track(
         id: norm.id,
         title: norm.title,
         artist: norm.subtitle,
-        album: cleanAlbum,
+        album: isVid ? 'Music Video' : cleanAlbum,
         albumBrowseId: albumBrowseId,
         coverUrl: _cover(thumbs, videoId),
         durationSeconds: 210,
         language:
             Track.detectLanguage(norm.title, norm.subtitle, cleanAlbum) ?? '',
         source: 'youtube',
+        isVideo: isVid,
       );
     } catch (_) {
       return null;
@@ -738,23 +883,29 @@ class InnerTubeService {
                   : MediaNormalizer.formatArtists(
                       rawArtists?.map((a) => a is Map ? a['name'] : a).toList(),
                     );
+              final rawAlbumName = it['album'] is Map
+                  ? MediaNormalizer.cleanTitle(
+                      it['album']['name'] as String?,
+                    )
+                  : 'Single';
+              final thumb = MediaNormalizer.upgradeArtworkUrl(
+                it['thumbnail'] as String?,
+                videoId: id,
+              );
+              final isVid = it['type'] == 'video' ||
+                  Track.detectIsVideo(it['title'] as String? ?? '', rawAlbumName,
+                      coverUrl: thumb);
               tracks.add(
                 Track(
                   id: 'yt-$id',
                   title: MediaNormalizer.cleanTitle(it['title'] as String?),
                   artist: artists,
                   artists: artistRefs,
-                  album: it['album'] is Map
-                      ? MediaNormalizer.cleanTitle(
-                          it['album']['name'] as String?,
-                        )
-                      : 'Single',
-                  coverUrl: MediaNormalizer.upgradeArtworkUrl(
-                    it['thumbnail'] as String?,
-                    videoId: id,
-                  ),
+                  album: isVid ? 'Music Video' : rawAlbumName,
+                  coverUrl: thumb,
                   durationSeconds: (it['duration'] as num?)?.toInt() ?? 210,
                   source: 'youtube',
+                  isVideo: isVid,
                 ),
               );
             }
@@ -836,23 +987,29 @@ class InnerTubeService {
                             ?.map((a) => a is Map ? a['name'] : a)
                             .toList(),
                       );
+                final rawAlbumName = it['album'] is Map
+                    ? MediaNormalizer.cleanTitle(
+                        it['album']['name'] as String?,
+                      )
+                    : 'Single';
+                final thumb = MediaNormalizer.upgradeArtworkUrl(
+                  it['thumbnail'] as String?,
+                  videoId: id,
+                );
+                final isVid = it['type'] == 'video' ||
+                    Track.detectIsVideo(it['title'] as String? ?? '', rawAlbumName,
+                        coverUrl: thumb);
                 tracks.add(
                   Track(
                     id: 'yt-$id',
                     title: MediaNormalizer.cleanTitle(it['title'] as String?),
                     artist: artistsList,
                     artists: artistRefs,
-                    album: it['album'] is Map
-                        ? MediaNormalizer.cleanTitle(
-                            it['album']['name'] as String?,
-                          )
-                        : 'Single',
-                    coverUrl: MediaNormalizer.upgradeArtworkUrl(
-                      it['thumbnail'] as String?,
-                      videoId: id,
-                    ),
+                    album: isVid ? 'Music Video' : rawAlbumName,
+                    coverUrl: thumb,
                     durationSeconds: (it['duration'] as num?)?.toInt() ?? 210,
                     source: 'youtube',
+                    isVideo: isVid,
                   ),
                 );
               } else if (it['type'] == 'artist') {
@@ -1291,20 +1448,28 @@ class InnerTubeService {
             as String?;
     final browseId =
         row['navigationEndpoint']?['browseEndpoint']?['browseId'] as String?;
+    final videoId =
+        row['navigationEndpoint']?['watchEndpoint']?['videoId'] as String? ??
+        row['thumbnailOverlay']?['musicItemThumbnailOverlayRenderer']?['content']?['musicPlayButtonRenderer']?['playNavigationEndpoint']?['watchEndpoint']?['videoId'] as String?;
 
     final norm = MediaNormalizer.normalize(
-      id: browseId ?? '',
+      id: videoId != null ? 'yt-$videoId' : (browseId ?? ''),
       titleRuns: titleRuns,
       subtitleRuns: subRuns,
       rawImageUrl: rawCover,
-      defaultType: 'album',
+      defaultType: videoId != null ? 'video' : 'album',
+      videoId: videoId,
+      browseId: browseId,
     );
 
     return {
       'title': norm.title,
       'subtitle': norm.subtitle,
       'browseId': browseId,
+      'videoId': videoId,
+      'id': videoId ?? browseId,
       'coverUrl': norm.imageUrl,
+      'year': norm.year,
     };
   }
 
@@ -1395,15 +1560,36 @@ class InnerTubeService {
                 if (it is! Map) continue;
                 final id = it['id'] as String?;
                 if (id == null || id.isEmpty) continue;
+                final rawTitle = it['title'] as String? ?? 'Video';
+                final rawArtist = MediaNormalizer.formatArtists(
+                  (it['artists'] as List?)
+                      ?.map((a) => a is Map ? a['name'] : a)
+                      .toList(),
+                );
+                String resolvedArtist = rawArtist;
+                if (resolvedArtist.isEmpty ||
+                    resolvedArtist.toLowerCase() == 'unknown artist' ||
+                    MediaNormalizer.isDistributorOrLabel(resolvedArtist)) {
+                  resolvedArtist = MediaNormalizer.extractArtistsFromVideoTitle(
+                    rawTitle,
+                    defaultArtist: artistName ?? name,
+                  );
+                }
+                if (resolvedArtist.isEmpty) {
+                  resolvedArtist = (artistName != null && artistName.isNotEmpty)
+                      ? artistName
+                      : (name.isNotEmpty ? name : 'Artist');
+                }
+                String? vidYear = it['year']?.toString();
+                if (vidYear == null || vidYear.isEmpty) {
+                  final ym = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(rawTitle);
+                  if (ym != null) vidYear = ym.group(0);
+                }
                 videos.add(
                   Track(
                     id: 'yt-$id',
-                    title: MediaNormalizer.cleanTitle(it['title'] as String?),
-                    artist: MediaNormalizer.formatArtists(
-                      (it['artists'] as List?)
-                          ?.map((a) => a is Map ? a['name'] : a)
-                          .toList(),
-                    ),
+                    title: rawTitle,
+                    artist: resolvedArtist,
                     album: 'Music Video',
                     coverUrl: MediaNormalizer.upgradeArtworkUrl(
                       it['thumbnail'] as String?,
@@ -1411,6 +1597,8 @@ class InnerTubeService {
                     ),
                     durationSeconds: (it['duration'] as num?)?.toInt() ?? 240,
                     source: 'youtube',
+                    isVideo: true,
+                    year: vidYear,
                   ),
                 );
               }
@@ -1674,17 +1862,39 @@ class InnerTubeService {
             for (final item in contents) {
               final c = _twoRowCard(item);
               if (c != null) {
-                final vid = c['browseId'] ?? c['id'];
+                final vid = c['videoId'] ?? c['browseId'] ?? c['id'];
                 if (vid != null) {
+                  final rawTitle = c['title'] ?? 'Video';
+                  String resolvedArtist = (c['subtitle'] != null &&
+                          c['subtitle'].toString().isNotEmpty &&
+                          c['subtitle'].toString().toLowerCase() != 'unknown artist' &&
+                          !MediaNormalizer.isDistributorOrLabel(c['subtitle'].toString()))
+                      ? c['subtitle'].toString()
+                      : MediaNormalizer.extractArtistsFromVideoTitle(
+                          rawTitle,
+                          defaultArtist: artistName ?? 'Artist',
+                        );
+                  if (resolvedArtist.isEmpty) {
+                    resolvedArtist = artistName ?? 'Artist';
+                  }
+                  String? vidYear = c['year']?.toString();
+                  if (vidYear == null || vidYear.isEmpty) {
+                    final sub = c['subtitle']?.toString() ?? '';
+                    final ym = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(sub) ??
+                        RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(rawTitle);
+                    if (ym != null) vidYear = ym.group(0);
+                  }
                   videos.add(
                     Track(
                       id: 'yt-$vid',
-                      title: c['title'] ?? 'Video',
-                      artist: artistName ?? 'Artist',
+                      title: rawTitle,
+                      artist: resolvedArtist,
                       album: 'Music Video',
                       coverUrl: c['coverUrl'] ?? '',
                       durationSeconds: 240,
                       source: 'youtube',
+                      isVideo: true,
+                      year: vidYear,
                     ),
                   );
                 }
@@ -2170,6 +2380,159 @@ class InnerTubeService {
     return null;
   }
 
+  final Map<String, VideoDetailsResult> _videoDetailsCache = {};
+  final Map<String, Future<VideoDetailsResult?>> _videoDetailsInflight = {};
+
+  /// Fetches comprehensive video details including original upload/posted date,
+  /// full description credits, and authentic artist names (bypassing distributors).
+  Future<VideoDetailsResult?> getVideoDetails(String videoId) async {
+    final cleanId = videoId.replaceFirst('yt-', '').trim();
+    if (cleanId.isEmpty) return null;
+
+    final cached = _videoDetailsCache[cleanId];
+    if (cached != null) return cached;
+
+    final inflight = _videoDetailsInflight[cleanId];
+    if (inflight != null) return inflight;
+
+    final fut = _fetchVideoDetails(cleanId).then((res) {
+      if (res != null) {
+        _videoDetailsCache[cleanId] = res;
+      }
+      return res;
+    }).whenComplete(() {
+      _videoDetailsInflight.remove(cleanId);
+    });
+
+    _videoDetailsInflight[cleanId] = fut;
+    return fut;
+  }
+
+  Future<VideoDetailsResult?> _fetchVideoDetails(String cleanId) async {
+    // 1. Try native channel first
+    if (_useNative) {
+      try {
+        final res = await _nativeChannel
+            .invokeMapMethod<String, dynamic>('getVideoDetails', {'videoId': cleanId})
+            .timeout(const Duration(seconds: 8), onTimeout: () => null);
+        if (res != null && res.isNotEmpty) {
+          final title = (res['title'] ?? '').toString();
+          final author = (res['author'] ?? '').toString();
+          final pubDate = res['publishDate']?.toString();
+          final upDate = res['uploadDate']?.toString();
+          var year = res['year']?.toString();
+          if (year == null || year.isEmpty) {
+            if (pubDate != null && pubDate.length >= 4) {
+              year = pubDate.substring(0, 4);
+            } else if (upDate != null && upDate.length >= 4) {
+              year = upDate.substring(0, 4);
+            }
+          }
+          final desc = (res['description'] ?? '').toString();
+
+          var artists = MediaNormalizer.extractArtistsFromDescription(desc);
+          if (artists.isEmpty || MediaNormalizer.isDistributorOrLabel(artists)) {
+            artists = MediaNormalizer.extractArtistsFromVideoTitle(title);
+          }
+          if (artists.isEmpty && !MediaNormalizer.isDistributorOrLabel(author)) {
+            artists = MediaNormalizer.cleanArtistName(author);
+          }
+
+          if (year == null || year.isEmpty) {
+            year = MediaNormalizer.extractYearFromDescription(desc);
+          }
+
+          return VideoDetailsResult(
+            videoId: cleanId,
+            title: title,
+            author: author,
+            publishDate: pubDate,
+            uploadDate: upDate,
+            year: year,
+            description: desc,
+            artists: artists,
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[InnerTube] Native getVideoDetails error: $e');
+      }
+    }
+
+    // 2. Direct YouTube WEB player endpoint fallback
+    try {
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+      final req = await client.postUrl(
+        Uri.parse('https://www.youtube.com/youtubei/v1/player?prettyPrint=false'),
+      );
+      req.headers.set('Content-Type', 'application/json');
+      req.headers.set(
+        'User-Agent',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      );
+      req.headers.set('Origin', 'https://www.youtube.com');
+      req.headers.set('Referer', 'https://www.youtube.com/');
+      final payload = utf8.encode(jsonEncode({
+        'context': {
+          'client': {
+            'clientName': 'WEB',
+            'clientVersion': '2.20240101.01.00',
+            'hl': 'en',
+            'gl': CountryService.instance.currentCode,
+          },
+        },
+        'videoId': cleanId,
+      }));
+      req.contentLength = payload.length;
+      req.add(payload);
+      final res = await req.close().timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        final body = await res.transform(utf8.decoder).join();
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        final mf = json['microformat']?['playerMicroformatRenderer'];
+        final vd = json['videoDetails'];
+        final pubDate = mf?['publishDate']?.toString();
+        final upDate = mf?['uploadDate']?.toString();
+        var year = '';
+        if (pubDate != null && pubDate.length >= 4) {
+          year = pubDate.substring(0, 4);
+        } else if (upDate != null && upDate.length >= 4) {
+          year = upDate.substring(0, 4);
+        }
+        final desc = vd?['shortDescription']?.toString() ?? '';
+        final title = vd?['title']?.toString() ?? '';
+        final author = vd?['author']?.toString() ?? '';
+
+        var artists = MediaNormalizer.extractArtistsFromDescription(desc);
+        if (artists.isEmpty || MediaNormalizer.isDistributorOrLabel(artists)) {
+          artists = MediaNormalizer.extractArtistsFromVideoTitle(title);
+        }
+        if (artists.isEmpty && !MediaNormalizer.isDistributorOrLabel(author)) {
+          artists = MediaNormalizer.cleanArtistName(author);
+        }
+
+        if (year.isEmpty) {
+          final descYear = MediaNormalizer.extractYearFromDescription(desc);
+          if (descYear != null) year = descYear;
+        }
+
+        return VideoDetailsResult(
+          videoId: cleanId,
+          title: title,
+          author: author,
+          publishDate: pubDate,
+          uploadDate: upDate,
+          year: year.isNotEmpty ? year : null,
+          description: desc,
+          artists: artists,
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[InnerTube] Direct getVideoDetails error: $e');
+    }
+
+    return null;
+  }
+
   /// Fetches single song/video details by videoId using native InnerTube / next queue.
   Future<Track?> getTrack(String videoId) async {
     final cleanId = videoId.replaceFirst('yt-', '').trim();
@@ -2187,7 +2550,7 @@ class InnerTubeService {
           final artistsRaw = (res['artists'] as List?)
               ?.map((a) => a is Map ? a['name'] : a)
               .toList();
-          final artist = MediaNormalizer.formatArtists(artistsRaw);
+          var artist = MediaNormalizer.formatArtists(artistsRaw);
           final albRaw = res['album'];
           final album = albRaw is Map
               ? MediaNormalizer.cleanTitle(albRaw['name'] as String?)
@@ -2197,15 +2560,39 @@ class InnerTubeService {
             videoId: id,
           );
           final dur = (res['duration'] as num?)?.toInt() ?? 210;
+          final isVid = Track.detectIsVideo(title, album, coverUrl: thumb);
+          String? vidYear = res['year']?.toString();
+
+          if (isVid ||
+              artist.isEmpty ||
+              artist.toLowerCase() == 'unknown artist' ||
+              MediaNormalizer.isDistributorOrLabel(artist)) {
+            final vidDet = await getVideoDetails(cleanId);
+            if (vidDet != null) {
+              if (vidDet.artists.isNotEmpty) artist = vidDet.artists;
+              if (vidDet.year != null && vidDet.year!.isNotEmpty) {
+                vidYear = vidDet.year;
+              }
+            }
+            if (artist.isEmpty ||
+                artist.toLowerCase() == 'unknown artist' ||
+                MediaNormalizer.isDistributorOrLabel(artist)) {
+              artist = MediaNormalizer.extractArtistsFromVideoTitle(
+                res['title'] as String?,
+              );
+            }
+          }
 
           return Track(
             id: 'yt-$id',
             title: title.isNotEmpty ? title : 'YouTube Track',
             artist: artist.isNotEmpty ? artist : 'YouTube Music',
-            album: album,
+            album: isVid ? 'Music Video' : album,
             coverUrl: thumb,
             durationSeconds: dur,
             source: 'youtube',
+            isVideo: isVid,
+            year: vidYear,
           );
         }
       } catch (e) {
@@ -2239,21 +2626,44 @@ class InnerTubeService {
       }).timeout(const Duration(seconds: 8));
       final details = res['videoDetails'] as Map?;
       if (details != null) {
-        final title = MediaNormalizer.cleanTitle(details['title']?.toString());
-        final author = MediaNormalizer.cleanTitle(
-          details['author']?.toString(),
-        );
+        final rawTitle = details['title']?.toString();
+        final title = MediaNormalizer.cleanTitle(rawTitle);
+        final author = details['author']?.toString() ?? '';
         final dur =
             int.tryParse(details['lengthSeconds']?.toString() ?? '210') ?? 210;
         final thumb = MediaNormalizer.upgradeArtworkUrl(null, videoId: cleanId);
+        final isVid = Track.detectIsVideo(title, 'Single', coverUrl: thumb);
+        var artist = MediaNormalizer.cleanArtistName(author);
+        String? vidYear;
+
+        if (isVid ||
+            artist.isEmpty ||
+            artist.toLowerCase() == 'unknown artist' ||
+            MediaNormalizer.isDistributorOrLabel(artist)) {
+          final vidDet = await getVideoDetails(cleanId);
+          if (vidDet != null) {
+            if (vidDet.artists.isNotEmpty) artist = vidDet.artists;
+            if (vidDet.year != null && vidDet.year!.isNotEmpty) {
+              vidYear = vidDet.year;
+            }
+          }
+          if (artist.isEmpty ||
+              artist.toLowerCase() == 'unknown artist' ||
+              MediaNormalizer.isDistributorOrLabel(artist)) {
+            artist = MediaNormalizer.extractArtistsFromVideoTitle(rawTitle);
+          }
+        }
+
         return Track(
           id: 'yt-$cleanId',
           title: title.isNotEmpty ? title : 'YouTube Track',
-          artist: author.isNotEmpty ? author : 'YouTube Music',
-          album: 'Single',
+          artist: artist.isNotEmpty ? artist : 'YouTube Music',
+          album: isVid ? 'Music Video' : 'Single',
           coverUrl: thumb,
           durationSeconds: dur,
           source: 'youtube',
+          isVideo: isVid,
+          year: vidYear,
         );
       }
     } catch (_) {}
@@ -2290,22 +2700,26 @@ class InnerTubeService {
                 final cleanAlbum = (albName != null && albName.isNotEmpty)
                     ? MediaNormalizer.cleanTitle(albName)
                     : 'Single';
+                final isVid = norm.isVideo ||
+                    Track.detectIsVideo(norm.cleanTitle, cleanAlbum,
+                        coverUrl: norm.imageUrl);
                 tracks.add(
                   Track(
                     id: norm.id.startsWith('yt-') ? norm.id : 'yt-${norm.id}',
                     title: norm.cleanTitle,
                     artist: norm.subtitle,
-                    album: cleanAlbum,
+                    album: isVid ? 'Music Video' : cleanAlbum,
                     coverUrl: norm.imageUrl,
                     durationSeconds: (raw['duration'] as num?)?.toInt() ?? 210,
                     language:
                         Track.detectLanguage(
                           norm.cleanTitle,
                           norm.subtitle,
-                          'Single',
+                          isVid ? 'Music Video' : cleanAlbum,
                         ) ??
                         '',
                     source: 'youtube',
+                    isVideo: isVid,
                   ),
                 );
               }
@@ -2356,22 +2770,26 @@ class InnerTubeService {
           rawImageUrl: _cover(p['thumbnail']?['thumbnails'] as List?, id),
         );
 
+        final isVid = norm.isVideo ||
+            Track.detectIsVideo(norm.cleanTitle, 'Single',
+                coverUrl: norm.imageUrl);
         out.add(
           Track(
             id: 'yt-$id',
             title: norm.cleanTitle,
             artist: norm.subtitle,
-            album: 'Single',
+            album: isVid ? 'Music Video' : 'Single',
             coverUrl: norm.imageUrl,
             durationSeconds: 210,
             language:
                 Track.detectLanguage(
                   norm.cleanTitle,
                   norm.subtitle,
-                  'Single',
+                  isVid ? 'Music Video' : 'Single',
                 ) ??
                 '',
             source: 'youtube',
+            isVideo: isVid,
           ),
         );
       }
@@ -2612,4 +3030,28 @@ class InnerTubeService {
       return null;
     }
   }
+}
+
+class VideoDetailsResult {
+  const VideoDetailsResult({
+    required this.videoId,
+    required this.title,
+    required this.author,
+    this.publishDate,
+    this.uploadDate,
+    this.year,
+    required this.description,
+    required this.artists,
+  });
+
+  final String videoId;
+  final String title;
+  final String author;
+  final String? publishDate;
+  final String? uploadDate;
+  final String? year;
+  final String description;
+  final String artists;
+
+  String get shortDescription => description;
 }

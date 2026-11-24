@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -9,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
@@ -22,6 +24,7 @@ import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
+import '../../services/auth_state.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
 import '../../services/search_nav.dart';
@@ -29,6 +32,7 @@ import '../details/album_screen.dart';
 import '../details/artist_screen.dart';
 import '../details/category_screen.dart';
 import '../player/player_shell.dart';
+import '../profile/profile_screen.dart';
 import 'search_data_service.dart';
 import 'search_models.dart';
 import 'search_ranker.dart';
@@ -59,9 +63,88 @@ TextStyle _displayStyle({
     fontSize: fontSize,
     fontWeight: fontWeight,
     color: color,
-    letterSpacing: letterSpacing ?? -0.3,
+    letterSpacing: letterSpacing ?? 0,
     height: height,
   );
+}
+
+const String _kMetaKey = 'search_recent_meta_v1';
+
+class _RecentMeta {
+  const _RecentMeta({
+    required this.kind,
+    required this.title,
+    required this.sub,
+    required this.rawSub,
+    required this.image,
+    this.browseId,
+    this.id,
+    this.durationSeconds,
+  });
+  final String kind, title, sub, rawSub, image;
+  final String? browseId;
+  final String? id;
+  final int? durationSeconds;
+
+  Map<String, dynamic> toJson() => {
+    'k': kind,
+    't': title,
+    's': sub,
+    'r': rawSub,
+    'i': image,
+    'b': browseId,
+    if (id != null) 'id': id,
+    if (durationSeconds != null) 'd': durationSeconds,
+  };
+
+  factory _RecentMeta.fromJson(Map<String, dynamic> j) => _RecentMeta(
+    kind: j['k'] as String? ?? '',
+    title: j['t'] as String? ?? '',
+    sub: j['s'] as String? ?? '',
+    rawSub: j['r'] as String? ?? '',
+    image: j['i'] as String? ?? '',
+    browseId: j['b'] as String?,
+    id: j['id'] as String?,
+    durationSeconds: j['d'] as int?,
+  );
+
+  static _RecentMeta? from(SearchItem it, String sub, String image) {
+    final kind = switch (it) {
+      SearchSongItem _ => 'song',
+      SearchArtistItem _ => 'artist',
+      SearchAlbumItem _ => 'album',
+      SearchPlaylistItem _ => 'playlist',
+      SearchVideoItem _ => 'video',
+      _ => '',
+    };
+    if (kind.isEmpty) return null;
+    final String? browseId = switch (it) {
+      SearchArtistItem a => a.browseId,
+      SearchAlbumItem a => a.browseId,
+      SearchPlaylistItem p => p.browseId,
+      _ => null,
+    };
+    final String? id = switch (it) {
+      SearchSongItem s => s.id,
+      SearchVideoItem v => v.videoId,
+      _ => null,
+    };
+    final int? duration = switch (it) {
+      SearchSongItem s => s.durationSeconds,
+      SearchVideoItem v => v.toTrack().durationSeconds,
+      _ => null,
+    };
+    return _RecentMeta(
+      kind: kind,
+      title: it.title,
+      sub: sub,
+      rawSub: it.subtitle,
+      image: image,
+      browseId: browseId,
+      id: id,
+      durationSeconds: duration,
+    );
+  }
 }
 
 TextStyle _bodyStyle({
@@ -520,9 +603,126 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   bool get wantKeepAlive => true;
 
-  /// Rich data (artwork + type) for "Recently Searched". Survives screen
-  /// rebuilds, not app restarts. Recents without an entry show a clock icon.
   static final Map<String, SearchItem> _recentItems = {};
+  static final Map<String, _RecentMeta> _recentMeta = {};
+  Timer? _saveTimer;
+
+  void _stash(String key, SearchItem item) {
+    if (key.isEmpty) return;
+    if (_recentItems.length > 200) _recentItems.clear();
+    _recentItems[key] = item;
+    final m = _RecentMeta.from(item, _typeSub(item), _hiResUrl(item));
+    if (m != null) {
+      _recentMeta[key] = m;
+      _saveMeta();
+    }
+  }
+
+  void _saveMeta() {
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 400), () async {
+      try {
+        final keep = _dataService.recentsNotifier.value.map(_norm).toSet();
+        final out = {
+          for (final e in _recentMeta.entries)
+            if (keep.contains(e.key)) e.key: e.value.toJson(),
+        };
+        final p = await SharedPreferences.getInstance();
+        await p.setString(_kMetaKey, jsonEncode(out));
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _loadMeta() async {
+    if (_recentMeta.isNotEmpty) return;
+    try {
+      final p = await SharedPreferences.getInstance();
+      final raw = p.getString(_kMetaKey);
+      if (raw == null) return;
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      map.forEach((k, v) =>
+          _recentMeta[k] = _RecentMeta.fromJson(v as Map<String, dynamic>));
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
+  void _openMeta(_RecentMeta m, String q) {
+    HapticFeedback.lightImpact();
+    switch (m.kind) {
+      case 'artist':
+        Navigator.push(
+          context,
+          ZenPageRoute(
+            builder: (_) => ArtistScreen(
+              artistName: m.title,
+              imageUrl: m.image,
+              browseId: m.browseId,
+            ),
+          ),
+        );
+        return;
+      case 'album':
+        Navigator.push(
+          context,
+          ZenPageRoute(
+            builder: (_) => AlbumScreen(
+              albumTitle: m.title,
+              artistName: m.rawSub,
+              coverUrl: m.image,
+              browseId: m.browseId,
+            ),
+          ),
+        );
+        return;
+      case 'playlist':
+        Navigator.push(
+          context,
+          ZenPageRoute(
+            builder: (_) => AlbumScreen(
+              albumTitle: m.title,
+              artistName: m.rawSub.isNotEmpty ? m.rawSub : 'Playlist',
+              coverUrl: m.image,
+              browseId: m.browseId,
+            ),
+          ),
+        );
+        return;
+      case 'song':
+        final track = Track(
+          id: (m.id != null && m.id!.isNotEmpty)
+              ? m.id!
+              : 'yt-${_norm(m.title)}',
+          title: m.title,
+          artist: _cleanSub(m.rawSub).split(' · ').first,
+          album: 'Single',
+          coverUrl: m.image,
+          durationSeconds: m.durationSeconds ?? 210,
+          isVideo: false,
+        );
+        _playSong([track], 0);
+        return;
+      case 'video':
+        final rawVidId =
+            (m.id != null && m.id!.isNotEmpty) ? m.id! : _norm(m.title);
+        final vidId =
+            rawVidId.startsWith('yt-') ? rawVidId.substring(3) : rawVidId;
+        final track = Track(
+          id: 'yt-$vidId',
+          title: m.title,
+          artist: _cleanSub(m.rawSub).split(' · ').first,
+          album: 'Music Video',
+          coverUrl: m.image,
+          durationSeconds: m.durationSeconds ?? 210,
+          isVideo: true,
+        );
+        _playSong([track], 0);
+        PlayerShell.requestOpen();
+        return;
+      default:
+        final artist = _cleanSub(m.rawSub).split(' · ').first;
+        _submitSearch('${m.title} $artist'.trim());
+    }
+  }
 
   final _SuffixController _textCtrl = _SuffixController();
   final FocusNode _focusNode = FocusNode();
@@ -561,6 +761,7 @@ class _SearchScreenState extends State<SearchScreen>
   void initState() {
     super.initState();
     _dataService.initRecents();
+    _loadMeta();
     if (CatalogDataSource.allTracks.isEmpty) {
       CatalogDataSource.initialize();
     }
@@ -574,6 +775,7 @@ class _SearchScreenState extends State<SearchScreen>
   void dispose() {
     _suggestTimer?.cancel();
     _debounceTimer?.cancel();
+    _saveTimer?.cancel();
     _textCtrl.removeListener(_onTextChanged);
     _focusNode.removeListener(_onFocusChanged);
     _scrollCtrl.removeListener(_onScroll);
@@ -703,8 +905,8 @@ class _SearchScreenState extends State<SearchScreen>
       } catch (_) {}
     });
 
-    // 2. High-speed debounced search execution (110ms)
-    _debounceTimer = Timer(const Duration(milliseconds: 110), () {
+    // 2. High-speed debounced search execution (350ms)
+    _debounceTimer = Timer(const Duration(milliseconds: 350), () {
       if (mounted && _lastTyped == q) {
         _executeSearch(q, searchId, filter: _selectedFilter);
       }
@@ -776,8 +978,7 @@ class _SearchScreenState extends State<SearchScreen>
     try {
       final tops = _rankTopResults(r, [_norm(query)]);
       if (tops.isNotEmpty && tops.first.score >= 0.8) {
-        if (_recentItems.length > 200) _recentItems.clear();
-        _recentItems[_norm(query)] = tops.first.item;
+        _stash(_norm(query), tops.first.item);
       }
     } catch (_) {}
   }
@@ -923,16 +1124,17 @@ class _SearchScreenState extends State<SearchScreen>
     }
   }
 
-  void _removeRecent(String q) {
-    _dataService.removeRecent(q);
-    _recentItems.remove(_norm(q));
-  }
-
   void _rememberItem(SearchItem item) {
     if (item.title.trim().isEmpty) return;
     _dataService.addRecent(item.title);
-    if (_recentItems.length > 200) _recentItems.clear();
-    _recentItems[_norm(item.title)] = item;
+    _stash(_norm(item.title), item);
+  }
+
+  void _removeRecent(String q) {
+    _dataService.removeRecent(q);
+    _recentItems.remove(_norm(q));
+    _recentMeta.remove(_norm(q));
+    _saveMeta();
   }
 
   // ── Category page ──────────────────────────────────────────────────────────
@@ -1197,7 +1399,7 @@ class _SearchScreenState extends State<SearchScreen>
     final barBlock = topPad + 14 + _kTopBarH + 10;
 
     final double spacer = switch (phase) {
-      _SearchViewPhase.landing => topPad + 78,
+      _SearchViewPhase.landing => topPad + 10,
       _SearchViewPhase.category => 0,
       _SearchViewPhase.recents || _SearchViewPhase.suggestions => barBlock + 6,
       _SearchViewPhase.loading ||
@@ -1357,19 +1559,23 @@ class _SearchScreenState extends State<SearchScreen>
                         key: const ValueKey('top_search_bar'),
                         child: _buildTopBar(topPad),
                       )
-                    : KeyedSubtree(
-                        key: const ValueKey('top_header'),
-                        child: DynamicIslandHeader(
-                          title: category != null ? category.title : 'Search',
-                          showBack: showBack,
-                          isDockPage: !showBack,
-                          scrollController: _scrollCtrl,
-                          revealOffset: 120.0,
-                          showProfile: true,
-                          topPadding: topPad + 4,
-                          onBack: _goBack,
-                        ),
-                      ),
+                    : (category != null
+                          ? KeyedSubtree(
+                              key: const ValueKey('top_header_cat'),
+                              child: DynamicIslandHeader(
+                                title: category.title,
+                                showBack: true,
+                                isDockPage: false,
+                                scrollController: _scrollCtrl,
+                                revealOffset: 120.0,
+                                showProfile: false,
+                                topPadding: topPad + 4,
+                                onBack: _goBack,
+                              ),
+                            )
+                          : const SizedBox.shrink(
+                              key: ValueKey('no_island_on_landing'),
+                            )),
               ),
             ),
           ],
@@ -1770,35 +1976,99 @@ class _SearchScreenState extends State<SearchScreen>
   // Phase: Landing  (search bar · category grid)
   // ═══════════════════════════════════════════════════════════════════════════
 
+  Widget _buildProfileAvatar(BuildContext context) {
+    return Consumer<AuthState>(
+      builder: (context, auth, _) {
+        final avatar = auth.user?.avatarUrl;
+        return PressableScale(
+          scale: 0.88,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context, rootNavigator: true).push(
+              CupertinoPageRoute<void>(builder: (_) => const ProfileScreen()),
+            );
+          },
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF2C2C2E),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.14),
+                width: 0.8,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: avatar != null && avatar.startsWith('http')
+                ? CachedNetworkImage(
+                    imageUrl: avatar,
+                    fit: BoxFit.cover,
+                    errorWidget: (context, url, error) => const Icon(
+                      CupertinoIcons.person_crop_circle_fill,
+                      size: 32,
+                      color: Colors.white60,
+                    ),
+                  )
+                : const Icon(
+                    CupertinoIcons.person_crop_circle_fill,
+                    size: 32,
+                    color: Colors.white60,
+                  ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildLanding({Key? key}) {
     return Column(
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(_kEdge, 4, _kEdge, 14),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                'Search',
+                style: _displayStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              _buildProfileAvatar(context),
+            ],
+          ),
+        ),
         SpringIn(
           delayMs: 0,
-          rise: 10,
+          rise: 8,
           child: _LandingSearchBar(onTap: _activateSearch),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 16),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: _kEdge),
           child: Text(
             'Browse Categories',
-            style: _displayStyle(fontSize: 22, letterSpacing: -0.4),
+            style: _displayStyle(fontSize: 20, letterSpacing: 0),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Padding(
           padding: const EdgeInsets.fromLTRB(_kEdge, 0, _kEdge, 26),
           child: GridView.builder(
+            padding: EdgeInsets.zero,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _kSearchCategories.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
               childAspectRatio: 1.78,
             ),
             itemBuilder: (context, i) {
@@ -1840,7 +2110,13 @@ class _SearchScreenState extends State<SearchScreen>
           valueListenable: _dataService.recentsNotifier,
           builder: (context, recents, _) {
             if (recents.isEmpty) return const SizedBox.shrink();
-            final visible = recents.take(12).toList();
+            final seen = <String>{};
+            final visible = recents.where((q) {
+              final m = _recentMeta[_norm(q)];
+              return seen.add(m == null
+                  ? 'q|${_norm(q)}'
+                  : '${m.kind}|${_norm(m.title)}|${_norm(m.sub)}');
+            }).take(12).toList();
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1874,6 +2150,8 @@ class _SearchScreenState extends State<SearchScreen>
               HapticFeedback.lightImpact();
               _dataService.clearRecents();
               _recentItems.clear();
+              _recentMeta.clear();
+              _saveMeta();
             },
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
@@ -1893,19 +2171,35 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Widget _recentRow(String q, int i) {
-    final item = _recentItems[_norm(q)];
-    final isArtist = item is SearchArtistItem;
-    final isPlayable = item is SearchSongItem || item is SearchVideoItem;
-    final sub = item == null ? '' : _typeSub(item);
+    final key = _norm(q);
+    final live = _recentItems[key];
+    final meta = _recentMeta[key];
+    final isArtist = meta?.kind == 'artist';
+    final isVideo = meta?.kind == 'video' || live is SearchVideoItem;
+    final isPlayable = live is SearchSongItem ||
+        live is SearchVideoItem ||
+        meta?.kind == 'song' ||
+        meta?.kind == 'video';
 
-    final Widget leading = item != null
-        ? _Artwork(
-            url: _hiResUrl(item),
-            title: q,
-            size: 56,
-            circle: isArtist,
-            radius: 6,
-          )
+    final String artUrl = meta?.image ?? (live != null ? _hiResUrl(live) : '');
+    final String artTitle = meta?.title ?? (live?.title ?? q);
+
+    final Widget leading = (artUrl.isNotEmpty || meta != null || live != null)
+        ? (isVideo
+            ? _Artwork(
+                url: artUrl,
+                title: artTitle,
+                size: 44,
+                width: 76,
+                radius: 6,
+              )
+            : _Artwork(
+                url: artUrl,
+                title: artTitle,
+                size: 56,
+                circle: isArtist,
+                radius: 6,
+              ))
         : Container(
             width: 56,
             height: 56,
@@ -1914,7 +2208,7 @@ class _SearchScreenState extends State<SearchScreen>
               shape: BoxShape.circle,
             ),
             child: const Icon(
-              CupertinoIcons.clock,
+              CupertinoIcons.search,
               size: 20,
               color: AppColors.textSecondary,
             ),
@@ -1944,8 +2238,10 @@ class _SearchScreenState extends State<SearchScreen>
                 scale: 0.985,
                 onTap: () {
                   HapticFeedback.selectionClick();
-                  if (item != null && _norm(item.title) == _norm(q)) {
-                    _handleItemTap(item);
+                  if (live != null) {
+                    _handleItemTap(live);
+                  } else if (meta != null) {
+                    _openMeta(meta, q);
                   } else {
                     _submitSearch(q);
                   }
@@ -1964,7 +2260,7 @@ class _SearchScreenState extends State<SearchScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              q,
+                              meta?.title ?? (live?.title ?? q),
                               style: _bodyStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w500,
@@ -1974,10 +2270,12 @@ class _SearchScreenState extends State<SearchScreen>
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            if (sub.isNotEmpty) ...[
+                            if ((meta != null && meta.sub.isNotEmpty) ||
+                                (live != null && _typeSub(live).isNotEmpty)) ...[
                               const SizedBox(height: 2),
                               Text(
-                                sub,
+                                meta?.sub ??
+                                    (live != null ? _typeSub(live) : ''),
                                 style: _bodyStyle(fontSize: 14),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1986,9 +2284,33 @@ class _SearchScreenState extends State<SearchScreen>
                           ],
                         ),
                       ),
-                      if (isPlayable && item != null)
-                        _moreButton(() => _showMore(item))
-                      else if (item == null)
+                      if (isPlayable)
+                        _moreButton(() {
+                          if (live != null) {
+                            _showMore(live);
+                          } else if (meta != null) {
+                            final rawId = (meta.id != null && meta.id!.isNotEmpty)
+                                ? meta.id!
+                                : 'yt-${_norm(meta.title)}';
+                            final isVid = meta.kind == 'video';
+                            final track = Track(
+                              id: isVid && !rawId.startsWith('yt-')
+                                  ? 'yt-$rawId'
+                                  : rawId,
+                              title: meta.title,
+                              artist: _cleanSub(meta.rawSub).split(' · ').first,
+                              album: isVid ? 'Music Video' : 'Single',
+                              coverUrl: meta.image,
+                              durationSeconds: meta.durationSeconds ?? 210,
+                              isVideo: isVid,
+                            );
+                            ZenDropdown.showTrackMenu(
+                              context: context,
+                              track: track,
+                            );
+                          }
+                        })
+                      else if (meta == null && live == null)
                         PressableScale(
                           scale: 0.88,
                           onTap: () {
@@ -2605,6 +2927,9 @@ class _SearchScreenState extends State<SearchScreen>
     void add(SearchItem item) {
       // Validate videos and shorts
       if (item is SearchVideoItem) {
+        if (r.intent.intentType != SearchItemType.video && _selectedFilter != SearchFilter.videos) {
+          return; // Never let videos become top result in audio/overview search
+        }
         if (!MusicVideoFilter.isLegitMusicVideo(
           title: item.title,
           subtitle: item.subtitle,
@@ -3330,16 +3655,31 @@ class _LandingSearchBar extends StatelessWidget {
         child: Container(
           height: _kTopBarH,
           alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
             color: _kFieldBg,
             borderRadius: BorderRadius.circular(14),
           ),
-          child: Text(
-            'Artists, Songs, Lyrics and more',
-            style: _bodyStyle(fontSize: 16, color: AppColors.textTertiary),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          child: Row(
+            children: [
+              const Icon(
+                CupertinoIcons.search,
+                size: 19,
+                color: AppColors.textTertiary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Artists, Songs, Lyrics and more',
+                  style: _bodyStyle(
+                    fontSize: 15.5,
+                    color: AppColors.textTertiary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -3356,6 +3696,7 @@ class _Artwork extends StatelessWidget {
     required this.url,
     required this.title,
     required this.size,
+    this.width,
     this.radius = 6.0,
     this.circle = false,
     this.active = false,
@@ -3365,6 +3706,7 @@ class _Artwork extends StatelessWidget {
   final String url;
   final String title;
   final double size;
+  final double? width;
   final double radius;
   final bool circle;
   final bool active;
@@ -3372,10 +3714,11 @@ class _Artwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final w = width ?? size;
     final br = BorderRadius.circular(circle ? size / 2 : radius);
     final fallback = MonogramAvatar(name: title, size: size, isCircle: circle);
     return SizedBox(
-      width: size,
+      width: w,
       height: size,
       child: ClipRRect(
         borderRadius: br,

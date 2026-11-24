@@ -71,25 +71,6 @@ class _QueuePanelState extends State<QueuePanel> {
     }
   }
 
-  /// Maps a drag inside one section onto the full up-next list and keeps the
-  /// same (Flutter style, pre-removal) index contract q.reorder already had.
-  void _reorder(
-    QueueState q,
-    List<QueueEntry> all,
-    List<QueueEntry> sec,
-    int o,
-    int n,
-  ) {
-    if (o < 0 || o >= sec.length) return;
-    final oldG = all.indexOf(sec[o]);
-    final newG = n >= sec.length
-        ? all.indexOf(sec.last) + 1
-        : all.indexOf(sec[n]);
-    if (oldG < 0 || newG < 0) return;
-    HapticFeedback.selectionClick();
-    q.reorder(oldG, newG);
-  }
-
   @override
   Widget build(BuildContext context) {
     final q = context.watch<QueueState>();
@@ -231,7 +212,7 @@ class _QueuePanelState extends State<QueuePanel> {
             active: q.autoplay,
             onTap: () {
               HapticFeedback.selectionClick();
-              q.toggleAutoplay(); // automix
+              q.toggleAutoplay(refreshIfOn: true); // automix (tap again to refresh batch)
             },
           ),
         ),
@@ -252,8 +233,9 @@ class _QueuePanelState extends State<QueuePanel> {
       },
       onReorderEnd: (_) => widget.onReorderingChanged?.call(false),
       onReorderItem: (o, n) {
-        final rawN = n > o ? n + 1 : n;
-        _reorder(q, all, sec, o, rawN);
+        if (o < 0 || o >= sec.length) return;
+        HapticFeedback.selectionClick();
+        q.reorderInSection(sec[o], o, n, sec);
       },
       proxyDecorator: _proxy,
       findChildIndexCallback: (key) {
@@ -550,15 +532,25 @@ class _QueuePanelState extends State<QueuePanel> {
             }
           : null,
       onGoToAlbum: () {
+        final isVid = e.track.isVideo ||
+            Track.detectIsVideo(e.track.title, e.track.album) ||
+            e.track.album.toLowerCase() == 'music video';
         Navigator.push(
           context,
           ZenPageRoute(
             builder: (_) => AlbumScreen(
-              albumTitle: MediaNormalizer.cleanAlbumTitle(
-                e.track.album.isNotEmpty ? e.track.album : e.title,
-              ),
+              albumTitle: isVid
+                  ? MediaNormalizer.cleanTitle(e.track.title)
+                  : MediaNormalizer.cleanAlbumTitle(
+                      e.track.album.isNotEmpty ? e.track.album : e.title,
+                    ),
               artistName: MediaNormalizer.formatArtists(e.artist),
               coverUrl: e.track.coverUrl,
+              browseId: isVid ? null : e.track.albumBrowseId,
+              initialTracks: [
+                e.track.copyWith(isVideo: isVid ? true : e.track.isVideo),
+              ],
+              isVideo: isVid,
             ),
           ),
         );
@@ -691,6 +683,19 @@ class _TrackRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isVideo = (track is Track && track.isVideo) ||
+        (track.id is String &&
+            ((track.id as String).startsWith('vid-') ||
+                (track.id as String).startsWith('video-'))) ||
+        (track is Track &&
+            Track.detectIsVideo(track.title, track.album,
+                coverUrl: track.coverUrl)) ||
+        (track.coverUrl is String &&
+            ((track.coverUrl as String).contains('/vi/') ||
+                (track.coverUrl as String).contains('ytimg.com/vi') ||
+                (track.coverUrl as String).contains('maxresdefault') ||
+                (track.coverUrl as String).contains('hqdefault')));
+
     return GestureDetector(
       onLongPress: onLongPress,
       child: PressableScale(
@@ -715,9 +720,9 @@ class _TrackRow extends StatelessWidget {
               child: Row(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(isVideo ? 6 : 9),
                     child: SizedBox(
-                      width: 48,
+                      width: isVideo ? 76 : 48,
                       height: 48,
                       child: CoverImage(track.coverUrl as String),
                     ),

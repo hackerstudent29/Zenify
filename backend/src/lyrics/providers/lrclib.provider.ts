@@ -14,16 +14,19 @@ export class LrcLibBase {
       const cleanTitle = MatchingGuard.normalizeTitle(query.title);
       const cleanArtist = MatchingGuard.normalizeArtist(query.artist);
 
-      // Strategy 1: Direct /api/get with duration (only accept if no language conflict)
-      let getUrl = `${LrcLibBase.BASE_URL}/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
-      if (query.duration && query.duration > 0 && query.duration !== 210) {
-        getUrl += `&duration=${Math.round(query.duration)}`;
-      }
-
-      const res = await fetch(getUrl, {
+      // Strategy 1: Direct /api/get (omit duration constraint first to avoid 404 mismatch)
+      const baseUrl = `${LrcLibBase.BASE_URL}/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
+      let res = await fetch(baseUrl, {
         headers: { 'User-Agent': LrcLibBase.USER_AGENT },
-        signal: signal || AbortSignal.timeout(3000)
+        signal: signal || AbortSignal.timeout(2500)
       });
+
+      if (!res.ok && query.duration && query.duration > 0 && query.duration !== 210) {
+        res = await fetch(`${baseUrl}&duration=${Math.round(query.duration)}`, {
+          headers: { 'User-Agent': LrcLibBase.USER_AGENT },
+          signal: signal || AbortSignal.timeout(2000)
+        });
+      }
 
       if (res.ok) {
         const data = (await res.json()) as any;

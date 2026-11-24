@@ -646,19 +646,19 @@ class _Depth {
 }
 
 // Opacity, blur sigma, scale. The further from the active line, the fainter
-// and blurrier (up to "there is a lyric but you cannot read it").
+// and blurrier (Apple Music gradual depth-of-field blur).
 const _after = [
-  _Depth(0.95, 0.8, 0.98), // next line: clearly READABLE (sing-ahead)
-  _Depth(0.52, 3.4, 0.95),
-  _Depth(0.30, 5.2, 0.92),
-  _Depth(0.18, 7.0, 0.89),
-  _Depth(0.10, 9.0, 0.86), // ghost
+  _Depth(0.95, 0.8, 0.98), // next line: clearly readable with subtle blur (sing-ahead)
+  _Depth(0.58, 2.4, 0.96), // +2: smooth gradual blur
+  _Depth(0.38, 4.4, 0.93), // +3: deeper blur
+  _Depth(0.22, 6.6, 0.90), // +4: heavy blur
+  _Depth(0.12, 9.0, 0.87), // +5+: deep background blur
 ];
 const _before = [
-  _Depth(0.40, 3.4, 0.96), // just passed: dim + well blurred
-  _Depth(0.24, 5.4, 0.93),
-  _Depth(0.13, 7.6, 0.90),
-  _Depth(0.07, 9.8, 0.87), // unreadable
+  _Depth(0.48, 2.2, 0.96), // just passed: dim + soft blur
+  _Depth(0.28, 4.4, 0.93), // -2: more blur
+  _Depth(0.15, 6.8, 0.90), // -3: heavy blur
+  _Depth(0.08, 9.2, 0.87), // past lines
 ];
 
 _Depth _depthFor(
@@ -847,6 +847,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
 
   int _active = -1;
   bool _manual = false;
+  bool _isAutoScrolling = false;
   Timer? _resume;
 
   late bool _immersive = widget.immersiveListenable?.value ?? false;
@@ -1210,16 +1211,24 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
 
     final reduce = MediaQuery.disableAnimationsOf(context);
     if ((!_didFirstFollow && !forceAnimated) || reduce) {
+      _isAutoScrolling = true;
       _scroll.jumpTo(target);
       _didFirstFollow = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _isAutoScrolling = false;
+      });
       return;
     }
     _didFirstFollow = true;
 
     final vh = math.max(1.0, pos.viewportDimension);
     final shown = delta.clamp(-vh * 1.1, vh * 1.1).toDouble();
+    _isAutoScrolling = true;
     _scroll.jumpTo(target);
     _glide.value = _Glide(++_glideId, _active, -1, shown, shown);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isAutoScrolling = false;
+    });
   }
 
   /// Scroll anchoring. A bracket-line / dots tile that sits ABOVE the reading
@@ -1361,14 +1370,18 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
                 ).createShader(r),
                 child: NotificationListener<ScrollNotification>(
                   onNotification: (n) {
-                    if (n is ScrollStartNotification) {
+                    if (_isAutoScrolling) return false;
+
+                    final isUserDrag =
+                        (n is ScrollStartNotification && n.dragDetails != null) ||
+                        (n is ScrollUpdateNotification && n.dragDetails != null) ||
+                        (n is UserScrollNotification &&
+                            n.direction != ScrollDirection.idle);
+
+                    if (isUserDrag) {
                       _resume?.cancel();
                       if (!_manual) setState(() => _manual = true);
-                    } else if (n is UserScrollNotification &&
-                        n.direction != ScrollDirection.idle) {
-                      _resume?.cancel();
-                      if (!_manual) setState(() => _manual = true);
-                    } else if (n is ScrollEndNotification && _manual) {
+                    } else if (n is ScrollEndNotification && _manual && n.dragDetails == null) {
                       _onUserScrollEnd();
                     }
                     return false;
@@ -1791,11 +1804,11 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
             alignment: alignment,
             child: child,
           );
-          if (dp.b > 0.5 && dp.o > 0.1 && !widget.manual) {
+          if (dp.b > 0.2 && dp.o > 0.05 && !widget.manual) {
             w = ImageFiltered(
               imageFilter: ImageFilter.blur(
-                sigmaX: math.min(dp.b, 2.0),
-                sigmaY: math.min(dp.b, 2.0),
+                sigmaX: dp.b,
+                sigmaY: dp.b,
                 tileMode: TileMode.decal,
               ),
               child: w,

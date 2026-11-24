@@ -9,7 +9,10 @@ import '../design_system/widgets/dynamic_island_header.dart';
 import 'api_service.dart';
 import 'auth_service.dart';
 import 'library_store.dart';
+import 'listening_tracker_service.dart';
 import 'secure_storage_service.dart';
+import 'settings_service.dart';
+import 'user_preferences_service.dart';
 
 class UserProfile {
   UserProfile({
@@ -149,6 +152,9 @@ class AuthState extends ChangeNotifier {
         _user = UserProfile.fromJson(jsonDecode(raw) as Map<String, dynamic>);
       }
       unawaited(LibraryStore.instance.switchUser(_user?.id));
+      if (isLoggedIn) {
+        unawaited(syncUserCloudData());
+      }
       notifyListeners();
     } catch (e) {
       if (kDebugMode) debugPrint('[AuthState] storage load error: $e');
@@ -174,6 +180,10 @@ class AuthState extends ChangeNotifier {
       if (prevGuestId != null) {
         unawaited(AuthService.instance.upgradeGuest(prevGuestId));
       }
+
+      unawaited(syncUserCloudData());
+
+      unawaited(syncUserCloudData());
 
       _isLoading = false;
       notifyListeners();
@@ -240,6 +250,8 @@ class AuthState extends ChangeNotifier {
         unawaited(AuthService.instance.upgradeGuest(prevGuestId));
       }
 
+      unawaited(syncUserCloudData());
+
       _isLoading = false;
       notifyListeners();
       if (result.isNewUser) {
@@ -280,6 +292,7 @@ class AuthState extends ChangeNotifier {
         email: email,
       );
       await _persistUser();
+      unawaited(syncUserCloudData());
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -378,6 +391,24 @@ class AuthState extends ChangeNotifier {
         leading: const Icon(CupertinoIcons.checkmark_circle_fill, color: Color(0xFFE11D48), size: 18),
       ),
     );
+  }
+
+  /// Automatically synchronizes the user's cloud library, taste preferences,
+  /// listening history, and settings from the backend account into local state.
+  Future<void> syncUserCloudData() async {
+    if (!isLoggedIn) return;
+    try {
+      // 1. Restore library (playlists, liked songs, albums)
+      unawaited(LibraryStore.instance.switchUser(_user?.id));
+      // 2. Restore taste & onboarding preferences
+      unawaited(UserPreferencesService.instance.fetchFromBackend());
+      // 3. Restore app settings (audio/video quality, theme, accent, etc.)
+      unawaited(SettingsState.instance.fetchServerSettings());
+      // 4. Restore listening history & Replay journal from backend
+      unawaited(ListeningTrackerService.instance.restoreHistoryFromServer());
+    } catch (e) {
+      if (kDebugMode) debugPrint('[AuthState] syncUserCloudData error: $e');
+    }
   }
 
   Future<void> setAudioQuality(String quality) async {

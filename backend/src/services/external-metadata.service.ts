@@ -8,7 +8,7 @@ import { uploadToR2 } from '../utils/s3';
 import { LyricsEnhancementService } from './lyrics-enhancement.service';
 import { SystemSettingsService } from './system-settings.service';
 import { safeExecFile, isSafePublicUrl } from '../utils/security';
-import { upgradeInnerTubeArtwork } from '../utils/innertube-artwork';
+import { upgradeInnerTubeArtwork, isDistributorOrLabel, extractArtistsFromVideoTitle } from '../utils/innertube-artwork';
 
 // Dynamic imports for ESM modules if needed, or stick to require if it's simpler for these libs
 const fetch = require('node-fetch');
@@ -3036,7 +3036,30 @@ export class ExternalMetadataService {
                 if (!title || !videoId) continue;
 
                 const secondColRuns = flexCols[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [];
-                const artist = secondColRuns[0]?.text || 'Unknown Artist';
+                let artist = secondColRuns[0]?.text || 'Unknown Artist';
+                if (artist.toLowerCase() === 'video' && secondColRuns[2]?.text) {
+                    artist = secondColRuns[2].text;
+                }
+                const rawUploader = artist;
+                if (isDistributorOrLabel(artist) || artist === 'Unknown Artist') {
+                    const extracted = extractArtistsFromVideoTitle(title);
+                    if (extracted) artist = extracted;
+                }
+
+                let year: string | undefined;
+                for (const run of secondColRuns) {
+                    const text = (run?.text || '').trim();
+                    const ym = text.match(/\b(19\d{2}|20\d{2})\b/);
+                    if (ym) {
+                        year = ym[1];
+                        break;
+                    }
+                }
+                if (!year) {
+                    const ym = title.match(/\b(19\d{2}|20\d{2})\b/);
+                    if (ym) year = ym[1];
+                }
+
                 let durationSeconds = 210;
                 for (let i = secondColRuns.length - 1; i >= 0; i--) {
                     const text = secondColRuns[i]?.text || '';
@@ -3059,11 +3082,12 @@ export class ExternalMetadataService {
                     videoId,
                     title: title.trim(),
                     artist: artist.trim(),
-                    uploader: artist.trim(),
+                    uploader: rawUploader.trim(),
                     duration: durationSeconds,
                     thumbnail: highResThumb,
                     isYtMusic: true,
-                    isVideo: true
+                    isVideo: true,
+                    year
                 });
             }
             return results;

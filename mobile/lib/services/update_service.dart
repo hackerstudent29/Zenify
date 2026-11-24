@@ -11,6 +11,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../design_system/tokens/app_colors.dart';
 import 'api_service.dart';
 import 'dock_visibility.dart';
+import 'system_notification_service.dart';
 
 /// Information regarding the latest available app release.
 class UpdateInfo {
@@ -175,6 +176,14 @@ class UpdateService {
 
       availableUpdateNotifier.value = info;
       _isChecking = false;
+
+      if (hasUpdate) {
+        unawaited(SystemNotificationService.instance.notifyAppUpdate(
+          latestVersion: info.latestVersion,
+          releaseNotes: info.releaseNotes,
+        ));
+      }
+
       return info;
     } catch (_) {
       _isChecking = false;

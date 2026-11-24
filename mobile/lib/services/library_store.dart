@@ -45,16 +45,22 @@ class PrefsLibraryStorage implements LibraryStorage {
       final p = await SharedPreferences.getInstance();
       await p.reload();
       final val = p.getString(_keyPrimary);
-      if (val != null && val.trim().isNotEmpty && val.trim().length > 10) return val;
+      if (val != null && val.trim().isNotEmpty && val.trim().length > 10)
+        return val;
       final backup = p.getString(_keyBackup);
-      if (backup != null && backup.trim().isNotEmpty && backup.trim().length > 10) return backup;
+      if (backup != null &&
+          backup.trim().isNotEmpty &&
+          backup.trim().length > 10)
+        return backup;
 
       // Safe migration: if this is an authenticated user with no data yet,
       // but legacy shared library exists, migrate it safely to user's storage
       // while keeping legacy backup untouched!
       if (userId != null && userId!.trim().isNotEmpty) {
         final legacy = p.getString('library_v1');
-        if (legacy != null && legacy.trim().isNotEmpty && legacy.trim().length > 10) {
+        if (legacy != null &&
+            legacy.trim().isNotEmpty &&
+            legacy.trim().length > 10) {
           await p.setString('library_legacy_backup', legacy);
           await p.setString(_keyPrimary, legacy);
           return legacy;
@@ -216,7 +222,9 @@ class LibraryStore extends ChangeNotifier {
               if (item is Map) {
                 final title = (item['title'] as String? ?? '').trim();
                 final artist = (item['artist'] as String? ?? '').trim();
-                final cover = MediaNormalizer.upgradeArtworkUrl((item['coverUrl'] as String? ?? '').trim());
+                final cover = MediaNormalizer.upgradeArtworkUrl(
+                  (item['coverUrl'] as String? ?? '').trim(),
+                );
                 if (title.isNotEmpty && !isAlbumSaved(title, artist)) {
                   _albums.add(SavedAlbum(title, artist, cover));
                   changed = true;
@@ -267,16 +275,23 @@ class LibraryStore extends ChangeNotifier {
                 final id = (item['id'] as String? ?? '').trim();
                 final name = (item['name'] as String? ?? '').trim();
                 final rawList = item['tracks'] as List? ?? [];
-                final trackIds = rawList.map((x) => '$x'.trim()).where((x) => x.isNotEmpty).toList();
+                final trackIds = rawList
+                    .map((x) => '$x'.trim())
+                    .where((x) => x.isNotEmpty)
+                    .toList();
                 final rawCreated = item['createdAt']?.toString();
-                final createdAt = rawCreated != null ? DateTime.tryParse(rawCreated) : null;
+                final createdAt = rawCreated != null
+                    ? DateTime.tryParse(rawCreated)
+                    : null;
                 if (id.isNotEmpty && !localPlaylistIds.contains(id)) {
-                  _playlists.add(UserPlaylist(
-                    id: id,
-                    name: name.isEmpty ? 'My Playlist' : name,
-                    trackIds: trackIds,
-                    createdAt: createdAt,
-                  ));
+                  _playlists.add(
+                    UserPlaylist(
+                      id: id,
+                      name: name.isEmpty ? 'My Playlist' : name,
+                      trackIds: trackIds,
+                      createdAt: createdAt,
+                    ),
+                  );
                   changed = true;
                 }
               }
@@ -286,46 +301,54 @@ class LibraryStore extends ChangeNotifier {
           if (changed) _save();
 
           // 5. Push local library to cloud DB so nothing is ever lost across installs
-          final remoteLikedIds = (remote['liked'] as List?)
-              ?.map((x) => x is Map ? (x['id'] as String? ?? '') : '')
-              .toSet() ?? {};
-          final unuploadedLiked = _liked.where((id) => !remoteLikedIds.contains(id)).toList();
-          final remotePlaylistIds = (remote['playlists'] as List?)
-              ?.map((x) => x is Map ? (x['id'] as String? ?? '') : '')
-              .toSet() ?? {};
-          final unuploadedPlaylists = _playlists.where((p) => !remotePlaylistIds.contains(p.id)).toList();
+          final remoteLikedIds =
+              (remote['liked'] as List?)
+                  ?.map((x) => x is Map ? (x['id'] as String? ?? '') : '')
+                  .toSet() ??
+              {};
+          final unuploadedLiked = _liked
+              .where((id) => !remoteLikedIds.contains(id))
+              .toList();
+          final remotePlaylistIds =
+              (remote['playlists'] as List?)
+                  ?.map((x) => x is Map ? (x['id'] as String? ?? '') : '')
+                  .toSet() ??
+              {};
+          final unuploadedPlaylists = _playlists
+              .where((p) => !remotePlaylistIds.contains(p.id))
+              .toList();
 
-          if (unuploadedLiked.isNotEmpty || _albums.isNotEmpty || _artists.isNotEmpty || unuploadedPlaylists.isNotEmpty) {
+          if (unuploadedLiked.isNotEmpty ||
+              _albums.isNotEmpty ||
+              _artists.isNotEmpty ||
+              unuploadedPlaylists.isNotEmpty) {
             final syncPayload = <String, dynamic>{
               if (_albums.isNotEmpty)
                 'albums': [
                   for (final a in _albums)
-                    {'title': a.title, 'artist': a.artist, 'cover': a.cover}
+                    {'title': a.title, 'artist': a.artist, 'cover': a.cover},
                 ],
               if (_artists.isNotEmpty)
                 'artists': [
-                  for (final a in _artists)
-                    {'name': a.name, 'cover': a.cover}
+                  for (final a in _artists) {'name': a.name, 'cover': a.cover},
                 ],
               if (unuploadedLiked.isNotEmpty)
                 'liked': [
                   for (final id in unuploadedLiked)
-                    if (_seen[id] != null)
-                      _seen[id]!.toJson()
-                    else
-                      {'id': id}
+                    if (_seen[id] != null) _seen[id]!.toJson() else {'id': id},
                 ],
               if (unuploadedPlaylists.isNotEmpty)
                 'playlists': [
                   for (final p in unuploadedPlaylists)
-                    {'id': p.id, 'name': p.name, 'tracks': p.trackIds}
+                    {'id': p.id, 'name': p.name, 'tracks': p.trackIds},
                 ],
             };
             unawaited(ApiService.syncUserLibrary(syncPayload));
           }
         }
       } catch (e) {
-        if (kDebugMode) debugPrint('[LibraryStore] Failed to sync remote library: $e');
+        if (kDebugMode)
+          debugPrint('[LibraryStore] Failed to sync remote library: $e');
       }
     }
 
@@ -424,16 +447,23 @@ class LibraryStore extends ChangeNotifier {
                 final id = (item['id'] as String? ?? '').trim();
                 final name = (item['name'] as String? ?? '').trim();
                 final rawList = item['tracks'] as List? ?? [];
-                final trackIds = rawList.map((x) => '$x'.trim()).where((x) => x.isNotEmpty).toList();
+                final trackIds = rawList
+                    .map((x) => '$x'.trim())
+                    .where((x) => x.isNotEmpty)
+                    .toList();
                 final rawCreated = item['createdAt']?.toString();
-                final createdAt = rawCreated != null ? DateTime.tryParse(rawCreated) : null;
+                final createdAt = rawCreated != null
+                    ? DateTime.tryParse(rawCreated)
+                    : null;
                 if (id.isNotEmpty) {
-                  _playlists.add(UserPlaylist(
-                    id: id,
-                    name: name.isEmpty ? 'My Playlist' : name,
-                    trackIds: trackIds,
-                    createdAt: createdAt,
-                  ));
+                  _playlists.add(
+                    UserPlaylist(
+                      id: id,
+                      name: name.isEmpty ? 'My Playlist' : name,
+                      trackIds: trackIds,
+                      createdAt: createdAt,
+                    ),
+                  );
                 }
               }
             }
@@ -441,7 +471,8 @@ class LibraryStore extends ChangeNotifier {
         }
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('[LibraryStore] Error loading library data: $e');
+      if (kDebugMode)
+        debugPrint('[LibraryStore] Error loading library data: $e');
     } finally {
       _isLoaded = true;
       notifyListeners();
@@ -451,16 +482,21 @@ class LibraryStore extends ChangeNotifier {
   void _save() {
     notifyListeners();
     if (!_isLoaded) {
-      if (kDebugMode) debugPrint('[LibraryStore] Suppressed save: store not yet loaded from disk');
+      if (kDebugMode)
+        debugPrint(
+          '[LibraryStore] Suppressed save: store not yet loaded from disk',
+        );
       return;
     }
     try {
       final json = jsonEncode({
         'liked': _liked,
-        'artists': [for (final a in _artists) {'name': a.name, 'cover': a.cover}],
+        'artists': [
+          for (final a in _artists) {'name': a.name, 'cover': a.cover},
+        ],
         'albums': [
           for (final a in _albums)
-            {'title': a.title, 'artist': a.artist, 'cover': a.cover}
+            {'title': a.title, 'artist': a.artist, 'cover': a.cover},
         ],
         'playlists': [
           for (final p in _playlists)
@@ -468,17 +504,18 @@ class LibraryStore extends ChangeNotifier {
               'id': p.id,
               'name': p.name,
               'tracks': p.trackIds,
-              if (p.createdAt != null) 'createdAt': p.createdAt!.toIso8601String(),
-            }
+              if (p.createdAt != null)
+                'createdAt': p.createdAt!.toIso8601String(),
+            },
         ],
         'tracks': {
-          for (final entry in _seen.entries)
-            entry.key: entry.value.toJson(),
+          for (final entry in _seen.entries) entry.key: entry.value.toJson(),
         },
       });
       unawaited(storage.write(json));
     } catch (e) {
-      if (kDebugMode) debugPrint('[LibraryStore] Error saving library data: $e');
+      if (kDebugMode)
+        debugPrint('[LibraryStore] Error saving library data: $e');
     }
   }
 
@@ -487,12 +524,18 @@ class LibraryStore extends ChangeNotifier {
 
   List<Track> _resolve(Iterable<String> ids) {
     final index = <String, Track>{
-      for (final t in CatalogDataSource.allTracks) t.id: t
+      for (final t in CatalogDataSource.allTracks) t.id: t,
     };
     final out = <Track>[];
     for (final id in ids) {
-      final t = _seen[id] ?? index[id];
+      var t = _seen[id] ?? index[id];
       if (t != null) {
+        final isVid = t.isVideo ||
+            Track.detectIsVideo(t.title, t.album, coverUrl: t.coverUrl);
+        if (isVid && !t.isVideo) {
+          t = t.copyWith(isVideo: true, album: 'Music Video');
+          _seen[id] = t;
+        }
         out.add(t);
       }
     }
@@ -524,14 +567,28 @@ class LibraryStore extends ChangeNotifier {
   Track? getTrackById(String id) => _seen[id];
   List<Track> get likedTracks => _resolve(_liked);
   int get likedCount => _liked.length;
-  bool isLiked(Track t) => _liked.contains(_key(t));
-  bool isLikedId(String? id) => id != null && id.isNotEmpty && _liked.contains(id);
+  bool isLiked(Track t) => isLikedId(t.id);
+  bool isLikedId(String? id) {
+    if (id == null || id.isEmpty) return false;
+    if (_liked.contains(id)) return true;
+    final clean = id.replaceFirst('yt-', '').trim();
+    if (_liked.contains(clean)) return true;
+    if (_liked.contains('yt-$clean')) return true;
+    return false;
+  }
 
   void toggleLike(Track t) {
     final k = _key(t);
     _seen[k] = t;
-    final target = IslandNotification.artistOrTitle(artist: t.artist, title: t.title);
-    final isAdd = !_liked.remove(k);
+    final cleanId = t.id.replaceFirst('yt-', '').trim();
+    final target = IslandNotification.artistOrTitle(
+      artist: t.artist,
+      title: t.title,
+    );
+    final isAdd =
+        !_liked.remove(k) &&
+        !_liked.remove(cleanId) &&
+        !_liked.remove('yt-$cleanId');
     if (isAdd) {
       _liked.insert(0, k);
       IslandNotifier.instance.show(
@@ -539,7 +596,11 @@ class LibraryStore extends ChangeNotifier {
           id: 'like_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Favourited',
           body: target,
-          leading: IslandNotification.trackThumb(t.coverUrl, fallbackIcon: CupertinoIcons.star_fill, iconColor: const Color(0xFFE11D48)),
+          leading: IslandNotification.trackThumb(
+            t.coverUrl,
+            fallbackIcon: CupertinoIcons.star_fill,
+            iconColor: const Color(0xFFE11D48),
+          ),
         ),
       );
     } else {
@@ -548,11 +609,16 @@ class LibraryStore extends ChangeNotifier {
           id: 'unlike_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Removed from Favourites',
           body: target,
-          leading: IslandNotification.trackThumb(t.coverUrl, fallbackIcon: CupertinoIcons.star, iconColor: Colors.white70),
+          leading: IslandNotification.trackThumb(
+            t.coverUrl,
+            fallbackIcon: CupertinoIcons.star,
+            iconColor: Colors.white70,
+          ),
         ),
       );
     }
     _save();
+    notifyListeners();
 
     if (_activeUserId != null && _activeUserId!.isNotEmpty) {
       unawaited(ApiService.toggleTrackLike(t.id, t.toJson()));
@@ -563,12 +629,15 @@ class LibraryStore extends ChangeNotifier {
 
   /* ── artists ── */
   List<FollowedArtist> get followedArtists => List.unmodifiable(_artists);
-  bool isFollowing(String name) => _artists.any((a) => a.name.toLowerCase() == name.trim().toLowerCase());
+  bool isFollowing(String name) =>
+      _artists.any((a) => a.name.toLowerCase() == name.trim().toLowerCase());
 
   void toggleFollow(String name, String cover) {
     final clean = name.trim();
     if (clean.isEmpty) return;
-    final i = _artists.indexWhere((a) => a.name.toLowerCase() == clean.toLowerCase());
+    final i = _artists.indexWhere(
+      (a) => a.name.toLowerCase() == clean.toLowerCase(),
+    );
     if (i >= 0) {
       _artists.removeAt(i);
       IslandNotifier.instance.show(
@@ -576,7 +645,11 @@ class LibraryStore extends ChangeNotifier {
           id: 'unfollow_${clean}_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Unfollowed',
           body: clean,
-          leading: IslandNotification.trackThumb(cover, fallbackIcon: CupertinoIcons.person_crop_circle, iconColor: Colors.white70),
+          leading: IslandNotification.trackThumb(
+            cover,
+            fallbackIcon: CupertinoIcons.person_crop_circle,
+            iconColor: Colors.white70,
+          ),
         ),
       );
     } else {
@@ -586,31 +659,47 @@ class LibraryStore extends ChangeNotifier {
           id: 'follow_${clean}_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Following',
           body: clean,
-          leading: IslandNotification.trackThumb(cover, fallbackIcon: CupertinoIcons.person_crop_circle_badge_checkmark, iconColor: const Color(0xFFE11D48)),
+          leading: IslandNotification.trackThumb(
+            cover,
+            fallbackIcon: CupertinoIcons.person_crop_circle_badge_checkmark,
+            iconColor: const Color(0xFFE11D48),
+          ),
         ),
       );
     }
     _save();
 
     if (_activeUserId != null && _activeUserId!.isNotEmpty) {
-      unawaited(ApiService.syncUserLibrary({
-        'artists': [{'name': clean, 'cover': cover}],
-      }));
+      unawaited(
+        ApiService.syncUserLibrary({
+          'artists': [
+            {'name': clean, 'cover': cover},
+          ],
+        }),
+      );
     }
   }
 
   /* ── albums ── */
   List<SavedAlbum> get savedAlbums => List.unmodifiable(_albums);
-  bool isAlbumSaved(String title, String artist) =>
-      _albums.any((a) => a.title.toLowerCase() == title.trim().toLowerCase() && a.artist.toLowerCase() == artist.trim().toLowerCase());
+  bool isAlbumSaved(String title, String artist) => _albums.any(
+    (a) =>
+        a.title.toLowerCase() == title.trim().toLowerCase() &&
+        a.artist.toLowerCase() == artist.trim().toLowerCase(),
+  );
 
   void toggleAlbum(String title, String artist, String cover) {
     final cTitle = title.trim();
     final cArtist = artist.trim();
     if (cTitle.isEmpty) return;
-    final target = IslandNotification.artistOrTitle(artist: cArtist, title: cTitle);
+    final target = IslandNotification.artistOrTitle(
+      artist: cArtist,
+      title: cTitle,
+    );
     final i = _albums.indexWhere(
-      (a) => a.title.toLowerCase() == cTitle.toLowerCase() && a.artist.toLowerCase() == cArtist.toLowerCase(),
+      (a) =>
+          a.title.toLowerCase() == cTitle.toLowerCase() &&
+          a.artist.toLowerCase() == cArtist.toLowerCase(),
     );
     if (i >= 0) {
       _albums.removeAt(i);
@@ -622,24 +711,34 @@ class LibraryStore extends ChangeNotifier {
           id: 'album_rm_${cTitle}_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Removed',
           body: target,
-          leading: IslandNotification.trackThumb(cover, fallbackIcon: CupertinoIcons.music_albums, iconColor: Colors.white70),
+          leading: IslandNotification.trackThumb(
+            cover,
+            fallbackIcon: CupertinoIcons.music_albums,
+            iconColor: Colors.white70,
+          ),
         ),
       );
     } else {
       _albums.insert(0, SavedAlbum(cTitle, cArtist, cover));
       if (_activeUserId != null && _activeUserId!.isNotEmpty) {
-        unawaited(ApiService.saveUserAlbum({
-          'title': cTitle,
-          'artist': cArtist,
-          'coverUrl': cover,
-        }));
+        unawaited(
+          ApiService.saveUserAlbum({
+            'title': cTitle,
+            'artist': cArtist,
+            'coverUrl': cover,
+          }),
+        );
       }
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'album_add_${cTitle}_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Saved',
           body: target,
-          leading: IslandNotification.trackThumb(cover, fallbackIcon: CupertinoIcons.music_albums, iconColor: const Color(0xFFE11D48)),
+          leading: IslandNotification.trackThumb(
+            cover,
+            fallbackIcon: CupertinoIcons.music_albums,
+            iconColor: const Color(0xFFE11D48),
+          ),
         ),
       );
     }
@@ -651,11 +750,13 @@ class LibraryStore extends ChangeNotifier {
 
   void _syncPlaylistToCloud(UserPlaylist p) {
     if (_activeUserId != null && _activeUserId!.isNotEmpty) {
-      unawaited(ApiService.syncUserLibrary({
-        'playlists': [
-          {'id': p.id, 'name': p.name, 'tracks': p.trackIds}
-        ],
-      }));
+      unawaited(
+        ApiService.syncUserLibrary({
+          'playlists': [
+            {'id': p.id, 'name': p.name, 'tracks': p.trackIds},
+          ],
+        }),
+      );
     }
   }
 
@@ -687,7 +788,11 @@ class LibraryStore extends ChangeNotifier {
         id: 'playlist_create_${p.id}',
         title: 'Created',
         body: p.name,
-        leading: const Icon(CupertinoIcons.text_badge_plus, color: Color(0xFFE11D48), size: 18),
+        leading: const Icon(
+          CupertinoIcons.text_badge_plus,
+          color: Color(0xFFE11D48),
+          size: 18,
+        ),
       ),
     );
     return p;
@@ -712,7 +817,11 @@ class LibraryStore extends ChangeNotifier {
         id: 'playlist_import_${p.id}',
         title: 'Playlist Imported',
         body: '${p.name} (${tracks.length} songs)',
-        leading: const Icon(CupertinoIcons.link, color: Color(0xFFE11D48), size: 18),
+        leading: const Icon(
+          CupertinoIcons.link,
+          color: Color(0xFFE11D48),
+          size: 18,
+        ),
       ),
     );
     return p;
@@ -729,7 +838,11 @@ class LibraryStore extends ChangeNotifier {
         id: 'playlist_rename_$id',
         title: 'Renamed',
         body: p.name,
-        leading: const Icon(CupertinoIcons.pencil, color: Color(0xFFE11D48), size: 18),
+        leading: const Icon(
+          CupertinoIcons.pencil,
+          color: Color(0xFFE11D48),
+          size: 18,
+        ),
       ),
     );
   }
@@ -747,7 +860,11 @@ class LibraryStore extends ChangeNotifier {
         id: 'playlist_del_$id',
         title: 'Deleted',
         body: name,
-        leading: const Icon(CupertinoIcons.trash, color: Colors.white70, size: 18),
+        leading: const Icon(
+          CupertinoIcons.trash,
+          color: Colors.white70,
+          size: 18,
+        ),
       ),
     );
   }
@@ -758,14 +875,21 @@ class LibraryStore extends ChangeNotifier {
     if (p == null) return false;
     final k = _key(t);
     _seen[k] = t;
-    final target = IslandNotification.artistOrTitle(artist: t.artist, title: t.title);
+    final target = IslandNotification.artistOrTitle(
+      artist: t.artist,
+      title: t.title,
+    );
     if (p.trackIds.contains(k)) {
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'playlist_exists_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
           title: 'In ${p.name}',
           body: target,
-          leading: const Icon(CupertinoIcons.info_circle, color: Color(0xFFFFCC00), size: 18),
+          leading: const Icon(
+            CupertinoIcons.info_circle,
+            color: Color(0xFFFFCC00),
+            size: 18,
+          ),
         ),
       );
       return false;
@@ -778,7 +902,11 @@ class LibraryStore extends ChangeNotifier {
         id: 'playlist_add_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
         title: 'Added',
         body: target,
-        leading: IslandNotification.trackThumb(t.coverUrl, fallbackIcon: CupertinoIcons.music_note_list, iconColor: const Color(0xFFE11D48)),
+        leading: IslandNotification.trackThumb(
+          t.coverUrl,
+          fallbackIcon: CupertinoIcons.music_note_list,
+          iconColor: const Color(0xFFE11D48),
+        ),
       ),
     );
     return true;
@@ -804,7 +932,11 @@ class LibraryStore extends ChangeNotifier {
         id: 'playlist_add_batch_${p.id}_${DateTime.now().millisecondsSinceEpoch}',
         title: 'Added to ${p.name}',
         body: '$added ${added == 1 ? "song" : "songs"} added',
-        leading: const Icon(CupertinoIcons.checkmark_circle, color: Color(0xFFE11D48), size: 18),
+        leading: const Icon(
+          CupertinoIcons.checkmark_circle,
+          color: Color(0xFFE11D48),
+          size: 18,
+        ),
       ),
     );
     return added;
@@ -820,8 +952,15 @@ class LibraryStore extends ChangeNotifier {
         IslandNotification(
           id: 'playlist_rm_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Removed',
-          body: IslandNotification.artistOrTitle(artist: t.artist, title: t.title),
-          leading: const Icon(CupertinoIcons.minus_circle, color: Colors.white70, size: 18),
+          body: IslandNotification.artistOrTitle(
+            artist: t.artist,
+            title: t.title,
+          ),
+          leading: const Icon(
+            CupertinoIcons.minus_circle,
+            color: Colors.white70,
+            size: 18,
+          ),
         ),
       );
     }
