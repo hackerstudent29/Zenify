@@ -2,54 +2,60 @@
 
   <br />
 
-  <!-- Animated Zenify Transparent Brand Logo -->
+  <!-- Animated Zenify Brand Logo -->
   <a href="https://github.com/hackerstudent29/Zenify">
-    <img src="assets/images/zenify_logo_transparent.gif" alt="Zenify Logo" width="380" />
+    <img src="assets/images/zenify_logo_transparent.gif" alt="Zenify Transparent Logo" width="380" />
   </a>
 
   <br /><br />
 
-  <!-- Subtle Dot Matrix Accent -->
-  <img src="assets/hero/dot_matrix.svg" alt="Accent Matrix" width="600" />
+  <!-- Accent Dot Matrix -->
+  <img src="assets/hero/dot_matrix.svg" alt="Accent Matrix" width="620" />
 
-  <h1 style="font-weight: 800; letter-spacing: -0.03em; margin-top: 12px;">
-    Zenify for Android &nbsp;•&nbsp; Next-Gen <span style="color: #FF375F;">Flutter</span> Music & Video Client &nbsp;•&nbsp; <span style="color: #30D158;">Stable Version 1</span>
+  <h1 align="center" style="font-size: 32px; font-weight: 900; letter-spacing: -0.04em; margin-top: 14px; margin-bottom: 6px;">
+    Zenify for Android &nbsp;•&nbsp; <span style="color: #FF375F;">Flutter</span> Native Audio Client
   </h1>
 
-  <p align="center" style="max-width: 820px; font-size: 15.5px; line-height: 1.6; color: #a1a1aa;">
-    <b>Stable Version 1 Milestone &nbsp;•&nbsp; Pristine 320kbps Akamai CDN &nbsp;•&nbsp; Hardware Media3 ExoPlayer DSP &nbsp;•&nbsp; 20-Style DJ Crossfade &nbsp;•&nbsp; Zero Ads</b><br />
-    An open-source high-fidelity mobile audio & video streaming application engineered with <b>Flutter 3.44</b>, <b>Dart 3.12</b>, and native <b>Kotlin</b>.<br />
-    Features Apple-grade fluid gesture physics, Liquid Glass Studio, real-time syllable-synced karaoke lyrics,<br />
+  <p align="center" style="font-size: 16px; font-weight: 700; color: #30D158; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0px;">
+    ✦ Stable Version 1 Official Milestone ✦
+  </p>
+
+  <p align="center" style="max-width: 820px; font-size: 15.5px; line-height: 1.65; color: #a1a1aa;">
+    <b>Pristine 320kbps Akamai CDN &nbsp;•&nbsp; Hardware Media3 ExoPlayer DSP &nbsp;•&nbsp; 20-Style DJ Crossfade &nbsp;•&nbsp; Strictly Zero Ads</b><br />
+    An open-source high-fidelity mobile music & video streaming platform crafted with <b>Flutter 3.44</b>, <b>Dart 3.12</b>, and native <b>Kotlin</b>.<br />
+    Featuring Apple-grade fluid gesture physics, Liquid Glass Studio, real-time syllable-synced karaoke lyrics,<br />
     sub-15ms Room Together synchronized listening, and a hardware-accelerated 16:9 video texture engine.<br />
-    <i>(Note: Web player service is in sunset mode; Zenify Android is our primary, full-featured experience.)</i>
+    <i>(Web player is in legacy sunset status; Zenify Android is our primary, full-featured client.)</i>
   </p>
 
   <br />
 
-  <!-- Signature Action Buttons -->
+  <!-- High-Contrast Interactive CTA Buttons -->
   <p align="center">
-    <span style="color: rgba(255,255,255,0.25); font-family: monospace; font-size: 16px;">+</span>
-    &nbsp;&nbsp;
+    <span style="color: rgba(255,255,255,0.25); font-family: monospace; font-size: 18px;">+</span>
+    &nbsp;&nbsp;&nbsp;
     <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk">
-      <img src="assets/buttons/btn_download_android.svg" alt="Download APK for Android" height="46" />
+      <img src="assets/buttons/btn_download_android.svg" alt="Download APK for Android" height="48" />
     </a>
-    &nbsp;&nbsp;
-    <a href="https://github.com/hackerstudent29/Zenify/releases">
-      <img src="assets/buttons/btn_github_releases.svg" alt="GitHub Releases" height="46" />
+    &nbsp;&nbsp;&nbsp;
+    <a href="https://github.com/hackerstudent29/Zenify/releases/tag/v1.1.21">
+      <img src="assets/buttons/btn_github_releases.svg" alt="GitHub Releases" height="48" />
     </a>
-    &nbsp;&nbsp;
-    <span style="color: rgba(255,255,255,0.25); font-family: monospace; font-size: 16px;">+</span>
+    &nbsp;&nbsp;&nbsp;
+    <span style="color: rgba(255,255,255,0.25); font-family: monospace; font-size: 18px;">+</span>
   </p>
 
   <p align="center">
-    <sub><code>Android 8.0+ (ARM64-v8a & Universal APK)</code> &nbsp;•&nbsp; <code>Tested on Android 8 to 15</code> &nbsp;•&nbsp; <code>Free & Open Source (MIT)</code></sub>
+    <code>Android 8.0+ (ARM64-v8a & Universal)</code> &nbsp;•&nbsp; 
+    <code>Tested on Android 8 to 15</code> &nbsp;•&nbsp; 
+    <code>100% Free & Open Source (MIT)</code>
   </p>
 
   <br />
 
   <!-- Signature Rose Spec Capsules -->
   <p align="center">
-    <img src="assets/badges/badge_release.svg" alt="Release v1.1.21" height="26" />
+    <img src="assets/badges/badge_release.svg" alt="Release v1.1.21 Stable 1" height="26" />
     &nbsp;
     <img src="assets/badges/badge_audio.svg" alt="320kbps Audio" height="26" />
     &nbsp;
@@ -68,37 +74,155 @@
 
 ---
 
-## 📱 Application Overview
+> [!IMPORTANT]
+> **Zenify v1.1.21 is the official Stable Version 1 milestone.**  
+> It delivers pure YouTube Music search parity, 16:9 landscape video previews, sub-300ms parallel lyrics racing with video skip, 20-style hardware DJ crossfade, Studio FX DSP, Room Together WebRTC voice sync, and offline downloads with **strictly zero ads and zero subscriptions**.
 
-**Zenify Mobile** is an open-source, high-performance Android music and video streaming client engineered from the ground up using **Flutter (v3.44.2)** and **AndroidX Media3 ExoPlayer (v1.5.1)**. Built specifically for audiophiles, everyday music lovers, and synchronized listening circles, it combines an editorial Apple Music aesthetic with a custom native Android DSP engine.
+---
 
-Unlike web wrappers or basic media player apps, Zenify connects directly to low-level audio rendering pipelines in native Kotlin, processing raw 16-bit PCM audio buffers for studio-grade parametric equalization, spatial 8D orbital sound, real-time volume normalization, and hardware-accelerated 16:9 video rendering—with **100% zero ads**, zero telemetry tracking, and zero mandatory account requirements.
+## ⚡ Feature Highlights at a Glance
+
+<table width="100%">
+  <tr>
+    <td width="50%" valign="top">
+      <h3><span style="color: #FF375F;">◈</span> 320kbps Akamai CDN Audio</h3>
+      Direct pristine stream resolution from Akamai CDN edge servers. <b>Strict anti-snippet policy:</b> zero 30-second previews. Every song plays in full master quality with low-latency PCM buffer decoding.
+    </td>
+    <td width="50%" valign="top">
+      <h3><span style="color: #BF5AF2;">◈</span> 20-Style Hardware DJ Crossfade</h3>
+      Dual synchronized ExoPlayer pipeline in native Kotlin (<code>XfFxProcessor.kt</code>). Seamlessly blend songs with 20 distinct DJ transitions: <i>Bass Swap, Stutter Gate, Tape Stop, Vinyl Brake, Slam Cut</i>, and more.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3><span style="color: #0A84FF;">◈</span> Syllable-Synced Karaoke Lyrics</h3>
+      Dual-provider parallel racing (<code>lrc.red</code> + <code>lrclib.net</code>) under 300ms. Features real-time glowing word cursors, automated instrumental countdown dots (<code>• • •</code>), and romanization for non-Latin scripts.
+    </td>
+    <td width="50%" valign="top">
+      <h3><span style="color: #30D158;">◈</span> Room Together Voice Sync</h3>
+      Sub-15ms multi-device clock synchronization for listening with friends anywhere globally. Includes integrated ultra-low-latency <b>LiveKit WebRTC spatial voice chat</b> and interactive host/DJ roles.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3><span style="color: #FF9F0A;">◈</span> Hardware 16:9 Video Engine</h3>
+      Zero-overhead native Android <code>SurfaceTexture</code> hardware video rendering. Enjoy authentic 16:9 landscape previews in search, queue, and dedicated video single views with seamless background playback.
+    </td>
+    <td width="50%" valign="top">
+      <h3><span style="color: #FF453A;">◈</span> Studio FX DSP & 8D Spatial Audio</h3>
+      3-band parametric hardware equalizer, 360° orbital spatial audio rotation, real-time loudness normalization (-14 LUFS), acoustic reverb spaces (Warehouse & Cathedral), and $(L+R)/2$ mono downmixing.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3><span style="color: #5E5CE6;">◈</span> Multi-Threaded Offline Downloader</h3>
+      Chunked parallel range downloader bypassing CDN rate-limits. Bundles high-bitrate audio (<code>.m4a</code>), high-resolution artwork (<code>.jpg</code>/<code>.webp</code>), and synced lyrics (<code>.lrc</code>) with Wi-Fi Only protection.
+    </td>
+    <td width="50%" valign="top">
+      <h3><span style="color: #64D2FF;">◈</span> Liquid Glass Studio & Pure OLED</h3>
+      Live Apple Glass customization playground with real-time blur, specular rim lighting, and chromatic dispersion. Includes Pure OLED <code>#000000</code> Blackout Mode to turn off AMOLED pixels and save battery.
+    </td>
+  </tr>
+</table>
+
+---
+
+## 📊 Zenify vs Commercial Music Platforms
+
+| Capability / Feature | 🌸 **Zenify v1.1.21 (Stable 1)** | 🟢 Spotify Free | 🍎 Apple Music | 🔴 YouTube Music Free |
+|---|:---:|:---:|:---:|:---:|
+| **Cost & Subscription** | **100% Free Forever** | Ad-Supported ($11.99/mo) | $10.99/month | Ad-Supported ($10.99/mo) |
+| **Advertisements** | **Strictly ZERO Ads** | Audio & Banner Ads | None (Paid) | Video & Audio Ads |
+| **Streaming Quality** | **Pristine 320 kbps (Akamai)** | 160 kbps (Capped) | 256 kbps AAC (Paid) | 128 kbps (Capped) |
+| **DJ Crossfade Engine** | **20 Handcrafted Styles** | 1 Basic Linear Style | Basic Crossfade | None |
+| **Syllable Karaoke Lyrics** | **Sub-300ms Word-by-Word** | Basic / Delayed | Line-by-Line (Paid) | Static / Line-by-Line |
+| **Multi-Language Romanization** | **Built-In (Kanji, Hangul, Indic)** | None | Limited | None |
+| **16:9 Video Engine** | **Hardware SurfaceTexture** | None | Music Videos (Paid) | Video Ads / Screen Lock |
+| **Background Video Playback** | **Included (Screen Off)** | None | None | Blocked Behind Paywall |
+| **Social Listening & Voice** | **Sub-15ms + WebRTC Voice** | Jam (Paid Only) | SharePlay (Apple Only) | None |
+| **Offline Media Download** | **Full Audio + Art + Synced LRC** | Blocked Behind Paywall | Paid Subscription Only | Blocked Behind Paywall |
+| **Hardware Equalizer & 8D Audio** | **3-Band Parametric + 8D Orbit** | Basic Preset EQ | System EQ Only | Basic Preset EQ |
+| **Account / Login Requirement** | **Zero (Open & Play)** | Mandatory Account | Mandatory Apple ID | Mandatory Google Account |
+| **Data Privacy & Telemetry** | **Zero Tracking / Zero Telemetry** | User Behavioral Tracking | Telemetry Collected | Google Ad Profiling |
 
 ---
 
 ## 📋 Android Specifications
 
-| Attribute | Specification |
-|---|---|
-| **App Name** | Zenify |
-| **Package Identifier** | `com.zenify.mobile` |
-| **Current Version** | `v1.1.21` **(Stable Version 1)** |
-| **Build Number** | `2035` · *First Stable Release* |
-| **Cross-Platform Engine** | Flutter 3.44.2 / Dart 3.12.0 |
-| **Native Android Platform** | Kotlin 2.0.21 / JVM 17 |
-| **Audio Core** | AndroidX Media3 ExoPlayer 1.5.1 with Custom PCM AudioProcessor |
-| **Minimum Android OS** | **Android 8.0 (API Level 26 - Oreo)** *(96%+ device coverage)* |
-| **Target Android OS** | **Android 15 (API Level 35 - Vanilla Ice Cream)** |
-| **ARM64 Split APK** | **15.9 MB** (`16,708,961` bytes) · *Recommended for all modern phones* |
-| **Universal APK** | **36.1 MB** (`37,836,799` bytes) · *All architectures (ARM64, ARMv7, x86_64)* |
-| **Supported Bitrates** | 320 kbps (Pristine HQ), 160 kbps (Opus), 128 kbps (AAC), 70 kbps (Data Saver) |
-| **Video Decoding** | Hardware `SurfaceTexture` / `TextureRegistry` (360p to 4K 60fps) |
-| **Typography** | Bundled offline Apple `SF Pro Display` & `SF Pro Text` (Zero runtime font downloads) |
-| **License** | Open Source (MIT) |
+<table width="100%">
+  <thead>
+    <tr style="background: rgba(255,255,255,0.05);">
+      <th align="left" width="30%">Specification Field</th>
+      <th align="left" width="70%">Technical Value / Parameter</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>Application Name</b></td>
+      <td><code>Zenify</code></td>
+    </tr>
+    <tr>
+      <td><b>Package Identifier</b></td>
+      <td><code>com.zenify.mobile</code></td>
+    </tr>
+    <tr>
+      <td><b>Release Milestone</b></td>
+      <td><b>v1.1.21 · Stable Version 1</b></td>
+    </tr>
+    <tr>
+      <td><b>Build Number</b></td>
+      <td><code>2035</code></td>
+    </tr>
+    <tr>
+      <td><b>Mobile Framework</b></td>
+      <td>Flutter 3.44.2 / Dart 3.12.0</td>
+    </tr>
+    <tr>
+      <td><b>Native Platform Subsystem</b></td>
+      <td>Kotlin 2.0.21 / Android JVM 17</td>
+    </tr>
+    <tr>
+      <td><b>Media Engine Core</b></td>
+      <td>AndroidX Media3 ExoPlayer 1.5.1 with Custom 16-bit PCM AudioProcessor</td>
+    </tr>
+    <tr>
+      <td><b>Minimum Supported OS</b></td>
+      <td><b>Android 8.0 (API Level 26 - Oreo)</b> &nbsp;•&nbsp; <i>Covers 96%+ of active Android devices globally</i></td>
+    </tr>
+    <tr>
+      <td><b>Target Supported OS</b></td>
+      <td><b>Android 15 (API Level 35 - Vanilla Ice Cream)</b></td>
+    </tr>
+    <tr>
+      <td><b>ARM64 Optimized Split APK</b></td>
+      <td><b>15.9 MB</b> (<code>16,708,961</code> bytes) &nbsp;•&nbsp; <i>Recommended for all modern smartphones</i></td>
+    </tr>
+    <tr>
+      <td><b>Universal Multi-ABI APK</b></td>
+      <td><b>36.1 MB</b> (<code>37,836,799</code> bytes) &nbsp;•&nbsp; <i>Supports arm64-v8a, armeabi-v7a, and x86_64</i></td>
+    </tr>
+    <tr>
+      <td><b>Supported Bitrate Profiles</b></td>
+      <td>320 kbps (Pristine HQ), 160 kbps (Opus), 128 kbps (AAC), 70 kbps (Data Saver)</td>
+    </tr>
+    <tr>
+      <td><b>Video Surface Technology</b></td>
+      <td>Hardware <code>SurfaceTexture</code> / <code>TextureRegistry</code> (360p, 480p, 720p, 1080p, 4K 60fps)</td>
+    </tr>
+    <tr>
+      <td><b>Typography</b></td>
+      <td>Bundled offline Apple <code>SF Pro Display</code> & <code>SF Pro Text</code> (Zero runtime font downloads)</td>
+    </tr>
+    <tr>
+      <td><b>License</b></td>
+      <td><b>Free & Open Source (MIT License)</b></td>
+    </tr>
+  </tbody>
+</table>
 
 ---
 
-## ⚡ System Requirements (Minimum & Recommended)
+## ⚡ System Requirements & Performance Footprint
 
 ### Hardware & OS Compatibility Matrix
 
@@ -113,56 +237,78 @@ Unlike web wrappers or basic media player apps, Zenify connects directly to low-
 | **Network (Streaming)**| 1.5 Mbps (3G / 4G / Wi-Fi) | 5–10 Mbps+ (4G LTE / 5G / High-Speed Wi-Fi) |
 | **Offline Playback** | None (0 KB/s — Works 100% offline) | None |
 
-### Resource & Performance Profile
+### Real-World Resource Profiling
 
-* **RAM Footprint**:
-  * **Idle & Background Audio**: Uses only **85 MB to 140 MB of RAM** while streaming 320kbps audio with the native DSP Studio FX pipeline active.
+* **RAM Budget**:
+  * **Idle & Background Audio**: Consumes only **85 MB to 140 MB of RAM** while streaming 320kbps audio with the native DSP Studio FX pipeline active.
   * **Video Texture & Room Together**: Uses approximately **180 MB to 260 MB of RAM** during concurrent 1080p video rendering and LiveKit WebRTC spatial voice chat.
-  * **Efficiency**: ExoPlayer delegates audio demuxing and hardware video decoding directly to Android's native `MediaCodec` pipeline, preventing heavy garbage collection pauses in Flutter.
+  * **Hardware Offload**: ExoPlayer delegates audio demuxing and hardware video decoding directly to Android's native `MediaCodec` pipeline, avoiding garbage collection pauses in Flutter.
 * **Storage Footprint**:
-  * **Installed App Footprint**: **~45 MB – 65 MB** (app binary + SQLite catalog cache).
-  * **Offline Single Track**: **~3 MB to 6 MB** per song (`.m4a` / 320kbps).
-  * **100 Downloaded Tracks**: **~400 MB to 550 MB** of disk storage.
+  * **App Installation**: **~45 MB – 65 MB** (app binary + SQLite index).
+  * **Downloaded Song**: **~3 MB to 6 MB** per track (`.m4a` / 320kbps).
+  * **100 Downloaded Tracks**: **~400 MB to 550 MB** of storage.
   * **Streaming Buffer Cache**: Auto-capped at **250 MB** by default (customizable between 100 MB to 1.0 GB in *Settings → Storage Management*).
 
 ---
 
-## 🌟 360° Comprehensive Feature Breakdown
+## 🌟 360° Comprehensive Deep Dive
 
-### 1. 🎵 Pristine Audio Pipeline & Zero 30-Second Preview Guarantee
-* **Strict Anti-Snippet Policy**: Zenify completely bans 30-second preview snippets (`mzstatic`, iTunes previews). Every song resolves directly to pristine full-length 320kbps Akamai CDN streams or unhindered YouTube full-audio streams.
-* **Dual ExoPlayer Architecture**: Uses two synchronized ExoPlayer instances (`player` and `fadePlayer`) in native Kotlin (`ZenAudioPlugin.kt`) to achieve seamless overlapping crossfades, gapless track transitions, and instant pre-warming.
-* **Selectable Audio Bitrates**:
-  * **320 kbps (Lossless / Pristine Akamai CDN)**: Pristine master-quality audio with crystal-clear highs and deep bass response.
-  * **160 kbps (Opus)**: Audiophile-grade perceptual transparency at half the bandwidth.
-  * **128 kbps (AAC)**: Standard high-efficiency mobile streaming.
-  * **70 kbps (Data Saver)**: Ultra-efficient streaming for low-reception or metered data connections.
-* **Loudness Normalization (-14 LUFS)**: Intercepts song loudness metadata and automatically scales gain ($\text{gain} = 10^{-\text{loudnessDb}/20}$) to eliminate jarring volume jumps between tracks recorded at different loudness levels.
-* **Stereo-to-Mono Downmixing**: Accessibility-focused $(L + R) / 2$ audio downmix so listeners wearing a single earbud never miss vocals or instruments panned to the other ear.
+### 1. 🎵 Pristine Audio Architecture & Anti-Snippet Policy
+* **Zero 30-Second Previews**: Zenify enforces a strict architectural ban on iTunes or promotional 30-second snippets (`mzstatic`, Apple preview URLs). Every track resolves to full-length master streams via pristine 320kbps Akamai CDN edges or unhindered YouTube full-audio streams.
+* **Dual-ExoPlayer Overlap**: Coordinated in native Kotlin (`ZenAudioPlugin.kt`), two synchronized ExoPlayer instances (`player` and `fadePlayer`) run in parallel for zero-gap playback, instant pre-warming, and smooth overlapping crossfades.
+* **Selectable Bitrate Profiles**:
+  * **320 kbps (Lossless / Pristine Akamai CDN)**: Master-grade acoustic fidelity with deep bass impact and pristine vocal definition.
+  * **160 kbps (Opus)**: Perceptually transparent streaming at half the bandwidth.
+  * **128 kbps (AAC)**: Standard mobile streaming efficiency.
+  * **70 kbps (Data Saver)**: Ultra-efficient streaming for low-reception areas or metered mobile networks.
+* **Real-Time Volume Normalization (-14 LUFS)**: Automatically scales linear gain ($\text{gain} = 10^{-\text{loudnessDb}/20}$) using incoming loudness metadata, preventing volume spikes between tracks recorded across different eras.
+* **Stereo-to-Mono Downmixer**: Accessibility-focused $(L + R) / 2$ audio downmix so listeners using a single earbud never lose panned instruments, guitar licks, or backing vocals.
 
 ---
 
 ### 2. 🎛️ 20-Style Hardware DJ Crossfade Engine
-Engineered directly in native Kotlin (`XfFxProcessor.kt`) and orchestrated via Flutter's `CrossfadeController`, Zenify offers 20 distinct DJ transition styles across 4 musical categories:
+Engineered directly in native Kotlin (`XfFxProcessor.kt`) and synchronized via Flutter's `CrossfadeController`, transitions between songs can be customized with 20 distinct DJ transition styles:
 
-| Style Category | Transition Styles | Audible Behavior & Acoustic Character |
+<details open>
+<summary><b>▶ Click to Expand the 20 DJ Crossfade Styles Directory</b></summary>
+<br />
+
+| Category | Transition Name | Acoustic Mechanics & Audible Transition Profile |
 |---|---|---|
-| **Auto** | `Auto Intelligent Blend` | Analyzes BPM, energy, silence, and key of incoming and outgoing songs to automatically trigger the optimal transition |
-| **Classic** | `Smooth Crossfade`<br />`Classic Linear`<br />`Cinematic S-Curve`<br />`Fade Through Dip` | Equal-power logarithmic volume blend, linear slope, smooth sigmoidal curve, or a clean momentary silence dip |
-| **DJ Blend** | `DJ Blend`<br />`Bass Swap`<br />`Filter Sweep`<br />`Stutter Gate`<br />`Slam Cut`<br />`Riser` | Resonant low-shelf bass drop (-30 dB) swapped cleanly at midpoint, resonant low-pass/high-pass filter sweeps, tempo-synced 8th-note audio chopping, instant beat drops, and pitch-shifted snare riser builds |
-| **Production** | `R&B Glide`<br />`Echo Out`<br />`Reverb Wash`<br />`Tape Stop`<br />`Vinyl Brake`<br />`Spin-Up`<br />`Lo-Fi Dive`<br />`Jet Sweep`<br />`Radio Tune` | Smooth pitch-glide transitions, freeze-delay echo tails on outgoing tracks, lush cathedral reverb washes, vintage analog tape motor decelerations, turntable scratch brakes, vinyl spin-ups, sample-rate bitcrush dives, resonant jet flanger sweeps, and vintage AM/FM dial static sweeps |
+| **Auto** | `Auto Intelligent Blend` | Analyzes BPM, energy, silence, and musical key of outgoing and incoming tracks to automatically choose the best transition curve |
+| **Classic** | `Smooth Crossfade` | Equal-power logarithmic volume crossfade maintaining uniform acoustic loudness |
+| | `Classic Linear` | Symmetrical linear volume taper between outgoing and incoming audio streams |
+| | `Cinematic S-Curve` | Smooth sigmoidal curve with gentle lead-in and gradual exponential fade-out |
+| | `Fade Through Dip` | Clean momentary volume dip to silence between songs for dramatic pacing |
+| **DJ Blend** | `DJ Blend` | Club DJ blend with gradual high-frequency wash and smooth tempo matching |
+| | `Bass Swap` | Cuts bass on outgoing track at midpoint with a resonant -30 dB low-shelf drop while instantly kicking in the incoming bassline |
+| | `Filter Sweep` | Sweeps outgoing track through a resonant low-pass filter while opening the incoming track with a high-pass sweep |
+| | `Stutter Gate` | Tempo-synced 8th-note audio chopping across the transition window |
+| | `Slam Cut` | Instant zero-fade beat drop on the downbeat of the next track |
+| | `Riser` | Pitched snare roll riser build leading directly into the incoming drop |
+| **Production** | `R&B Glide` | Smooth pitch-glide transition creating a seamless vinyl-style vocal blend |
+| | `Echo Out` | Freezes outgoing audio into a tempo-synced delay feedback tail |
+| | `Reverb Wash` | Outgoing song washes out into a lush cathedral reverb tail as the next begins |
+| | `Tape Stop` | Simulates an authentic analog tape machine motor powering down |
+| | `Vinyl Brake` | Emulates a turntable motor brake and tonearm scratch deceleration |
+| | `Spin-Up` | Turntable motor spin-up from dead stop to full speed |
+| | `Lo-Fi Dive` | Sample-rate bitcrusher hold and filter dive down to vintage 8-bit lofi textures |
+| | `Jet Sweep` | Resonant jet flanger sweep across the overlapping transition window |
+| | `Radio Tune` | Sweeps across vintage AM/FM analog dial static and frequencies |
 
-* **Interactive Timeline Preview**: Features a live interactive visualizer preview in *Settings → Crossfade* (`CrossfadeStyleSection.dart`) to test transitions between real song pairs before listening.
-* **Custom Duration Slider**: Adjust transition lengths freely from **1 to 12 seconds** with smart gapless silence skipping.
+</details>
+
+* **Interactive Timeline Preview**: Test transitions between real song pairs on a live visualizer canvas in *Settings → Crossfade* (`CrossfadeStyleSection.dart`) before listening.
+* **Duration Slider**: Fine-tune crossfade duration from **1 to 12 seconds** with smart silence skipping.
 
 ---
 
 ### 3. 🎚️ Hardware Studio FX & Audio Enhancement
-* **Parametric Hardware Equalizer**: 3-band parametric hardware EQ with Low Shelf (32Hz–250Hz), Peaking Mid (250Hz–4kHz), and High Shelf (4kHz–16kHz) with ±12 dB hardware gain adjustment.
-* **Spatial 8D Audio Rotation**: Dynamic orbital simulator using Interaural Time Difference (ITD) and Interaural Intensity Difference (IID) panning around the listener's head with customizable rotation speed (0.05–1.0 Hz) and direction (clockwise or counter-clockwise).
+* **Parametric Hardware EQ**: 3-band parametric hardware equalizer operating on 16-bit PCM buffers with Low Shelf (32Hz–250Hz), Peaking Mid (250Hz–4kHz), and High Shelf (4kHz–16kHz) with ±12 dB hardware gain adjustment.
+* **Spatial 8D Audio Rotation**: Dynamic orbital simulator using ITD (Interaural Time Difference) and IID (Interaural Intensity Difference) panning around the listener's head with customizable rotation speed (0.05–1.0 Hz) and orbital direction (clockwise or counter-clockwise).
 * **Acoustic Reverb Presets**: Warehouse (studio room acoustics) and Cathedral (spacious atmospheric decay) with adjustable wet/dry mix.
-* **Drive & Warmth**: Warm analog tube saturation simulation for extra acoustic punch.
-* **Stereo Width Widener & Delay**: Expand the soundstage or add stereo echo with custom feedback timing.
+* **Drive & Warmth**: Analog tube saturation simulation for extra punch.
+* **Stereo Width Widener & Delay**: Expand the acoustic soundstage or add stereo echo with custom feedback timing.
 * **Vocal Mode Processor**: Real-time vocal boost to enhance lyrics or vocal reduction for impromptu karaoke singing.
 * **36-Band FFT Real-Time Spectrum**: Native 30 fps audio spectrum analyzer feeding real-time visualizer data to the player interface.
 
@@ -250,7 +396,7 @@ Engineered directly in native Kotlin (`XfFxProcessor.kt`) and orchestrated via F
 
 <table width="100%">
   <thead>
-    <tr>
+    <tr style="background: rgba(255,255,255,0.05);">
       <th align="left">Package</th>
       <th align="left">Target Device & Architecture</th>
       <th align="center">File Size</th>
@@ -283,10 +429,26 @@ Engineered directly in native Kotlin (`XfFxProcessor.kt`) and orchestrated via F
 
 ### 📱 Android Installation Steps
 
-1. Tap [**Download APK**](https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk) on your Android device.
-2. When the download completes, tap the notification or locate `zenify-v1.1.21.apk` in your device's **Files** or **Downloads** folder.
-3. If prompted with *"For your security, your phone is not allowed to install unknown apps from this source"*, tap **Settings** and toggle **Allow from this source**.
-4. Tap **Install**, open Zenify, and enjoy high-fidelity ad-free music and video streaming!
+<table width="100%">
+  <tr>
+    <td width="25%" align="center">
+      <h3>1️⃣ Download</h3>
+      <p>Tap <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk"><b>Download APK</b></a> on your phone to fetch the ARM64 package.</p>
+    </td>
+    <td width="25%" align="center">
+      <h3>2️⃣ Open Package</h3>
+      <p>Tap the download notification or locate <code>zenify-v1.1.21.apk</code> in your <b>Downloads</b> folder.</p>
+    </td>
+    <td width="25%" align="center">
+      <h3>3️⃣ Allow Source</h3>
+      <p>If prompted with <i>"Install unknown apps"</i>, tap <b>Settings</b> and toggle <b>Allow from this source</b>.</p>
+    </td>
+    <td width="25%" align="center">
+      <h3>4️⃣ Launch & Enjoy</h3>
+      <p>Tap <b>Install</b>, launch Zenify, and enjoy 100% ad-free 320kbps music streaming!</p>
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -336,7 +498,8 @@ The compiled binaries will be output to:
 
 ## 🌐 Note on the Web Player
 
-The browser-based web player at [listenzenify.vercel.app](https://listenzenify.vercel.app) is currently in **sunset / legacy status** due to browser audio engine constraints, mobile background playback restrictions, and ISP/CORS stream blockages. All ongoing active feature development, hardware DSP processing, and 16:9 video enhancements are dedicated to the **Zenify Android Flutter application**.
+> [!NOTE]
+> The browser-based web player at [listenzenify.vercel.app](https://listenzenify.vercel.app) is currently in **sunset / legacy status** due to browser audio engine constraints, mobile background playback restrictions, and ISP/CORS stream blockages. All ongoing active feature development, hardware DSP processing, and 16:9 video enhancements are dedicated to the **Zenify Android Flutter application**.
 
 ---
 
