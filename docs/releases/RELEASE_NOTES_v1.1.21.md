@@ -14,7 +14,13 @@
 
 Zenify v1.1.21 represents the **first production-grade stable release** of the complete Flutter Android client, delivering hardware-accelerated Media3 audio/video streaming, pure YouTube Music search parity, and seamless performance:
 
-### 1. 🔍 Pure YouTube Music Search Parity
+### 1. 🛡️ 100% Offline Data Isolation (Zero Network Usage on Downloaded Songs)
+- **Zero Internet Usage**: Completely blocked all background HTTP queries, stream resolutions, speculative lookahead prefetching, and radio population when listening to downloaded songs.
+- **Offline Lyrics Disk Cache**: Synced lyrics load directly from local storage (`DownloadService.getLocalLyrics`). Missing lyrics on offline tracks immediately return `null` without pinging online lyrics APIs.
+- **Local Artwork Rendering**: Cover art uses local `file://` URIs natively across ExoPlayer notification headers and `ArtworkMeshBackground` without triggering network fetches.
+- **Isolated Telemetry**: Playback history journal records offline plays locally without triggering immediate HTTP sync flushes.
+
+### 2. 🔍 Pure YouTube Music Search Parity
 - **Unrestricted Discovery**: Search queries now yield 1:1 parity with YouTube Music. Video songs, official studio audio, verified artists, official albums, and playlists now display cleanly without artificial candidate dropping.
 - **Popularity & Catalog Integrity**: Restored full shelves and carousels for albums and playlists, ensuring high-intent queries locate famous tracks and records instantly.
 

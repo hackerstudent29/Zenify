@@ -134,7 +134,7 @@ export default function DownloadPage() {
                     className="h-12 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 cursor-pointer shadow-lg hover:border-brand/40"
                   >
                     <Download size={18} className="text-brand shrink-0" />
-                    <span>Download APK (15.5 MB)</span>
+                    <span>Download APK (16.0 MB)</span>
                   </a>
 
                   <a
@@ -144,7 +144,7 @@ export default function DownloadPage() {
                     className="h-12 px-5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/90 text-xs font-semibold tracking-wider transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Download size={15} className="text-zinc-400" />
-                    <span>Universal (34.7 MB)</span>
+                    <span>Universal (36.1 MB)</span>
                   </a>
 
                   <a

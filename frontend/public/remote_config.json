@@ -5,24 +5,27 @@
   "latestAppVersion": "1.1.21",
   "isForceUpdate": false,
   "releaseDate": "November 24, 2026",
-  "releaseTime": "10:30 PM IST",
+  "releaseTime": "11:50 PM IST",
   "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk",
   "features": [
+    "100% Offline Data Isolation: Zero internet consumption when listening to downloaded songs (offline disk cache for lyrics, blocked speculative prefetching, disabled background radio queries, and local artwork resolution)",
     "Strict YouTube Music Search Parity: Full unrestricted access to official songs, video songs, albums, verified artists, and playlists",
     "16:9 Landscape Video Previews: Landscape thumbnail rendering in search history and queue panels for video songs",
     "Instant Search History Playback: 1-tap playback from search history without re-search delays",
     "Ultra-Fast Parallel Lyrics Resolver: Sub-300ms parallel lyrics fetching with LRCLIB, lrc.red, and instant video song bypass"
   ],
   "fixes": [
+    "Completely blocked network leakage on background services when listening to offline downloaded tracks",
     "Restored pure YouTube Music search results across songs, videos, albums, and playlists",
     "Bypassed lyrical retrieval for video songs to eliminate unnecessary network latency",
     "Fixed search history item tapping to directly play media or navigate to the target artist/album page"
   ],
   "improvements": [
+    "Ultra-compressed 16.0 MB APK footprint with R8 minification, ProGuard dead-code removal, and ABI-split optimization",
     "Landscape 16:9 aspect ratio previews for video songs in queue and search history",
     "LRCLIB ultra-fast lyrics integration with cache version 12 and auto-cleanup",
-    "Optimized package footprint and memory efficiency"
+    "Optimized package footprint, CPU usage, and battery longevity"
   ],
-  "releaseNotes": "• Strict YouTube Music search parity (unrestricted songs, videos, albums, playlists)\n• 16:9 landscape video previews in search history & queue\n• Ultra-fast parallel lyrics resolver with video skip",
-  "message": "Update to v1.1.21 for pure YouTube Music search parity, landscape video previews, and ultra-fast lyrics fetching"
+  "releaseNotes": "• 100% Offline Data Isolation: Zero data consumption on downloaded songs\n• Strict YouTube Music search parity (unrestricted songs, videos, albums, playlists)\n• 16:9 landscape video previews in search history & queue\n• Ultra-fast parallel lyrics resolver with video skip\n• Ultra-compressed 16.0 MB APK footprint",
+  "message": "Update to v1.1.21 for 100% offline playback isolation (zero data usage on downloaded songs), YouTube Music search parity, and ultra-fast lyrics fetching"
 }
