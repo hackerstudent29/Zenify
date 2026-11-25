@@ -72,7 +72,7 @@
 
   <!-- Main 4-Screen Hero Showcase -->
   <p align="center">
-    <img src="assets/screenshots/hero_showcase.png" alt="Zenify Android Showcase — Now Playing, Album View, 16:9 Video Player, and Syllable-Synced Lyrics" width="920" />
+    <img src="assets/screenshots/hero_showcase.png" alt="Zenify Android Showcase — Now Playing, Album View, 16:9 Video Player, and Syllable-Synced Lyrics" width="100%" />
   </p>
   <p align="center">
     <sub><b>Now Playing (Hi-Res Lossless)</b> &nbsp;•&nbsp; <b>Album &amp; Floating Dock</b> &nbsp;•&nbsp; <b>16:9 Video Single Player</b> &nbsp;•&nbsp; <b>Syllable-Synced Karaoke Lyrics</b></sub>
@@ -94,80 +94,84 @@
 
 <table width="100%">
   <tr>
-    <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_bleed_artwork.jpg" alt="Bleed Artwork Player" width="230" />
+    <td width="50%" align="center" valign="top">
+      <img src="assets/screenshots/feature_bleed_artwork.jpg" alt="Bleed Artwork Player" width="340" />
       <br /><br />
       <b>Bleed Artwork Player</b><br />
       <sub>Zenify features soft-feathered edge-bleeding artwork that melts album covers smoothly into the player canvas, paired with Hi-Res Lossless playback.</sub>
     </td>
-    <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_studio_fx.jpg" alt="Studio FX & Parametric EQ" width="230" />
+    <td width="50%" align="center" valign="top">
+      <img src="assets/screenshots/feature_studio_fx.jpg" alt="Studio FX & Parametric EQ" width="340" />
       <br /><br />
       <b>Studio FX &amp; Parametric EQ</b><br />
       <sub>Zenify includes a real-time native audio engine with a 36-band spectrum visualizer, Bass/Mid/Treble EQ, Warmth, Filter, Spatial 8D, and Night Mode.</sub>
     </td>
-    <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_crossfade.jpg" alt="20-Style DJ Crossfade Engine" width="230" />
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src="assets/screenshots/feature_crossfade.jpg" alt="20-Style DJ Crossfade Engine" width="340" />
       <br /><br />
       <b>20-Style DJ Crossfade Engine</b><br />
       <sub>Zenify lets you preview and customize 20 handcrafted DJ transitions (Auto, Smooth, Bass Swap, Tape Stop, Vinyl Brake) with a live transition curve.</sub>
     </td>
-  </tr>
-  <tr>
-    <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_queue.jpg" alt="Smart Queue & Infinite Autoplay" width="230" />
+    <td width="50%" align="center" valign="top">
+      <img src="assets/screenshots/feature_queue.jpg" alt="Smart Queue & Infinite Autoplay" width="340" />
       <br /><br />
       <b>Smart Queue &amp; Infinite Autoplay</b><br />
       <sub>Zenify gives you a drag-to-reorder Up Next queue with Shuffle, Repeat, and Infinite Autoplay that keeps similar tracks queued automatically.</sub>
     </td>
-    <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_sound_atlas.jpg" alt="Sound Atlas 3D Globe" width="230" />
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src="assets/screenshots/feature_sound_atlas.jpg" alt="Sound Atlas 3D Globe" width="340" />
       <br /><br />
       <b>Sound Atlas 3D Globe</b><br />
       <sub>Zenify lets you spin an interactive 3D globe across 177 countries and 76 cities to discover trending regional music and global charts.</sub>
     </td>
-    <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_liquid_glass.jpg" alt="Liquid Glass Studio" width="230" />
+    <td width="50%" align="center" valign="top">
+      <img src="assets/screenshots/feature_liquid_glass.jpg" alt="Liquid Glass Studio" width="340" />
       <br /><br />
       <b>Liquid Glass Studio</b><br />
       <sub>Zenify includes a live Glass Customizer to switch between Liquid, Clear, and Frosted glass styles with real-time Blur and Transparency sliders.</sub>
     </td>
   </tr>
   <tr>
-    <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_artist_page.jpg" alt="Artist Profiles" width="230" />
+    <td width="50%" align="center" valign="top">
+      <img src="assets/screenshots/feature_artist_page.jpg" alt="Artist Profiles" width="340" />
       <br /><br />
       <b>Rich Artist Pages</b><br />
       <sub>Zenify showcases artist headers, monthly listeners, Latest Releases, and Top Songs while keeping your MiniPlayer and floating Dock persistent.</sub>
     </td>
-    <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_downloads.jpg" alt="Offline Downloads Manager" width="230" />
+    <td width="50%" align="center" valign="top">
+      <img src="assets/screenshots/feature_downloads.jpg" alt="Offline Downloads Manager" width="340" />
       <br /><br />
       <b>Offline Downloads Manager</b><br />
       <sub>Zenify supports fast multi-threaded offline downloads with separate Songs and Music Videos tabs, local search, and full playback without internet.</sub>
     </td>
-    <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_onboarding.jpg" alt="Zero-Friction Onboarding" width="230" />
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src="assets/screenshots/feature_onboarding.jpg" alt="Zero-Friction Onboarding" width="340" />
       <br /><br />
       <b>Zero-Friction Onboarding</b><br />
       <sub>Zenify lets you sign in with Google, Email, or jump straight in with Guest Mode — no mandatory account or tracking required.</sub>
     </td>
-  </tr>
-  <tr>
-    <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_room_hub.jpg" alt="Room Together Hub" width="230" />
+    <td width="50%" align="center" valign="top">
+      <img src="assets/screenshots/feature_room_hub.jpg" alt="Room Together Hub" width="340" />
       <br /><br />
       <b>Room Together Hub</b><br />
       <sub>Zenify lets you host or join DJ &amp; Jam Sessions via room code, with quick access to Sound Insights and Achievements.</sub>
     </td>
-    <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_room_create.jpg" alt="Custom Listening Rooms" width="230" />
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src="assets/screenshots/feature_room_create.jpg" alt="Custom Listening Rooms" width="340" />
       <br /><br />
       <b>Custom Listening Rooms</b><br />
       <sub>Zenify lets hosts customize room artwork, participant limits, public or password access, approval mode, duration timers, and Co-host roles.</sub>
     </td>
-    <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_room_live.jpg" alt="Live Synchronized Jam" width="230" />
+    <td width="50%" align="center" valign="top">
+      <img src="assets/screenshots/feature_room_live.jpg" alt="Live Synchronized Jam" width="340" />
       <br /><br />
       <b>Live Synchronized Jam</b><br />
       <sub>Zenify keeps friends in sub-15ms playback sync with live voice, emoji reactions, synced lyrics, room chat, and participant controls.</sub>
@@ -178,19 +182,19 @@
 <table width="100%">
   <tr>
     <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_landscape_player.jpg" alt="Landscape Player Mode" width="300" />
+      <img src="assets/screenshots/feature_landscape_player.jpg" alt="Landscape Player Mode" width="420" />
       <br /><br />
       <b>90° Landscape Player Mode</b><br />
       <sub>Zenify rotates smoothly into a dual-pane landscape player with album art on the left and scrubber, controls, and volume slider on the right.</sub>
     </td>
     <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_landscape_lyrics.jpg" alt="Landscape Live Lyrics" width="300" />
+      <img src="assets/screenshots/feature_landscape_lyrics.jpg" alt="Landscape Live Lyrics" width="420" />
       <br /><br />
       <b>Landscape Live Lyrics</b><br />
       <sub>Zenify pairs full-height album artwork with real-time syllable-synced karaoke lyrics side by side in widescreen landscape mode.</sub>
     </td>
     <td width="33.3%" align="center" valign="top">
-      <img src="assets/screenshots/feature_video_fullscreen.jpg" alt="Fullscreen 16:9 Video Theater" width="300" />
+      <img src="assets/screenshots/feature_video_fullscreen.jpg" alt="Fullscreen 16:9 Video Theater" width="420" />
       <br /><br />
       <b>Fullscreen 16:9 Video Theater</b><br />
       <sub>Zenify plays hardware-accelerated 16:9 music videos in fullscreen landscape with ±10s skip controls, double-tap seeking, and fit/fill zoom.</sub>
