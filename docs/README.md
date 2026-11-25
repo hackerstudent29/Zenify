@@ -19,6 +19,8 @@ Welcome to the Zenify documentation hub. Pick a guide below based on what you wa
 | [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) | Clean file locator & full monorepo folder tree |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | System topology, dual-mode audio pipeline & security |
 | [together/AUDIT.md](./together/AUDIT.md) | Room Together parity audit across Web, Mobile & Backend |
+| [replay/README.md](./replay/README.md) | Zenify Replay & Insights developer manual |
+| [replay/PROJECT_STRUCTURE.md](./replay/PROJECT_STRUCTURE.md) | Zenify Replay & Insights module map |
 
 ### Technical Specs (`docs/architecture/`)
 
@@ -30,6 +32,7 @@ Welcome to the Zenify documentation hub. Pick a guide below based on what you wa
 | [schema-plan.md](./architecture/schema-plan.md) | Data modeling plan and migrations |
 | [failure_strategy.md](./architecture/failure_strategy.md) | Playback & metadata fallback resilience |
 | [search_implementation_plan.md](./architecture/search_implementation_plan.md) | Multi-source unified search & ranking pipeline |
+| [SOUND_ATLAS_PLAN.md](./architecture/SOUND_ATLAS_PLAN.md) | Sound Atlas interactive 3D globe & passport blueprint |
 | [website-parity.md](./architecture/website-parity.md) | Cross-platform feature parity notes |
 
 ## Deployment (`docs/deployment/`)
@@ -49,6 +52,6 @@ Welcome to the Zenify documentation hub. Pick a guide below based on what you wa
 | [SUPPORT.md](./SUPPORT.md) | Getting help and reporting bugs |
 | [PRIVACY_POLICY.md](./PRIVACY_POLICY.md) | Data handling & privacy commitments |
 | [ROADMAP.md](./ROADMAP.md) | Upcoming milestones and feature roadmap |
-| [CHANGELOG.md](../CHANGELOG.md) | Complete version history (`v1.0.9` latest) |
+| [CHANGELOG.md](../CHANGELOG.md) | Complete version history |
 | [SECURITY.md](../SECURITY.md) | Security policy & vulnerability reporting |
 

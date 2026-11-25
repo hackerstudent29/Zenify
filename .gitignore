@@ -111,13 +111,10 @@ flutter_app/.dart_tool/
 mobile/build/
 mobile/.dart_tool/
 mobile/android/.gradle/
+mobile/all_time_index.json
+mobile/android/*.log
 *.apk
 !frontend/public/downloads/zenify.apk
-!frontend/public/downloads/zenify-v1.1.18.apk
-!frontend/public/downloads/zenify-v1.1.19.apk
-!frontend/public/downloads/zenify-v1.1.20.apk
-!frontend/public/downloads/zenify-v1.1.21.apk
-!frontend/public/downloads/zenify-v1.1.21-universal.apk
 !frontend/public/downloads/zenify-v1.1.22.apk
 !frontend/public/downloads/zenify-v1.1.22-universal.apk
 !frontend/public/downloads/zenify-universal.apk
@@ -127,11 +124,6 @@ backend/public/downloads/*
 frontend/dist/
 frontend/public/downloads/*
 !frontend/public/downloads/zenify.apk
-!frontend/public/downloads/zenify-v1.1.18.apk
-!frontend/public/downloads/zenify-v1.1.19.apk
-!frontend/public/downloads/zenify-v1.1.20.apk
-!frontend/public/downloads/zenify-v1.1.21.apk
-!frontend/public/downloads/zenify-v1.1.21-universal.apk
 !frontend/public/downloads/zenify-v1.1.22.apk
 !frontend/public/downloads/zenify-v1.1.22-universal.apk
 !frontend/public/downloads/zenify-universal.apk

@@ -47,21 +47,24 @@ Zenify/
 │   ├── FUNDING.yml
 │   └── PULL_REQUEST_TEMPLATE.md
 │
-├── assets/                               # Brand artwork, display fonts & promotional media
+├── assets/                               # Brand artwork, badges, buttons, display fonts & screenshots
+│   ├── badges/                           # README status & capability SVG badges
+│   ├── brand-kit/                        # Complete Zenify brand kit (icons, lockups, logos, brand guide)
+│   ├── buttons/                          # README CTA buttons
 │   ├── fonts/                            # Display font assets
-│   ├── images/                           # Logos, animated GIF, letter stamps & icons
-│   ├── logo.svg
-│   └── Zenify logo animation.html
+│   ├── hero/                             # README dot-matrix hero divider
+│   ├── images/                           # App icon, favicons, animated logo & letter stamps
+│   └── screenshots/                      # README Android showcase & feature screenshots
 │
 ├── backend/                              # Fastify 5 + TypeScript + Prisma + Redis API & WebSocket server
 │   ├── config/                           # Cloud object storage CORS config (r2-cors.json)
 │   ├── prisma/                           # Prisma schema, SQL migrations & seed scripts
-│   │   ├── add_fullview_bg.sql
+│   │   ├── migrations/
 │   │   ├── schema.prisma
 │   │   ├── seed.ts
 │   │   ├── seed_artists.ts
 │   │   └── seed_insights.ts
-│   ├── scripts/                          # Storage audits, Prisma helpers & E2E smoke checks
+│   ├── scripts/                          # Storage & DB health check scripts (R2, Cloudinary, Postgres)
 │   ├── src/
 │   │   ├── config/                       # Environment validation (env.ts)
 │   │   ├── constants/                    # Language & metadata constants
@@ -106,21 +109,24 @@ Zenify/
 │   │   ├── frontend_architecture.md
 │   │   ├── schema-plan.md
 │   │   ├── search_implementation_plan.md
+│   │   ├── SOUND_ATLAS_PLAN.md
 │   │   └── website-parity.md
 │   ├── deployment/                       # Cloud provisioning & deploy guides
 │   │   ├── CLOUD_SETUP_GUIDE.md
 │   │   ├── QUICK_DEPLOY.md
 │   │   └── README_CLOUD_SETUP.md
 │   ├── images/                           # Application UI screenshots
-│   ├── releases/                         # Legacy release notes archive
-│   │   └── RELEASE_NOTES_v2.5.0.md
+│   ├── releases/                         # Release notes archive (v1.1.15–v1.1.22, v2.5.0)
+│   ├── replay/                           # Zenify Replay & Insights documentation
+│   │   ├── PROJECT_STRUCTURE.md
+│   │   └── README.md
 │   └── together/                         # Room Together parity & module audit
 │       └── AUDIT.md
 │
 ├── frontend/                             # React 19 + Vite 6 + TypeScript Web PWA
-│   ├── public/                           # Static icons, favicons, APK download, SEO & PWA files
+│   ├── public/                           # Static icons, favicons, APK downloads, SEO & PWA files
 │   │   ├── assets/letters/               # Monogram avatar assets
-│   │   ├── downloads/zenify.apk          # Latest Android release APK (v1.0.9)
+│   │   ├── downloads/                    # Latest Android release APKs (ARM64 + Universal)
 │   │   ├── moods/                        # Home mood artwork
 │   │   ├── llms.txt                      # AI crawler overview & primary routes
 │   │   ├── manifest.json                 # PWA web app manifest
@@ -167,19 +173,17 @@ Zenify/
 │   ├── pubspec.yaml                      # App version (1.0.9+13), SF Pro fonts & dependencies
 │   └── README.md
 │
-├── scripts/                              # Root deployment, security & dev helper scripts
+├── scripts/                              # Root deployment & security scripts
 │   ├── deploy.ps1                        # Windows PowerShell multi-target deploy script
 │   ├── deploy.sh                         # Unix shell deploy script
-│   ├── run-mobile.bat                    # Quick Windows Flutter USB dev launcher
-│   ├── secret-scan.js                    # Repository secret scanner
-│   └── serve-mobile.js                   # Static mobile build preview server
+│   └── secret-scan.js                    # Repository secret scanner
 │
 ├── .dockerignore
 ├── .editorconfig
 ├── .gitignore
 ├── .vercelignore
 ├── analysis_options.yaml                 # Workspace-level Dart analyzer exclusions
-├── CHANGELOG.md                          # Unified release history (through v1.0.9)
+├── CHANGELOG.md                          # Unified release history
 ├── CODE_OF_CONDUCT.md
 ├── CONTRIBUTING.md
 ├── docker-compose.yml                    # Local Redis, PostgreSQL & backend compose stack

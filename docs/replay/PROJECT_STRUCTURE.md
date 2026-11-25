@@ -169,12 +169,6 @@ Zenify/
 │           ├── phase10_social_viral_test.dart    # Tests for Match (F17) & Gift Song (F18)
 │           ├── phase11_addons_test.dart          # Tests for Add-on widgets (First song, Marathon, etc.)
 │           └── phase12_hardening_test.dart       # Boundary tests, zero plays, leap years, stress tests
-│
-├── scripts/
-│   └── generate_replay_seed.js                   # Node.js generator for enriched regional music metadata
-│
-├── REPLAY_RECON.md                               # Reconnaissance of all existing Zenify audio services
-└── REPLAY_STATUS.md                              # Implementation status matrix across all 27 features
 ```
 
 ---

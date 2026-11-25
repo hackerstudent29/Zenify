@@ -293,6 +293,6 @@ flutter test test/replay/phase10_social_viral_test.dart
 | **Presentation** | `mobile/lib/features/replay/presentation/` | 33 files |
 | **Insights Adapter** | `mobile/lib/views/insights/` | 11 files |
 | **Backend** | `backend/src/routes/replay.routes.ts` | 1 file |
-| **Assets & Scripts** | `mobile/assets/` & `scripts/` | 2 files |
+| **Assets** | `mobile/assets/` | 1 seed catalog (`replay_track_meta_seed.json`) |
 | **Automated Tests** | `mobile/test/replay/` | 12 files |
-| **Documentation** | Root directory | 4 files (`PROJECT_STRUCTURE.md`, `README.md`, `REPLAY_STATUS.md`, `REPLAY_RECON.md`) |
+| **Documentation** | `docs/replay/` | 2 files (`README.md`, `PROJECT_STRUCTURE.md`) |
