@@ -2,9 +2,11 @@
 
 All notable user updates and improvements to Zenify are documented here.
 
-## [1.1.22] - 2026-11-25
+## [1.1.22] - 2026-11-25 (Stable Version 1)
 
-### What's New
+> 🎉 **Stable Version 1:** Zenify v1.1.22 marks the official **Stable Version 1** milestone release of Zenify for Android.
+
+### What's New in Stable Version 1
 - **New Zendrum Brand Identity**:
   - Updated the Android app icon to the new white and rose Zendrum emblem and refreshed brand marks across the app.
 - **Smarter Single, Album, Video Browsing & Offline Video Downloads**:
@@ -31,11 +33,9 @@ All notable user updates and improvements to Zenify are documented here.
 - **General Performance & Cleanup**:
   - Streamlined background services for faster startup and cleaner app behavior.
 
-## [1.1.21] - 2026-11-24 (Stable Version 1)
+## [1.1.21] - 2026-11-24
 
-> 🎉 **First Stable Version:** Zenify v1.1.21 marks the official **Stable Version 1** milestone release for the Zenify Flutter Android application.
-
-### What's New in Stable Version 1
+### What's New
 - **Strict YouTube Music Search Parity**:
   - Unrestricted, pristine search results directly mirroring YouTube Music for queries across songs, video songs, official albums, verified artists, and public playlists.
   - Resolved previous search distortion and missing album/playlist shelves.

@@ -5,10 +5,10 @@
   "latestAppVersion": "1.1.22",
   "isForceUpdate": false,
   "releaseDate": "November 25, 2026",
-  "releaseTime": "08:20 PM IST",
+  "releaseTime": "09:40 PM IST",
   "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.22/zenify-v1.1.22.apk",
   "features": [
-    "New Zendrum Brand Identity: Fresh white and rose Zendrum app icon and updated brand marks",
+    "Stable Version 1 Milestone: Official first stable release of Zenify for Android with the new white and rose Zendrum app icon",
     "Song Credits & Static View Lyrics: Full song credits breakdown (cast, composers, lyricists) and a clean, distraction-free static Lyrics page",
     "Smart Singles, Albums, Videos & Offline Downloads: Accurate album matching, quick Artist & Album jump sheet, offline video downloads, and cleaner song metadata",
     "Smooth 90° Rotation & Landscape Video Controls: Crisp portrait-to-landscape transition with ±10s skip controls, double-tap seeking, fit/fill zoom toggle, and transparent liquid-glass Top Picks"
@@ -24,6 +24,6 @@
     "Streamlined background services for faster startup and cleaner performance",
     "Improved stability across audio focus, credits, lyrics, artwork effects, and video downloads"
   ],
-  "releaseNotes": "• New white + rose Zendrum app icon & smoother audio/video playback\n• Persistent Dock & MiniPlayer on Credits, View Lyrics, Album & Artist pages\n• Dedicated Song Credits, clean static View Lyrics & offline video downloads\n• Smooth 90° portrait/landscape rotation & landscape video ±10s + fit/fill controls\n• Smarter Single/Album/Video browsing & transparent liquid-glass Top Picks",
-  "message": "Update to v1.1.22 for the new Zendrum app icon, smoother playback, persistent Dock & MiniPlayer on Credits & Lyrics, 90° landscape controls, and offline video downloads"
+  "releaseNotes": "🎉 Zenify v1.1.22 — Stable Version 1 is now live!\n• New white + rose Zendrum app icon & smoother audio/video playback\n• Persistent Dock & MiniPlayer on Credits, View Lyrics, Album & Artist pages\n• Dedicated Song Credits, clean static View Lyrics & offline video downloads\n• Smooth 90° portrait/landscape rotation & landscape video ±10s + fit/fill controls\n• Smarter Single/Album/Video browsing & transparent liquid-glass Top Picks",
+  "message": "Update to Zenify v1.1.22 (Stable Version 1) for the new Zendrum app icon, smoother playback, persistent Dock & MiniPlayer on Credits & Lyrics, 90° landscape controls, and offline video downloads."
 }

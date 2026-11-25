@@ -1,18 +1,15 @@
-# Zenify v1.1.21 — Stable Version 1
+# Zenify v1.1.21
 
-> 🎉 **Milestone:** Zenify v1.1.21 is the official **First Stable Version (Stable Version 1)** of Zenify for Android!
-
-**Release Version:** `v1.1.21 (Stable Version 1)`  
+**Release Version:** `v1.1.21`  
 **Build Number:** `2035`  
-**Milestone:** `Stable Release 1`  
 **Date:** November 24, 2026  
 **Package:** `zenify-v1.1.21.apk` (ARM64) / `zenify-v1.1.21-universal.apk` (Universal)
 
 ---
 
-## 🌟 What's New in Stable Version 1 (v1.1.21)
+## 🌟 What's New in v1.1.21
 
-Zenify v1.1.21 represents the **first production-grade stable release** of the complete Flutter Android client, delivering hardware-accelerated Media3 audio/video streaming, pure YouTube Music search parity, and seamless performance:
+Zenify v1.1.21 delivers hardware-accelerated Media3 audio/video streaming, pure YouTube Music search parity, and seamless performance:
 
 ### 1. 🛡️ 100% Offline Data Isolation (Zero Network Usage on Downloaded Songs)
 - **Zero Internet Usage**: Completely blocked all background HTTP queries, stream resolutions, speculative lookahead prefetching, and radio population when listening to downloaded songs.

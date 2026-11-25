@@ -1,6 +1,8 @@
-# Zenify v1.1.22
+# Zenify v1.1.22 — Stable Version 1
 
-## What's New
+> 🎉 **Milestone:** Zenify v1.1.22 is the official **Stable Version 1** release of Zenify for Android!
+
+## What's New in Stable Version 1
 - **Smarter Single, Album & Video Song Browsing**:
   - Opening a song from Singles now opens its Single view with a quick option to jump to the artist or full album instead of misrouting to an unrelated release.
   - Dedicated Video Single view with recommended video songs, artist links, cleaner titles and artist names, release year details, and better organization across Home.

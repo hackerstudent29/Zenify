@@ -11,7 +11,7 @@
   <img src="assets/hero/dot_matrix.svg" alt="Accent Matrix" width="620" />
 
   <h3>Your music. Pure. Free. Yours.</h3>
-  <h1>🌸 Zenify — the ad-free, 320kbps music app for Android</h1>
+  <h1><img src="assets/images/zenify_app_icon.png" alt="Zenify App Icon" width="34" align="absmiddle" /> Zenify — the ad-free, 320kbps music app for Android</h1>
 
   <p><b>Stream in studio quality · Sing along word-by-word · Listen with friends · Watch music videos · Never see an ad.</b></p>
   <p><sub>Open-source • No subscription • No tracking • No account needed</sub></p>
@@ -67,7 +67,7 @@
 </div>
 
 > [!IMPORTANT]
-> **🎉 Zenify v1.1.22 (Build 2036) is live!**  
+> **🎉 Zenify v1.1.22 (Stable Version 1) is live!**  
 > New Zendrum app icon • More stable audio &amp; video playback • Cleaner full-lyrics view that keeps your mini-player and dock in place • Better soundtrack album info • Still zero ads. Still zero subscriptions. Still free.
 
 ---
@@ -374,7 +374,7 @@
 
 ## 🆚 Why people switch to Zenify
 
-| What you get | 🌸 **Zenify** | 🟢 Spotify Free | 🍎 Apple Music | 🔴 YouTube Music Free |
+| What you get | <img src="assets/images/zenify_app_icon.png" alt="Zenify" width="18" align="absmiddle" /> **Zenify** | 🟢 Spotify Free | 🍎 Apple Music | 🔴 YouTube Music Free |
 |---|:---:|:---:|:---:|:---:|
 | **Price** | **Free forever** | Free with ads / paid plan | Paid | Free with ads / paid plan |
 | **Ads** | **Zero** | Audio &amp; banner ads | None (paid) | Video &amp; audio ads |
@@ -726,7 +726,7 @@ Output files:
 
 <div align="center">
 
-  <h2>🌸 Ready to hear the difference?</h2>
+  <h2><img src="assets/images/zenify_app_icon.png" alt="Zenify" width="30" align="absmiddle" /> Ready to hear the difference?</h2>
 
   <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.22/zenify-v1.1.22.apk">
     <img src="assets/buttons/btn_download_android.svg" alt="Download APK for Android" height="52" />
