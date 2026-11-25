@@ -4,7 +4,9 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -25,12 +27,14 @@ import 'studio_fx_sheet.dart';
 import 'xfade_layer.dart';
 import '../../services/crossfade_controller.dart';
 import '../details/artist_screen.dart';
-import '../details/album_screen.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../design_system/widgets/media_navigation_sheet.dart';
 import '../../models/track.dart';
+import '../../services/album_resolver.dart';
 import '../../services/library_store.dart';
+import '../../services/media_router.dart';
 import '../../utils/media_normalizer.dart';
+import '../shell_screen.dart' show ShellNavigationScope;
 
 const double _kPaused = 0.86; // artwork shrink while paused
 // Mini player geometry. [full] = normal pill, [compact] = narrow pill that
@@ -93,6 +97,97 @@ class _WindowClipper extends CustomClipper<RRect> {
 
 double _clampAr(double ar) => ar.clamp(9 / 22, 22 / 9).toDouble();
 
+/// Rotation morph start: same offset from the screen centre, size unchanged.
+Rect _mapRect(Rect r, Size from, Size to) {
+  if (from.isEmpty || to.isEmpty) return r;
+  return Rect.fromCenter(
+    center: to.center(Offset.zero) + (r.center - from.center(Offset.zero)),
+    width: r.width,
+    height: r.height,
+  );
+}
+
+enum _Slot { meta, seek, transport, volume, tools, body }
+
+class _SlotPose {
+  const _SlotPose(this.u0, this.u1, this.s0);
+  final Offset u0; // old centre, relative to the OLD screen centre
+  final Offset u1; // new centre, relative to the NEW screen centre
+  final double s0; // old size / new size
+}
+
+/// Approximate slot rects of the audio layouts (same numbers as
+/// `_sheetColumn` / `_landscapeContent`). Only the START pose uses these,
+/// so a few px of error never show: the morph always ends on the real layout.
+Map<_Slot, Rect> _slotRects(Size size, EdgeInsets safe, bool land) {
+  if (!land) {
+    final bi = _blockBottomInset(safe);
+    const dh = _kSeekH + _kRowGap + _kTransportH;
+    final seekTop = size.height - bi - dh;
+    final seekW = math.min(size.width - 48, 420.0);
+    final trW = math.min(size.width - 48, 340.0);
+    final toolW = math.min(size.width - 48, 260.0);
+    return {
+      _Slot.meta: Rect.fromLTWH(
+        24,
+        seekTop - _kMetaGap - _kMetaH,
+        size.width - 48,
+        _kMetaH,
+      ),
+      _Slot.seek: Rect.fromLTWH(
+        (size.width - seekW) / 2,
+        seekTop,
+        seekW,
+        _kSeekH,
+      ),
+      _Slot.transport: Rect.fromLTWH(
+        (size.width - trW) / 2,
+        seekTop + _kSeekH + _kRowGap,
+        trW,
+        _kTransportH,
+      ),
+      _Slot.tools: Rect.fromLTWH(
+        (size.width - toolW) / 2,
+        size.height - safe.bottom - 16 - 44,
+        toolW,
+        44,
+      ),
+      _Slot.body: Rect.fromLTRB(0, safe.top + 97, size.width, size.height),
+    };
+  }
+  final art = _landscapeArtRect(size, safe);
+  final pad = _landscapePad(size);
+  final paneLeft = art.right + 40;
+  final paneRight = math.max(safe.right + pad, size.width - paneLeft - 560);
+  final paneW = size.width - paneLeft - paneRight;
+  final top = art.top + 4;
+  final ctrlH = math.max(0.0, art.bottom - top - 54);
+  const metaH = 50.0;
+  const volH = 28.0;
+  final trH = (ctrlH * 0.30).clamp(68.0, 92.0).toDouble();
+  final gap = math.max(0.0, (ctrlH - (metaH + _kSeekH + trH + volH)) / 3);
+  final seekTop = top + metaH + gap;
+  final trTop = seekTop + _kSeekH + gap;
+  return {
+    _Slot.meta: Rect.fromLTWH(paneLeft, top, paneW, metaH),
+    _Slot.seek: Rect.fromLTWH(paneLeft, seekTop, paneW, _kSeekH),
+    _Slot.transport: Rect.fromLTWH(paneLeft, trTop, paneW, trH),
+    _Slot.volume: Rect.fromLTWH(paneLeft, trTop + trH + gap, paneW, volH),
+    _Slot.tools: Rect.fromLTWH(
+      paneLeft + (paneW - 196) / 2,
+      art.bottom - 46,
+      196,
+      46,
+    ),
+    _Slot.body: Rect.fromLTRB(
+      paneLeft,
+      top,
+      size.width - paneRight,
+      art.bottom,
+    ),
+  };
+}
+
 /// Big card for a video (portrait). Fits inside the art region, centered.
 Rect _videoBigRect(Size size, EdgeInsets safe, double ar) {
   final region = Rect.fromLTRB(
@@ -152,11 +247,33 @@ const Duration _kIdleHide = Duration(seconds: 3);
 /// long so the initial auto-scroll can never hide the controls.
 const Duration _kPanelScrollGrace = Duration(milliseconds: 900);
 
-/// Rotation morph: critically damped, a bit softer than the panel spring.
+/// Rotation morph: slightly under-damped (ζ≈0.73) so the cover overshoots a
+/// hair and settles like a real object.
 const SpringDescription _kRotSpring = SpringDescription(
   mass: 1,
+  stiffness: 170,
+  damping: 19,
+);
+
+/// `_dock` during a rotation: critically damped, no bounce.
+const SpringDescription _kRotDockSpring = SpringDescription(
+  mass: 1,
   stiffness: 190,
-  damping: 28,
+  damping: 27.6,
+);
+
+/// Landscape video fit <-> fill zoom.
+const SpringDescription _kFillSpring = SpringDescription(
+  mass: 1,
+  stiffness: 260,
+  damping: 26,
+);
+
+/// ±10s buttons / double-tap flash: lively kick with a bouncy return.
+const SpringDescription _kSkipSpring = SpringDescription(
+  mass: 0.7,
+  stiffness: 300,
+  damping: 13,
 );
 
 /// Cover docking spring (art <-> header). Critically damped: no bounce.
@@ -384,10 +501,29 @@ class PlayerShellState extends State<PlayerShell>
   late final AnimationController _press;
   late final AnimationController _videoUiC; // landscape video controls
   late final AnimationController _rot; // rotation morph 0 -> 1
+  late final AnimationController _fillC; // landscape video: 0 fit, 1 fill
   Rect? _rotFrom;
   Rect _curRect = Rect.zero; // where the cover REALLY is (after dock / morph)
-  bool _rotPending = false; // rotation just happened: frame 1 keeps the old rect
-  double get _rotV => _rotPending ? 0.0 : _rot.value.clamp(0.0, 1.0).toDouble();
+  bool _rotPending =
+      false; // rotation just happened: frame 1 keeps the old rect
+  Size _lastSize = Size.zero;
+  EdgeInsets _lastSafe = EdgeInsets.zero;
+  bool _rotToLand = false; // direction of the running morph
+  double _rotA0 = 0; // start angle of the morph (±90°)
+  Map<_Slot, _SlotPose> _slotPose = {};
+  Set<_Slot> _rotAppear = {}; // hidden before the turn: fade in while rotating
+  bool _rotFromVideoLand = false; // leaving the black landscape video page
+
+  /// Unclamped: lets the cover overshoot for a natural settle.
+  double get _rotRaw => _rotPending ? 0.0 : _rot.value;
+
+  /// Clamped + snapped to exactly 1.0 when settled (no permanent saveLayer).
+  double get _rotV {
+    if (_rotPending) return 0.0;
+    final v = _rot.value;
+    return v >= 0.998 ? 1.0 : v.clamp(0.0, 1.0).toDouble();
+  }
+
   bool _rotInit = false, _landSeen = false;
 
   _Panel _bodyPanel = _Panel.art; // what is actually mounted in the middle
@@ -397,6 +533,20 @@ class PlayerShellState extends State<PlayerShell>
   // bumped on every skip so the prev / next icons can nudge with a spring
   final ValueNotifier<int> _prevPulse = ValueNotifier<int>(0);
   final ValueNotifier<int> _nextPulse = ValueNotifier<int>(0);
+
+  // landscape video: ±10s buttons, double-tap skip, fit/fill, swipe-down exit
+  final ValueNotifier<int> _skipBackPulse = ValueNotifier<int>(0);
+  final ValueNotifier<int> _skipFwdPulse = ValueNotifier<int>(0);
+  final ValueNotifier<_SkipFlash?> _skipFlash = ValueNotifier<_SkipFlash?>(
+    null,
+  );
+  DateTime _flashAt = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _vidLastTap = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _vidChainUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  Timer? _vidTapTimer;
+  bool _videoFill = false;
+  double _vidScale = 1.0;
+  double _vidDrag = 0.0;
 
   /// true while ANYTHING is moving (sheet, dock glide, body fade, drag,
   /// close). Used to mute the lyrics / queue tickers so the whole frame
@@ -434,7 +584,8 @@ class PlayerShellState extends State<PlayerShell>
   bool _closing = false;
   bool _bodyShowing = false; // lyrics / queue body is (becoming) visible
   double _lastPublished = 0;
-  DateTime _panelChangedAt = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _scrollGraceActive = false;
+  Timer? _scrollGraceTimer;
 
   /// true when the body swap must be instant (art <-> panel). lyrics <-> queue
   /// keeps a short cross-fade.
@@ -454,6 +605,8 @@ class PlayerShellState extends State<PlayerShell>
   String _bleedUrl = '';
   String? _bakingUrl;
   bool _bakeFailed = false;
+  int _bakeAttempts = 0;
+  DateTime? _nextBakeRetryAt;
   bool _paletteReady = false;
 
   List<Color> _palette = [
@@ -495,6 +648,8 @@ class PlayerShellState extends State<PlayerShell>
     _press = AnimationController.unbounded(vsync: this, value: 1);
     _videoUiC = AnimationController.unbounded(vsync: this, value: 1);
     _rot = AnimationController.unbounded(vsync: this, value: 1);
+    _fillC = AnimationController.unbounded(vsync: this, value: 0);
+    _rot.addStatusListener(_onAnyStatus); // mutes lyrics tickers while morphing
     PlayerShell.openRequestNotifier.addListener(_onOpenRequested);
     _sheet.addListener(_publishProgress);
     _sheet.addListener(_syncDockVisibility);
@@ -516,6 +671,7 @@ class PlayerShellState extends State<PlayerShell>
         _dock.isAnimating ||
         _bodyIn.isAnimating ||
         _sheet.isAnimating ||
+        _rot.isAnimating ||
         _closing ||
         _dragging;
     if (_dockGliding.value != g) _dockGliding.value = g;
@@ -534,9 +690,18 @@ class PlayerShellState extends State<PlayerShell>
   /// it is fully visible (a laggy glide can no longer eat the 3 seconds).
   /// Landscape uses a critically damped SPRING (interruptible, carries
   /// velocity); portrait keeps the short timed fade.
+  void _startScrollGrace() {
+    _scrollGraceTimer?.cancel();
+    _scrollGraceActive = true;
+    _scrollGraceTimer = Timer(_kPanelScrollGrace, () {
+      _scrollGraceActive = false;
+    });
+  }
+
   void _showBody() {
     if (_bodyShowing) return;
     _bodyShowing = true;
+    _startScrollGrace();
     final token = ++_bodyToken;
     final Future<void> fut = _landscape
         ? _bodyIn.springTo(
@@ -547,7 +712,6 @@ class PlayerShellState extends State<PlayerShell>
         : _bodyIn.animateTo(1.0, duration: _kBodyFadeIn, curve: Curves.easeOut);
     fut.whenComplete(() {
       if (!mounted || token != _bodyToken || _panel == _Panel.art) return;
-      _panelChangedAt = DateTime.now();
       if (_panel == _Panel.lyrics) _scheduleIdle();
     });
   }
@@ -601,9 +765,15 @@ class PlayerShellState extends State<PlayerShell>
     _dock.removeListener(_onDockTick);
     _dock.removeStatusListener(_onAnyStatus);
     _bodyIn.removeStatusListener(_onAnyStatus);
+    _rot.removeStatusListener(_onAnyStatus);
+    _vidTapTimer?.cancel();
+    _skipFlash.dispose();
+    _skipBackPulse.dispose();
+    _skipFwdPulse.dispose();
     _warmTimer?.cancel();
     _mountTimer?.cancel();
     _idleTimer?.cancel();
+    _scrollGraceTimer?.cancel();
     _closeSafetyTimer?.cancel();
     _videoUiTimer?.cancel();
     _lyricsImmersive.dispose();
@@ -621,9 +791,11 @@ class PlayerShellState extends State<PlayerShell>
       _press,
       _videoUiC,
       _rot,
+      _fillC,
     ]) {
       c.dispose();
     }
+    _preferredMode = _Panel.art;
     SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
     super.dispose();
   }
@@ -636,23 +808,172 @@ class PlayerShellState extends State<PlayerShell>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final s = MediaQuery.sizeOf(context);
+    final pad = MediaQuery.paddingOf(context);
     final l = s.width > s.height;
     if (_rotInit && l != _landSeen && _open && _curRect != Rect.zero) {
-      _rotFrom = _curRect; // fly from where the cover really is
-      _rotPending = true; // frame 1 still draws the OLD rect: no jump
+      _planRotation(_lastSize, _lastSafe, _landSeen, s, pad, l);
+      _rotFrom = _mapRect(_curRect, _lastSize, s);
+      _rotToLand = l;
+      _rotFromVideoLand = _isVideo && !l;
+      _rotPending = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _rotPending = false;
+        _resetVideoForRotation(l);
         if (_reduceMotion) {
+          _rotFrom = null;
           _rot.value = 1;
           return;
         }
         _rot.value = 0;
-        _rot.springTo(1, spring: _kRotSpring);
+        _rot.springTo(1, spring: _kRotSpring).whenComplete(() {
+          if (!mounted || _rot.isAnimating) return;
+          _rotFrom = null;
+          _rot.value = 1;
+        });
       });
     }
     _landSeen = l;
+    _lastSize = s;
+    _lastSafe = pad;
     _rotInit = true;
+  }
+
+  /// Works out where every component sat in the OLD layout once the whole
+  /// screen is turned 90° into the new window.
+  void _planRotation(
+    Size oldS,
+    EdgeInsets oldSafe,
+    bool oldLand,
+    Size newS,
+    EdgeInsets newSafe,
+    bool newLand,
+  ) {
+    final oldC = oldS.center(Offset.zero);
+    final newC = newS.center(Offset.zero);
+    // Which way the phone was turned: the notch / cutout side is the hint.
+    // If the spin looks backwards on your device, flip `leftTurn`.
+    final leftTurn = newLand
+        ? newSafe.left >= newSafe.right
+        : oldSafe.left >= oldSafe.right;
+    _rotA0 = (newLand ? 1.0 : -1.0) * (leftTurn ? 1.0 : -1.0) * math.pi / 2;
+
+    _slotPose = {};
+    if (!_isVideo) {
+      final o = _slotRects(oldS, oldSafe, oldLand);
+      final n = _slotRects(newS, newSafe, newLand);
+      n.forEach((k, b) {
+        final a = o[k];
+        if (a == null || a.isEmpty || b.isEmpty) return;
+        _slotPose[k] = _SlotPose(
+          a.center - oldC,
+          b.center - newC,
+          math
+              .sqrt((a.width * a.height) / (b.width * b.height))
+              .clamp(0.6, 1.6)
+              .toDouble(),
+        );
+      });
+    }
+    final inPanel = _panel != _Panel.art;
+    _rotAppear = {
+      if (!newLand && inPanel) ...[_Slot.seek, _Slot.transport],
+      if (newLand && inPanel) _Slot.meta,
+    };
+  }
+
+  _Slot? _slotOf(double b) {
+    if (b == 0.58) return _Slot.meta;
+    if (b == 0.64) return _Slot.seek;
+    if (b == 0.70) return _Slot.transport;
+    if (b == 0.74) return _Slot.volume;
+    if (b == 0.76) return _Slot.tools;
+    return null;
+  }
+
+  /// Turns [child] from its place in the OLD layout (screen rotated 90°)
+  /// into its real place. The path is an arc around the screen centre, the
+  /// angle follows the (slightly under-damped) spring. Constant tree shape.
+  Widget _applyMorph(_Slot? slot, Widget child) {
+    final pose = slot == null ? null : _slotPose[slot];
+    final t = _rotFrom == null
+        ? 0.0
+        : 1.0 - _rotRaw; // 1 -> 0 (< 0 = overshoot)
+    var m = Matrix4.identity();
+    var op = 1.0;
+    if (t != 0.0) {
+      if (pose != null) {
+        final ang = _rotA0 * t;
+        final v = pose.u1 + (pose.u0 - pose.u1) * t;
+        final cs = math.cos(ang), sn = math.sin(ang);
+        final rv = Offset(v.dx * cs - v.dy * sn, v.dx * sn + v.dy * cs);
+        final d = rv - pose.u1;
+        final sc = 1 + (pose.s0 - 1) * t;
+        m =
+            Matrix4.translationValues(d.dx, d.dy, 0) *
+            Matrix4.rotationZ(ang) *
+            Matrix4.diagonal3Values(sc, sc, 1);
+      }
+      if (pose == null || (slot != null && _rotAppear.contains(slot))) {
+        op = _smooth((_rotV - 0.15) / 0.6);
+      }
+    }
+    return Opacity(
+      opacity: op,
+      child: Transform(
+        alignment: Alignment.center,
+        transform: m,
+        child: RepaintBoundary(child: child),
+      ),
+    );
+  }
+
+  void _resetVideoForRotation(bool toLand) {
+    _videoFill = false;
+    _fillC.value = 0;
+    _vidTapTimer?.cancel();
+    _videoUiTimer?.cancel();
+    if (toLand && _isVideo) {
+      _videoUiShown = false; // controls spring in once the video has landed
+      _videoUiC.value = 0;
+      _pokeVideoUi();
+    }
+  }
+
+  /// 0..1 progress of the rotation morph for a block that starts at [begin].
+  double _rotStage(double begin) {
+    final r = _rotV;
+    if (r >= 1.0) return 1.0;
+    return Curves.easeOutCubic.transform(
+      ((r - begin) / (1 - begin)).clamp(0.0, 1.0).toDouble(),
+    );
+  }
+
+  /// Controls arrive from the right going to landscape, from below going
+  /// to portrait.
+  Offset _rotSlide(double stage) =>
+      _rotToLand ? Offset(40 * (1 - stage), 0) : Offset(0, 32 * (1 - stage));
+
+  /// Constant tree shape: always Opacity + Transform (state is never lost).
+  Widget _rotReveal({
+    required double begin,
+    bool slide = true,
+    required Widget child,
+  }) {
+    return AnimatedBuilder(
+      animation: _rot,
+      child: child,
+      builder: (_, c) {
+        final s = _rotStage(begin);
+        return Opacity(
+          opacity: s,
+          child: Transform.translate(
+            offset: slide ? _rotSlide(s) : Offset.zero,
+            child: c,
+          ),
+        );
+      },
+    );
   }
 
   /* ───────────────────────── sync with player ───────────────────────── */
@@ -660,30 +981,51 @@ class PlayerShellState extends State<PlayerShell>
   void _applyBleed(BleedArtwork art) {
     _bleedArt = art;
     _bakeFailed = false;
+    _bakeAttempts = 0;
+    _nextBakeRetryAt = null;
   }
 
   /// Makes sure the current cover is baked in both modes.
   /// Safe to call from build(): it never calls setState synchronously.
   void _ensureBleed() {
-    if (_bleedUrl.isEmpty || _bakeFailed) return;
+    if (_bleedUrl.isEmpty) return;
     if (_bleedArt?.key == _bleedUrl || _bakingUrl == _bleedUrl) return;
+    if (_bakeFailed) {
+      final retryAt = _nextBakeRetryAt;
+      if (_bakeAttempts >= 3 ||
+          retryAt == null ||
+          DateTime.now().isBefore(retryAt)) {
+        return;
+      }
+    }
 
-    final cached = BleedArtworkService.instance.peek(_bleedUrl) ??
+    final cached =
+        BleedArtworkService.instance.peek(_bleedUrl) ??
         BleedArtworkService.instance.peek(_shownCover ?? '');
     if (cached != null) {
-      _applyBleed(cached);
+      _applyBleed(
+        cached.key == _bleedUrl
+            ? cached
+            : BleedArtwork(
+                key: _bleedUrl,
+                image: cached.image,
+                backdrop: cached.backdrop,
+                average: cached.average,
+                scrim: cached.scrim,
+              ),
+      );
       return;
     }
 
     final url = _bleedUrl;
     final fallbackUrl = _shownCover;
+    final provider =
+        BleedArtworkService.providerForUrl(url) ??
+        CachedNetworkImageProvider(url);
     _bakingUrl = url;
+    _bakeAttempts++;
     BleedArtworkService.instance
-        .load(
-          url,
-          CachedNetworkImageProvider(url),
-          fallbackUrl: fallbackUrl,
-        )
+        .load(url, provider, fallbackUrl: fallbackUrl)
         .then((art) {
           if (_bakingUrl == url) _bakingUrl = null;
           if (!mounted || _bleedUrl != url) return;
@@ -692,6 +1034,9 @@ class PlayerShellState extends State<PlayerShell>
               _applyBleed(art);
             } else {
               _bakeFailed = true;
+              _nextBakeRetryAt = _bakeAttempts < 3
+                  ? DateTime.now().add(Duration(seconds: 3 * _bakeAttempts))
+                  : null;
             }
           });
         });
@@ -702,11 +1047,24 @@ class PlayerShellState extends State<PlayerShell>
     if (key == _trackKey) return;
     _trackKey = key;
     final url = (track.coverUrl as String?) ?? '';
-    _shownCover = url;
-    _bleedUrl = MediaNormalizer.upgradeArtworkUrl(url);
+    final trackId = track.id?.toString();
+    _bleedUrl = MediaNormalizer.upgradeArtworkUrl(url, videoId: trackId);
+    _shownCover = url.isNotEmpty ? url : _bleedUrl;
     _bakeFailed = false;
-    _bleedArt = BleedArtworkService.instance.peek(_bleedUrl) ??
+    _bakeAttempts = 0;
+    _nextBakeRetryAt = null;
+    final peeked =
+        BleedArtworkService.instance.peek(_bleedUrl) ??
         BleedArtworkService.instance.peek(url);
+    _bleedArt = (peeked != null && peeked.key != _bleedUrl)
+        ? BleedArtwork(
+            key: _bleedUrl,
+            image: peeked.image,
+            backdrop: peeked.backdrop,
+            average: peeked.average,
+            scrim: peeked.scrim,
+          )
+        : peeked;
     _bakingUrl = null;
 
     // Synchronously check if palette is already cached for immediate color switch (<16ms)
@@ -719,8 +1077,9 @@ class PlayerShellState extends State<PlayerShell>
     }
 
     // Immediately trigger fast background palette extraction & bleed baking in parallel
-    if (url.isNotEmpty) {
-      extractPalette(url).then((p) {
+    final paletteUrl = url.isNotEmpty ? url : _bleedUrl;
+    if (paletteUrl.isNotEmpty) {
+      extractPalette(paletteUrl).then((p) {
         if (mounted && p != null && _trackKey == key) {
           setState(() {
             _palette = p;
@@ -728,6 +1087,8 @@ class PlayerShellState extends State<PlayerShell>
           });
         }
       });
+    }
+    if (_bleedUrl.isNotEmpty) {
       _ensureBleed();
     }
 
@@ -755,14 +1116,22 @@ class PlayerShellState extends State<PlayerShell>
       if (queue.hasNext) {
         final nextTrack = queue.upNext.first.track;
         final nextCover = nextTrack.coverUrl;
-        if (nextCover.isNotEmpty) {
-          final nextBleed = MediaNormalizer.upgradeArtworkUrl(nextCover);
-          unawaited(extractPalette(nextCover));
-          unawaited(BleedArtworkService.instance.load(
-            nextBleed,
-            CachedNetworkImageProvider(nextBleed),
-            fallbackUrl: nextCover,
-          ));
+        final nextBleed = MediaNormalizer.upgradeArtworkUrl(
+          nextCover,
+          videoId: nextTrack.id,
+        );
+        if (nextBleed.isNotEmpty) {
+          unawaited(extractPalette(nextCover.isNotEmpty ? nextCover : nextBleed));
+          final nextProv =
+              BleedArtworkService.providerForUrl(nextBleed) ??
+              CachedNetworkImageProvider(nextBleed);
+          unawaited(
+            BleedArtworkService.instance.load(
+              nextBleed,
+              nextProv,
+              fallbackUrl: nextCover,
+            ),
+          );
         }
       }
 
@@ -814,13 +1183,10 @@ class PlayerShellState extends State<PlayerShell>
           (t != null && t.artists.isNotEmpty && t.artists.first.id.isNotEmpty)
           ? t.artists.first.id
           : null;
-      Navigator.push(
-        context,
-        ZenPageRoute(
-          builder: (_) =>
-              ArtistScreen(artistName: artistName, browseId: browseId),
-        ),
-      );
+      final page = ArtistScreen(artistName: artistName, browseId: browseId);
+      if (!ShellNavigationScope.openPage(context, page)) {
+        Navigator.push(context, ZenPageRoute(builder: (_) => page));
+      }
     }
   }
 
@@ -828,60 +1194,27 @@ class PlayerShellState extends State<PlayerShell>
     _close();
     if (widget.onGoToAlbum != null) {
       widget.onGoToAlbum!(track);
-    } else {
-      final t = track is Track ? track : null;
-      final isVid =
-          (t != null &&
-              (t.isVideo ||
-                  Track.detectIsVideo(t.title, t.album) ||
-                  t.album.toLowerCase() == 'music video')) ||
-          (track != null &&
-              Track.detectIsVideo(
-                track?.title?.toString() ?? '',
-                track?.album?.toString() ?? '',
-              ));
-      final targetTitle = isVid
-          ? (t?.title ?? MediaNormalizer.cleanTitle(track?.title?.toString()))
-          : ((track?.album as String?)?.isNotEmpty == true
-                ? (t != null
-                      ? t.album
-                      : MediaNormalizer.cleanAlbumTitle(
-                          track?.album?.toString(),
-                        ))
-                : (t != null
-                      ? t.title
-                      : MediaNormalizer.cleanTitle(track?.title?.toString())));
-      final vidTrack = isVid
-          ? (t ??
-                    Track(
-                      id: track?.id?.toString() ?? '',
-                      title: targetTitle,
-                      artist: MediaNormalizer.formatArtists(
-                        track?.artist?.toString(),
-                      ),
-                      coverUrl: track?.coverUrl as String? ?? '',
-                      album: 'Music Video',
-                      isVideo: true,
-                    ))
-                .copyWith(isVideo: true)
-          : null;
-
-      Navigator.push(
+    } else if (track is Track) {
+      MediaRouter.openForTrack(context, track, useShellTab: true);
+    } else if (track != null) {
+      final isVid = AlbumResolver.isVideoContext(
+        isVideo: false,
+        title: track?.title?.toString(),
+        album: track?.album?.toString(),
+        coverUrl: track?.coverUrl?.toString(),
+      );
+      MediaRouter.openRelease(
         context,
-        ZenPageRoute(
-          builder: (_) => AlbumScreen(
-            albumTitle: targetTitle,
-            artistName: t != null
-                ? t.artist
-                : MediaNormalizer.formatArtists(track?.artist?.toString()),
-            coverUrl: track?.coverUrl as String?,
-            browseId: isVid ? null : t?.albumBrowseId,
-            initialTracks: vidTrack != null
-                ? [vidTrack]
-                : (t != null ? [t] : null),
-            isVideo: isVid,
-          ),
-        ),
+        albumTitle: isVid
+            ? (track?.title?.toString() ?? 'Music Video')
+            : ((track?.album as String?)?.isNotEmpty == true
+                  ? track!.album!.toString()
+                  : (track?.title?.toString() ?? 'Single')),
+        artistName: track?.artist?.toString() ?? 'Artist',
+        coverUrl: track?.coverUrl?.toString(),
+        isVideo: isVid,
+        isSingle: isVid,
+        useShellTab: true,
       );
     }
   }
@@ -897,10 +1230,13 @@ class PlayerShellState extends State<PlayerShell>
                 album: track?.album?.toString() ?? '',
                 coverUrl: track?.coverUrl?.toString() ?? '',
               ));
+    final isVid = AlbumResolver.isVideoTrack(effectiveTrack);
 
     MediaNavigationSheet.show(
       context: context,
       track: effectiveTrack,
+      showAlbum: !isVid,
+      isVideo: isVid,
       landscape: _landscape,
     );
   }
@@ -934,16 +1270,75 @@ class PlayerShellState extends State<PlayerShell>
   }
 
   /// Landscape video: seek ±[seconds] (clamped to the track).
-  void _skip(int seconds) {
+  void _skip(int seconds, {bool gesture = false}) {
     final p = context.read<PlayerState>();
     final Duration cur = p.positionNotifier.value;
     final Duration total = (p.duration as Duration?) ?? Duration.zero;
     var t = cur + Duration(seconds: seconds);
     if (t < Duration.zero) t = Duration.zero;
     if (total > Duration.zero && t > total) t = total;
-    (seconds < 0 ? _prevPulse : _nextPulse).value++;
+    (seconds < 0 ? _skipBackPulse : _skipFwdPulse).value++;
+    HapticFeedback.selectionClick();
     p.seek(t);
-    _pokeVideoUi();
+    if (gesture) {
+      _flashSkip(seconds);
+    } else {
+      _pokeVideoUi();
+    }
+  }
+
+  /// "10 seconds" burst on the tapped half; chained taps accumulate.
+  void _flashSkip(int seconds) {
+    final side = seconds < 0 ? -1 : 1;
+    final now = DateTime.now();
+    final prev = _skipFlash.value;
+    final chain =
+        prev != null &&
+        prev.side == side &&
+        now.difference(_flashAt) < const Duration(milliseconds: 900);
+    _flashAt = now;
+    _skipFlash.value = _SkipFlash(
+      side,
+      chain ? prev.secs + seconds.abs() : seconds.abs(),
+      (prev?.tick ?? 0) + 1,
+    );
+  }
+
+  /// Tap = show / hide controls. Double-tap (or keep tapping) on the left /
+  /// right third = ∓10s. The hide is delayed ~290ms so a double-tap never
+  /// flickers the controls.
+  void _onVideoTapUp(Offset pos, Size size) {
+    final now = DateTime.now();
+    final third = size.width / 3;
+    final side = pos.dx < third ? -1 : (pos.dx > size.width - third ? 1 : 0);
+    final dbl = now.difference(_vidLastTap) < const Duration(milliseconds: 280);
+    final chain = now.isBefore(_vidChainUntil);
+    _vidLastTap = now;
+    if (side != 0 && (dbl || chain)) {
+      _vidTapTimer?.cancel();
+      _vidChainUntil = now.add(const Duration(milliseconds: 650));
+      _skip(side * 10, gesture: true);
+      return;
+    }
+    if (_videoUiShown) {
+      _vidTapTimer?.cancel();
+      _vidTapTimer = Timer(const Duration(milliseconds: 290), () {
+        if (mounted) _setVideoUi(false);
+      });
+    } else {
+      _pokeVideoUi();
+    }
+  }
+
+  void _toggleFill() {
+    _videoFill = !_videoFill;
+    HapticFeedback.selectionClick();
+    _fillC.springTo(
+      _videoFill ? 1.0 : 0.0,
+      spring: _kFillSpring,
+      velocity: _fillC.velocity,
+    );
+    if (_videoUiShown) _pokeVideoUi();
   }
 
   /* ───────────── landscape video controls (spring show / hide) ───────────── */
@@ -1004,6 +1399,9 @@ class PlayerShellState extends State<PlayerShell>
 
   void _openSheet({double velocity = 0}) {
     HapticFeedback.lightImpact();
+    try {
+      context.read<PlayerState>().syncPositionNow();
+    } catch (_) {}
     SystemChrome.setPreferredOrientations(const [
       DeviceOrientation.portraitUp,
       DeviceOrientation.landscapeLeft,
@@ -1012,6 +1410,12 @@ class PlayerShellState extends State<PlayerShell>
     _closeToken++; // cancels any pending close finalizer
     _closeSafetyTimer?.cancel();
     _closing = false;
+    if (_bleedArt == null && _bakingUrl == null && _bleedUrl.isNotEmpty) {
+      _bakeFailed = false;
+      _bakeAttempts = 0;
+      _nextBakeRetryAt = null;
+      _ensureBleed();
+    }
     PlayerShell.isPlayerOpenNotifier.value = true;
     final restoreLyrics = _preferredMode == _Panel.lyrics;
     if (!_open) {
@@ -1075,6 +1479,7 @@ class PlayerShellState extends State<PlayerShell>
     _closing = true;
     _mountTimer?.cancel();
     _idleTimer?.cancel();
+    _scrollGraceTimer?.cancel();
     _closeSafetyTimer?.cancel();
     _videoUiTimer?.cancel();
     _panelToken++; // cancels a pending panel warm-up
@@ -1223,7 +1628,8 @@ class PlayerShellState extends State<PlayerShell>
     _mountTimer?.cancel();
     final token = ++_panelToken;
     final wasDocked = _docked;
-    _panelChangedAt = DateTime.now();
+    _scrollGraceTimer?.cancel();
+    _scrollGraceActive = p != _Panel.art;
 
     // Mount the new body NOW. It is invisible AND not painted (_bodyIn == 0),
     // so the expensive build / layout happens BEFORE any motion starts.
@@ -1259,6 +1665,7 @@ class PlayerShellState extends State<PlayerShell>
         });
       } else if (_bodyShowing) {
         // lyrics <-> queue: short cross-fade handled by the AnimatedSwitcher
+        _startScrollGrace();
         if (p == _Panel.lyrics) _scheduleIdle();
       } else {
         _warmThenShowBody(token);
@@ -1283,7 +1690,11 @@ class PlayerShellState extends State<PlayerShell>
 
     if (wasDocked) {
       // lyrics <-> queue: the cover is already docked, just cross-fade.
-      if (!_bodyShowing) _showBody();
+      if (!_bodyShowing) {
+        _showBody();
+      } else {
+        _startScrollGrace();
+      }
       _dock.springTo(1, spring: _kDockSpring, velocity: _dock.velocity);
       if (p == _Panel.lyrics) _scheduleIdle();
       return;
@@ -1404,7 +1815,7 @@ class PlayerShellState extends State<PlayerShell>
     if (!_bodyShowing ||
         _bodyIn.isAnimating ||
         _dock.isAnimating ||
-        DateTime.now().difference(_panelChangedAt) < _kPanelScrollGrace) {
+        _scrollGraceActive) {
       return false;
     }
 
@@ -1559,7 +1970,9 @@ class PlayerShellState extends State<PlayerShell>
       context: context,
       track: t,
       landscape: _landscape,
-      onGoToArtist: () => _openArtist(t.artist),
+      onGoToArtist: t.resolvedArtists.length > 1
+          ? null
+          : () => _openArtist(t.artist),
       onGoToAlbum: () => _openAlbum(t),
     );
   }
@@ -1618,8 +2031,20 @@ class PlayerShellState extends State<PlayerShell>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         final inPanel = _panel != _Panel.art;
-        _dock.value = (!land && inPanel) ? 1.0 : 0.0;
-        _bodyIn.value = inPanel ? 1.0 : 0.0;
+        final dockTarget = (!land && inPanel) ? 1.0 : 0.0;
+        // spring the dock instead of jumping: pause-scale, radius and halo
+        // all follow it, so nothing pops during the rotation
+        if (_open && !_reduceMotion && _dock.value != dockTarget) {
+          _dock.springTo(dockTarget, spring: _kRotDockSpring, velocity: 0);
+        } else {
+          _dock.value = dockTarget;
+        }
+        if (_open && !_reduceMotion && land && inPanel) {
+          _bodyIn.value = 0;
+          _bodyIn.springTo(1.0, spring: _kRotDockSpring, velocity: 0);
+        } else {
+          _bodyIn.value = inPanel ? 1.0 : 0.0;
+        }
         _bodyShowing = inPanel && _open;
         if (inPanel) setState(() => _bodyPanel = _panel);
       });
@@ -1660,11 +2085,25 @@ class PlayerShellState extends State<PlayerShell>
             _buildMini(player, track, safe),
             _buildSheet(player, track, size, safe, isFullBleed),
             _buildArtOverlay(player, track, size, safe, isFullBleed),
+            _buildNotifOverlay(size, safe),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildNotifOverlay(Size size, EdgeInsets safe) => Positioned.fill(
+    child: AnimatedBuilder(
+      animation: _sheet,
+      builder: (_, child) =>
+          (_open || _sheet.value > 0.15) ? child! : const SizedBox.shrink(),
+      child: IslandNotificationOverlay(
+        topOffset: size.width > size.height
+            ? math.max(12.0, safe.top + 8.0)
+            : math.max(54.0, safe.top + 4.0) + 46.0 + 8.0,
+      ),
+    ),
+  );
 
   Widget _buildScrim() => Positioned.fill(
     child: IgnorePointer(
@@ -1767,7 +2206,8 @@ class PlayerShellState extends State<PlayerShell>
                                         width: w,
                                         height: g.art,
                                         child: XfadeLayer(
-                                          incoming: (_open || _sheet.value > 0.001)
+                                          incoming:
+                                              (_open || _sheet.value > 0.001)
                                               ? CoverImage(
                                                   (track.coverUrl as String?) ??
                                                       '',
@@ -1782,7 +2222,8 @@ class PlayerShellState extends State<PlayerShell>
                                                   videoFit: BoxFit.cover,
                                                   isMini: true,
                                                 ),
-                                          outgoing: (s) => CoverImage(s.from.coverUrl),
+                                          outgoing: (s) =>
+                                              CoverImage(s.from.coverUrl),
                                         ),
                                       );
                                     },
@@ -2102,12 +2543,21 @@ class PlayerShellState extends State<PlayerShell>
                   final d = _dock.value.clamp(0.0, 1.0).toDouble();
 
                   final dest = Rect.lerp(targetBig, docked, d)!;
-                  final tgt = Rect.lerp(_rotFrom ?? dest, dest, _rotV)!;
+                  final tgt = Rect.lerp(_rotFrom ?? dest, dest, _rotRaw)!;
                   _curRect = tgt;
                   final px = Curves.easeOutQuad.transform(t);
                   final sp = (t + px) / 2;
-                  final cx = lerpDouble(mini.center.dx, tgt.center.dx, px)!;
-                  final cy = lerpDouble(mini.center.dy, tgt.center.dy, t)!;
+                  var cx = lerpDouble(mini.center.dx, tgt.center.dx, px)!;
+                  var cy = lerpDouble(mini.center.dy, tgt.center.dy, t)!;
+                  final rotT = _rotFrom == null ? 0.0 : 1.0 - _rotRaw;
+                  final rotAng = _rotA0 * rotT;
+                  if (rotT != 0.0) {
+                    final nc = size.center(Offset.zero);
+                    final vx = cx - nc.dx, vy = cy - nc.dy;
+                    final cs = math.cos(rotAng), sn = math.sin(rotAng);
+                    cx = nc.dx + vx * cs - vy * sn;
+                    cy = nc.dy + vx * sn + vy * cs;
+                  }
 
                   // landscape video lands edge to edge: radius melts to 0
                   final radius = lerpDouble(
@@ -2133,12 +2583,15 @@ class PlayerShellState extends State<PlayerShell>
                   final hh = lerpDouble(mini.height, tgt.height, sp)!;
                   final geomScale = math.max(ww / big.width, hh / big.height);
                   final s = geomScale * pauseScale;
-                  final m = Matrix4.diagonal3Values(s, s, 1)
-                    ..setTranslationRaw(
-                      cx + dx - big.width * s / 2,
-                      cy - big.height * s / 2,
-                      0,
-                    );
+                  final m =
+                      Matrix4.translationValues(cx + dx, cy, 0) *
+                      Matrix4.rotationZ(rotAng) *
+                      Matrix4.diagonal3Values(s, s, 1) *
+                      Matrix4.translationValues(
+                        -big.width / 2,
+                        -big.height / 2,
+                        0,
+                      );
 
                   final pauseHalo = bleed
                       ? 1.0
@@ -2147,19 +2600,24 @@ class PlayerShellState extends State<PlayerShell>
                       ? 0.0
                       : (_smooth((t - 0.9) / 0.1) *
                                 (1 - _smooth(d / 0.12)) *
-                                pauseHalo)
+                                pauseHalo *
+                                _smooth((_rotV - 0.55) / 0.45))
                             .clamp(0.0, 1.0)
                             .toDouble();
 
                   final skipClip = bleed && d < 0.05 && t > 0.9;
-                  // Landscape video: the flying cover cross-fades into the
-                  // sheet's own full-screen video (same rect) and then steps
-                  // aside, so it never covers the video controls.
-                  final hidden =
-                      (!_open && t <= 0.001) || (landVideo && t > 0.985);
+                  // Landscape video: the cover flies to the full-screen rect
+                  // (opening OR rotating) and dissolves into the sheet's own
+                  // video at the very end.
                   final coverFade = landVideo
-                      ? 1.0 - _smooth((t - 0.75) / 0.23)
+                      ? math.max(
+                          1.0 - _smooth((t - 0.75) / 0.23),
+                          1.0 - _smooth((_rotV - 0.8) / 0.18),
+                        )
                       : 1.0;
+                  final hidden =
+                      (!_open && t <= 0.001) ||
+                      (landVideo && coverFade <= 0.002);
 
                   return Offstage(
                     offstage: hidden,
@@ -2260,8 +2718,12 @@ class PlayerShellState extends State<PlayerShell>
                                               top: 12,
                                               child: Opacity(
                                                 opacity:
-                                                    (((t - 0.85) / 0.15) *
-                                                            (1 - d * 2.5))
+                                                    ((((t - 0.85) / 0.15) *
+                                                                (1 - d * 2.5)) *
+                                                            _smooth(
+                                                              (_rotV - 0.7) /
+                                                                  0.3,
+                                                            ))
                                                         .clamp(0.0, 1.0),
                                                 child: _SpringButton(
                                                   size: 42,
@@ -2271,11 +2733,10 @@ class PlayerShellState extends State<PlayerShell>
                                                       _expandVideoToLandscape,
                                                   child: _vidDisc(
                                                     38,
-                                                    const Icon(
-                                                      CupertinoIcons
-                                                          .arrow_up_left_arrow_down_right,
+                                                    const _BracketIcon(
+                                                      size: 18,
                                                       color: Colors.white,
-                                                      size: 17,
+                                                      collapse: false,
                                                     ),
                                                   ),
                                                 ),
@@ -2343,6 +2804,7 @@ class PlayerShellState extends State<PlayerShell>
                       _dock.isAnimating ||
                       _bodyIn.isAnimating ||
                       _chrome.isAnimating ||
+                      _rot.isAnimating ||
                       _videoUiC.isAnimating,
                 ),
               ),
@@ -2357,19 +2819,23 @@ class PlayerShellState extends State<PlayerShell>
         ),
       ),
     );
-    final column = AnimatedBuilder(
-      animation: _rot,
-      child: RepaintBoundary(
-        child: _sheetColumn(player, track, safe, size, isFullBleed),
+    final column = RepaintBoundary(
+      child: _sheetColumn(player, track, safe, size, isFullBleed),
+    );
+
+    // Leaving the black landscape video: fade the black out instead of
+    // snapping to the portrait backdrop.
+    final veil = IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _rot,
+        builder: (_, _) {
+          final a = _rotFromVideoLand ? 1.0 - _smooth(_rotV / 0.55) : 0.0;
+          return Opacity(
+            opacity: a,
+            child: const ColoredBox(color: Colors.black),
+          );
+        },
       ),
-      builder: (_, c) {
-        // controls appear only after the cover has started to move
-        final r = _smooth((_rotV - 0.12) / 0.88);
-        return Opacity(
-          opacity: r,
-          child: Transform.scale(scale: 0.94 + 0.06 * r, child: c),
-        );
-      },
     );
 
     // CONSTANT tree shape: the Opacity is ALWAYS present.
@@ -2385,7 +2851,10 @@ class PlayerShellState extends State<PlayerShell>
     // ClipRect: the sheet is exactly ONE rectangle, nothing can peek out of
     // its edges while it moves.
     final sheetBody = ClipRect(
-      child: Stack(fit: StackFit.expand, children: [backdropLayer, column]),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [backdropLayer, veil, column],
+      ),
     );
 
     return Positioned.fill(
@@ -2586,15 +3055,21 @@ class PlayerShellState extends State<PlayerShell>
   /// so a closing swipe never paints it). Opacity 0 = NOT painted at all.
   Widget _bodyFade({required Widget child}) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_bodyIn, _sheet]),
+      animation: Listenable.merge([_bodyIn, _sheet, _rot]),
       child: child,
       builder: (_, c) {
+        // the heavy body rotates too, but only fades in once it is mostly there
+        final rs = _smooth((_rotV - 0.25) / 0.5);
         final f =
             _bodyIn.value.clamp(0.0, 1.0).toDouble() *
-            _bodyAlpha(_sheet.value.clamp(0.0, 1.0).toDouble());
-        return IgnorePointer(
-          ignoring: f < 0.6,
-          child: Opacity(opacity: f, child: c),
+            _bodyAlpha(_sheet.value.clamp(0.0, 1.0).toDouble()) *
+            rs;
+        return _applyMorph(
+          _Slot.body,
+          IgnorePointer(
+            ignoring: f < 0.6,
+            child: Opacity(opacity: f, child: c),
+          ),
         );
       },
     );
@@ -2636,10 +3111,12 @@ class PlayerShellState extends State<PlayerShell>
   /// Plain fade following `_chrome`.
   Widget _chromeFade({required Widget child}) {
     return AnimatedBuilder(
-      animation: _chrome,
+      animation: Listenable.merge([_chrome, _rot]),
       child: child,
       builder: (_, c) => Opacity(
-        opacity: (1 - _chrome.value).clamp(0.0, 1.0).toDouble(),
+        opacity: ((1 - _chrome.value) * _rotStage(0.25))
+            .clamp(0.0, 1.0)
+            .toDouble(),
         child: c,
       ),
     );
@@ -2648,18 +3125,43 @@ class PlayerShellState extends State<PlayerShell>
   /// Staggered rise-in of the controls as the sheet opens (and the reverse on
   /// close). [begin] is the sheet progress at which this element starts.
   Widget _rise({required double begin, required Widget child}) {
+    final slot = _slotOf(begin);
     return AnimatedBuilder(
-      animation: _sheet,
+      animation: Listenable.merge([_sheet, _rot]),
       child: child,
       builder: (_, c) {
         final t = _sheet.value.clamp(0.0, 1.0);
         final v = ((t - begin) / (1 - begin)).clamp(0.0, 1.0);
         final e = Curves.easeOutCubic.transform(v);
-        return Opacity(
-          opacity: e,
-          child: Transform.translate(offset: Offset(0, (1 - e) * 22), child: c),
+        return _applyMorph(
+          slot,
+          Opacity(
+            opacity: e,
+            child: Transform.translate(
+              offset: Offset(0, (1 - e) * 22),
+              child: c,
+            ),
+          ),
         );
       },
+    );
+  }
+
+  /// Blocks taps on empty gaps around visible bottom controls from falling
+  /// through to underlying lyrics lines.
+  Widget _bottomControlsHitShield({
+    required Listenable animation,
+    required bool Function() isActive,
+  }) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (_, child) => IgnorePointer(ignoring: !isActive(), child: child),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {},
+        onDoubleTap: () {},
+        onLongPress: () {},
+      ),
     );
   }
 
@@ -2877,6 +3379,7 @@ class PlayerShellState extends State<PlayerShell>
                           onSeek: (pos) => player.seek(pos),
                           activeColor: _seekTint.withValues(alpha: 0.62),
                           trackColor: _seekTint.withValues(alpha: 0.22),
+                          timeColor: Colors.white.withValues(alpha: 0.55),
                           middleWidget: (!isLyrics && !isQueue)
                               ? Container(
                                   padding: const EdgeInsets.symmetric(
@@ -2914,11 +3417,13 @@ class PlayerShellState extends State<PlayerShell>
                               : null,
                         ),
                         outgoing: (s) => ScrubberSlider(
-                          positionNotifier: CrossfadeController.instance.outPosition,
+                          positionNotifier:
+                              CrossfadeController.instance.outPosition,
                           duration: s.fromDuration,
                           onSeek: (_) {},
                           activeColor: _seekTint.withValues(alpha: 0.62),
                           trackColor: _seekTint.withValues(alpha: 0.22),
+                          timeColor: Colors.white.withValues(alpha: 0.55),
                         ),
                       ),
                     ),
@@ -2971,8 +3476,26 @@ class PlayerShellState extends State<PlayerShell>
     final content = Stack(
       fit: StackFit.expand,
       children: [
-        Column(children: [grabber, compactHeader, middleRegion]),
+        Column(
+          children: [
+            _rotReveal(begin: 0.04, slide: false, child: grabber),
+            _rotReveal(begin: 0.08, child: compactHeader),
+            middleRegion,
+          ],
+        ),
         _bottomBlur(blurH, isLyrics),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: queueReserve,
+          child: _bottomControlsHitShield(
+            animation: _chrome,
+            isActive: () =>
+                (isLyrics || _bodyPanel == _Panel.lyrics) &&
+                _chrome.value.clamp(0.0, 1.0) <= 0.35,
+          ),
+        ),
         meta,
         controls,
         tools,
@@ -2997,11 +3520,92 @@ class PlayerShellState extends State<PlayerShell>
     EdgeInsets safe,
     Size size,
   ) {
-    if (_isVideo) return _landscapeVideo(player, track, safe);
+    if (_isVideo) return _landscapeVideo(player, track, safe, size);
 
     final art = _landscapeArtRect(size, safe);
     final hasLyrics = player.hasLyrics || player.isLoadingLyrics;
-    _lyricsFadeEnd = 0.84;
+    _lyricsFadeEnd = 0.99;
+
+    final pad = _landscapePad(size);
+    final paneLeft = art.right + 40;
+    final paneRight = math.max(safe.right + pad, size.width - paneLeft - 560);
+    final fullRight = math.max(12.0, safe.right + 12.0);
+
+    Widget buildControlsColumn(double w, double h, bool spaceBetween) {
+      final transportH = (h * 0.30).clamp(68.0, 92.0).toDouble();
+      return SizedBox(
+        width: w,
+        height: spaceBetween ? h : null,
+        child: Column(
+          mainAxisSize: spaceBetween ? MainAxisSize.max : MainAxisSize.min,
+          mainAxisAlignment: spaceBetween
+              ? MainAxisAlignment.spaceBetween
+              : MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _rise(begin: 0.58, child: _metaRow(track, compact: true)),
+            _rise(
+              begin: 0.64,
+              child: XfadeLayer(
+                crossDissolve: true,
+                incoming: ScrubberSlider(
+                  positionNotifier: player.positionNotifier,
+                  duration: _duration,
+                  onSeek: (pos) => player.seek(pos),
+                  activeColor: _seekTint.withValues(alpha: 0.65),
+                  trackColor: _seekTint.withValues(alpha: 0.22),
+                  timeColor: Colors.white.withValues(alpha: 0.55),
+                  middleWidget: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        CupertinoIcons.waveform,
+                        size: 11,
+                        color: Colors.white.withValues(alpha: 0.58),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Lossless',
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.58),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                outgoing: (s) => ScrubberSlider(
+                  positionNotifier: CrossfadeController.instance.outPosition,
+                  duration: s.fromDuration,
+                  onSeek: (_) {},
+                  activeColor: _seekTint.withValues(alpha: 0.65),
+                  trackColor: _seekTint.withValues(alpha: 0.22),
+                  timeColor: Colors.white.withValues(alpha: 0.55),
+                ),
+              ),
+            ),
+            _rise(
+              begin: 0.70,
+              child: SizedBox(
+                height: transportH,
+                child: _transportLandscape(player, w, transportH),
+              ),
+            ),
+            _rise(
+              begin: 0.74,
+              child: _LandscapeVolumeSlider(
+                player: player,
+                activeColor: _seekTint.withValues(alpha: 0.68),
+                trackColor: _seekTint.withValues(alpha: 0.22),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     final controls = AnimatedBuilder(
       animation: _bodyIn,
@@ -3023,48 +3627,14 @@ class PlayerShellState extends State<PlayerShell>
           builder: (_, box) {
             final w = box.maxWidth; // == header width == tools width
             final h = box.maxHeight;
-            final transportH = (h - _kSeekH - 8).clamp(56.0, 92.0).toDouble();
+            final spaceBetween = h >= 210;
+            if (spaceBetween) {
+              return buildControlsColumn(w, h, true);
+            }
             return Center(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
-                child: SizedBox(
-                  width: w,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _rise(
-                        begin: 0.64,
-                        child: XfadeLayer(
-                          crossDissolve: true,
-                          incoming: ScrubberSlider(
-                            positionNotifier: player.positionNotifier,
-                            duration: _duration,
-                            onSeek: (pos) => player.seek(pos),
-                            activeColor: _seekTint.withValues(alpha: 0.62),
-                            trackColor: _seekTint.withValues(alpha: 0.22),
-                          ),
-                          outgoing: (s) => ScrubberSlider(
-                            positionNotifier:
-                                CrossfadeController.instance.outPosition,
-                            duration: s.fromDuration,
-                            onSeek: (_) {},
-                            activeColor: _seekTint.withValues(alpha: 0.62),
-                            trackColor: _seekTint.withValues(alpha: 0.22),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _rise(
-                        begin: 0.70,
-                        child: SizedBox(
-                          height: transportH,
-                          child: _transportLandscape(player, w, transportH),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                child: buildControlsColumn(w, h, false),
               ),
             );
           },
@@ -3087,45 +3657,28 @@ class PlayerShellState extends State<PlayerShell>
           ),
         );
       },
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 56),
-        child: RepaintBoundary(
-          child: _bodyFade(
-            child: AnimatedSwitcher(
-              duration: Duration(milliseconds: _instantSwap ? 0 : 200),
-              transitionBuilder: (c, a) => FadeTransition(opacity: a, child: c),
-              layoutBuilder: (cur, prev) =>
-                  Stack(fit: StackFit.expand, children: [...prev, ?cur]),
-              child: _panelBody(track),
-            ),
+      child: RepaintBoundary(
+        child: _bodyFade(
+          child: AnimatedSwitcher(
+            duration: Duration(milliseconds: _instantSwap ? 0 : 200),
+            transitionBuilder: (c, a) => FadeTransition(opacity: a, child: c),
+            layoutBuilder: (cur, prev) =>
+                Stack(fit: StackFit.expand, children: [...prev, ?cur]),
+            child: _panelBody(track),
           ),
         ),
       ),
     );
 
-    final header = AnimatedBuilder(
-      animation: _bodyIn,
-      builder: (_, c) {
-        final b = _smooth(_bodyIn.value);
-        return IgnorePointer(
-          ignoring: b > 0.1,
-          child: Opacity(
-            opacity: (1 - b).clamp(0.0, 1.0),
-            child: Transform.translate(offset: Offset(0, -16 * b), child: c),
-          ),
-        );
-      },
-      child: _rise(begin: 0.58, child: _metaRow(track, compact: true)),
-    );
-
-    // Lyrics + Queue centred at the bottom. Opening a panel collapses the
-    // other button (spring driven by _bodyIn); the remaining one is "back".
+    // Default: Lyrics + Queue centered at bottom. When one is open, the other
+    // collapses and the active button glides to the full right side so content
+    // uses the entire bottom area cleanly for both Lyrics and Queue.
     final tools = Positioned(
-      left: 0,
+      left: paneLeft,
       right: 0,
-      bottom: 0,
+      bottom: size.height - art.bottom,
       child: AnimatedBuilder(
-        animation: _bodyIn,
+        animation: Listenable.merge([_bodyIn, _rot]),
         builder: (_, _) {
           final b = _smooth(_bodyIn.value);
           final hf = (1 - b).clamp(0.0, 1.0);
@@ -3134,6 +3687,7 @@ class PlayerShellState extends State<PlayerShell>
           final hideLyrics = _bodyPanel == _Panel.queue;
           final hideQueue = _bodyPanel == _Panel.lyrics;
           final anyPanel = _bodyPanel != _Panel.art;
+          final rightEdge = lerpDouble(paneRight, fullRight, b)!;
 
           Widget slot(bool hide, Widget child) => ClipRect(
             child: Align(
@@ -3145,93 +3699,58 @@ class PlayerShellState extends State<PlayerShell>
             ),
           );
 
-          return Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                slot(
-                  hideLyrics,
-                  PlateButton(
-                    size: 44,
-                    active: inLyrics,
-                    onTap: hasLyrics ? () => _togglePanel(_Panel.lyrics) : null,
-                    child: Opacity(
-                      opacity: hasLyrics ? 1.0 : 0.28,
-                      child: SpringPop(
-                        trigger: inLyrics,
-                        scale: 0.3,
-                        child: Icon(
-                          inLyrics
-                              ? CupertinoIcons.quote_bubble_fill
-                              : CupertinoIcons.quote_bubble,
-                          size: 22,
+          final inner = Padding(
+            padding: EdgeInsets.only(right: rightEdge),
+            child: Align(
+              alignment: Alignment(lerpDouble(0.0, 1.0, b)!, 0.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  slot(
+                    hideLyrics,
+                    PlateButton(
+                      size: 46,
+                      active: inLyrics,
+                      onTap: hasLyrics
+                          ? () => _togglePanel(_Panel.lyrics)
+                          : null,
+                      child: Opacity(
+                        opacity: hasLyrics ? 1.0 : 0.28,
+                        child: SpringPop(
+                          trigger: inLyrics,
+                          scale: 0.3,
+                          child: Icon(
+                            inLyrics
+                                ? CupertinoIcons.quote_bubble_fill
+                                : CupertinoIcons.quote_bubble,
+                            size: 22,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                SizedBox(width: anyPanel ? 56.0 * hf : 56.0),
-                slot(
-                  hideQueue,
-                  PlateButton(
-                    size: 44,
-                    active: inQueue,
-                    onTap: () => _togglePanel(_Panel.queue),
-                    child: SpringPop(
-                      trigger: inQueue,
-                      scale: 0.3,
-                      child: const Icon(CupertinoIcons.list_bullet, size: 24),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-
-    final grabber = Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: _sheetFade(
-        child: Center(
-          child: SizedBox(
-            width: 140,
-            child: Semantics(
-              button: true,
-              label: 'Close player',
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _close,
-                onPanStart: (_) => _dragStart(),
-                onPanUpdate: (d) => _dragUpdate(d.delta.dy),
-                onPanEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
-                onPanCancel: () => _dragEnd(0),
-                child: Padding(
-                  padding: EdgeInsets.only(top: safe.top + 8, bottom: 10),
-                  child: Center(
-                    child: Container(
-                      width: 36,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(3),
+                  SizedBox(width: anyPanel ? 104.0 * hf : 104.0),
+                  slot(
+                    hideQueue,
+                    PlateButton(
+                      size: 46,
+                      active: inQueue,
+                      onTap: () => _togglePanel(_Panel.queue),
+                      child: SpringPop(
+                        trigger: inQueue,
+                        scale: 0.3,
+                        child: const Icon(CupertinoIcons.list_bullet, size: 24),
                       ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
-          ),
-        ),
+          );
+          return _applyMorph(_Slot.tools, inner);
+        },
       ),
     );
-
-    final pad = _landscapePad(size);
-    final paneLeft = art.right + 36;
-    final paneRight = math.max(safe.right + pad, size.width - paneLeft - 560);
 
     return Stack(
       fit: StackFit.expand,
@@ -3239,20 +3758,31 @@ class PlayerShellState extends State<PlayerShell>
         Positioned(
           left: paneLeft,
           right: paneRight,
-          top: art.top,
+          top: art.top + 4,
           bottom: size.height - art.bottom,
           child: Stack(
             fit: StackFit.expand,
             clipBehavior: Clip.none,
             children: [
               body,
-              Positioned.fill(top: 52, bottom: 52, child: controls),
-              Positioned(top: 0, left: 0, right: 0, child: header),
-              tools,
+              Positioned.fill(top: 0, bottom: 54, child: controls),
             ],
           ),
         ),
-        grabber,
+        Positioned(
+          left: paneLeft,
+          right: 0,
+          bottom: size.height - art.bottom,
+          height: 54,
+          child: _bottomControlsHitShield(
+            animation: Listenable.merge([_chrome, _bodyIn]),
+            isActive: () =>
+                (_panel == _Panel.lyrics || _bodyPanel == _Panel.lyrics) &&
+                _bodyIn.value > 0.1 &&
+                _chrome.value.clamp(0.0, 1.0) <= 0.35,
+          ),
+        ),
+        tools,
       ],
     );
   }
@@ -3269,11 +3799,17 @@ class PlayerShellState extends State<PlayerShell>
     child: icon,
   );
 
-  /// Full-screen landscape video. Everything on top of the video is driven by
-  /// ONE spring (`_videoUiC`): the dim fades, the buttons pop (soft scale),
-  /// the bottom info slides up. Hidden = Opacity 0 = nothing painted, so the
-  /// video texture plays with zero overdraw.
-  Widget _landscapeVideo(PlayerState player, dynamic track, EdgeInsets safe) {
+  /// Full-screen landscape video.
+  ///  • video layer fades in at the END of the rotation morph (the flying
+  ///    cover dissolves into it), controls spring in after that
+  ///  • tap = controls, double-tap L/R = ∓10s, pinch = fit/fill,
+  ///    swipe down = exit, prev / next track in the transport row
+  Widget _landscapeVideo(
+    PlayerState player,
+    dynamic track,
+    EdgeInsets safe,
+    Size size,
+  ) {
     final title = track is Track
         ? track.title
         : MediaNormalizer.cleanTitle(track?.title?.toString());
@@ -3281,181 +3817,305 @@ class PlayerShellState extends State<PlayerShell>
         ? track.artist
         : MediaNormalizer.formatArtists(track?.artist?.toString());
 
+    double fillOf(double? aspect) {
+      final fit = _videoFullRect(size, _clampAr(aspect ?? (16 / 9)));
+      return math.max(size.width / fit.width, size.height / fit.height);
+    }
+
+    final black = AnimatedBuilder(
+      animation: _rot,
+      builder: (_, _) => Opacity(
+        opacity: _smooth(_rotV / 0.5),
+        child: const ColoredBox(color: Colors.black),
+      ),
+    );
+
+    final videoLayer = RepaintBoundary(
+      child: ValueListenableBuilder<double?>(
+        valueListenable: player.videoAspectNotifier,
+        builder: (_, aspect, _) {
+          final fs = fillOf(aspect);
+          return AnimatedBuilder(
+            animation: Listenable.merge([_fillC, _rot]),
+            child: _TrackMediaView(
+              player: player,
+              coverUrl: _shownCover ?? '',
+              isVideo: true,
+              videoFit: BoxFit.contain,
+            ),
+            builder: (_, c) => Opacity(
+              opacity: _smooth((_rotV - 0.6) / 0.3),
+              child: Transform.scale(
+                scale: lerpDouble(1.0, fs, _fillC.value)!,
+                child: c,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
     final ui = RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: _videoUiC,
-        builder: (_, _) {
-          final v = _videoUiC.value;
-          final o = v.clamp(0.0, 1.0).toDouble();
-          final pop = 0.92 + 0.08 * v.clamp(0.0, 1.06); // tiny natural settle
-          return IgnorePointer(
-            ignoring: o < 0.5,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Opacity(
-                  opacity: o,
-                  child: const ColoredBox(color: Color(0x66000000)),
-                ),
-                // close (top left)
-                Positioned(
-                  top: safe.top + 16,
-                  left: safe.left + 24,
-                  child: Opacity(
-                    opacity: o,
-                    child: Transform.translate(
-                      offset: Offset(0, -14 * (1 - o)),
-                      child: Transform.scale(
-                        scale: pop,
-                        child: _SpringButton(
-                          size: 52,
-                          label: 'Exit full screen',
-                          onTap: _exitLandscapeToPortrait,
-                          child: _vidDisc(
-                            46,
-                            const Icon(
-                              CupertinoIcons.xmark,
-                              color: Colors.white,
-                              size: 22,
+      child: ValueListenableBuilder<double?>(
+        valueListenable: player.videoAspectNotifier,
+        builder: (_, aspect, _) {
+          final canFill = fillOf(aspect) > 1.02;
+          return AnimatedBuilder(
+            animation: Listenable.merge([_videoUiC, _rot, _fillC]),
+            builder: (_, _) {
+              final v = _videoUiC.value;
+              final o =
+                  v.clamp(0.0, 1.0).toDouble() * _smooth((_rotV - 0.7) / 0.3);
+              final pop = 0.92 + 0.08 * v.clamp(0.0, 1.06);
+              return IgnorePointer(
+                ignoring: o < 0.5,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Opacity(
+                      opacity: o,
+                      child: const ColoredBox(color: Color(0x66000000)),
+                    ),
+                    // exit (top left)
+                    Positioned(
+                      top: safe.top + 16,
+                      left: safe.left + 24,
+                      child: Opacity(
+                        opacity: o,
+                        child: Transform.translate(
+                          offset: Offset(0, -14 * (1 - o)),
+                          child: Transform.scale(
+                            scale: pop,
+                            child: _SpringButton(
+                              size: 52,
+                              label: 'Exit full screen',
+                              onTap: _exitLandscapeToPortrait,
+                              child: _vidDisc(
+                                46,
+                                const Icon(
+                                  CupertinoIcons.xmark,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-                // back 10 · play / pause · forward 10
-                Center(
-                  child: Opacity(
-                    opacity: o,
-                    child: Transform.scale(
-                      scale: pop,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _SpringButton(
-                            size: 72,
-                            label: 'Back 10 seconds',
-                            onTap: () => _skip(-10),
-                            child: SpringPop(
-                              pulse: _prevPulse,
-                              dx: -8,
-                              scale: 0.1,
-                              child: _vidDisc(
-                                66,
-                                const Icon(
-                                  CupertinoIcons.gobackward_10,
-                                  color: Colors.white,
-                                  size: 32,
+                    // fit / fill (top right), only when it changes anything
+                    if (canFill)
+                      Positioned(
+                        top: safe.top + 16,
+                        right: safe.right + 24,
+                        child: Opacity(
+                          opacity: o,
+                          child: Transform.translate(
+                            offset: Offset(0, -14 * (1 - o)),
+                            child: Transform.scale(
+                              scale: pop,
+                              child: _SpringButton(
+                                size: 52,
+                                label: _videoFill
+                                    ? 'Fit to screen'
+                                    : 'Fill screen',
+                                onTap: _toggleFill,
+                                child: _vidDisc(
+                                  46,
+                                  Icon(
+                                    _videoFill
+                                        ? CupertinoIcons
+                                              .arrow_down_right_arrow_up_left
+                                        : CupertinoIcons
+                                              .arrow_up_left_arrow_down_right,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 44),
-                          _SpringButton(
-                            size: 96,
-                            label: _playing ? 'Pause' : 'Play',
-                            pressedScale: 0.9,
-                            onTap: () {
-                              player.togglePlay();
-                              _pokeVideoUi();
-                            },
-                            child: _vidDisc(
-                              90,
-                              _PlayGlyph(playing: _playing, size: 44),
-                            ),
-                          ),
-                          const SizedBox(width: 44),
-                          _SpringButton(
-                            size: 72,
-                            label: 'Forward 10 seconds',
-                            onTap: () => _skip(10),
-                            child: SpringPop(
-                              pulse: _nextPulse,
-                              dx: 8,
-                              scale: 0.1,
-                              child: _vidDisc(
-                                66,
-                                const Icon(
-                                  CupertinoIcons.goforward_10,
-                                  color: Colors.white,
-                                  size: 32,
+                        ),
+                      ),
+                    // prev · -10 · play / pause · +10 · next
+                    Center(
+                      child: Opacity(
+                        opacity: o,
+                        child: Transform.scale(
+                          scale: pop,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _SpringButton(
+                                size: 56,
+                                label: 'Previous track',
+                                onTap: _prev,
+                                child: SpringPop(
+                                  pulse: _prevPulse,
+                                  dx: -8,
+                                  scale: 0.1,
+                                  child: _vidDisc(
+                                    50,
+                                    const Icon(
+                                      CupertinoIcons.backward_fill,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
+                              const SizedBox(width: 22),
+                              _SkipSpinButton(
+                                size: 72,
+                                forward: false,
+                                pulse: _skipBackPulse,
+                                label: 'Back 10 seconds',
+                                onTap: () => _skip(-10),
+                                child: _vidDisc(
+                                  66,
+                                  const Icon(
+                                    CupertinoIcons.gobackward_10,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 30),
+                              _SpringButton(
+                                size: 96,
+                                label: _playing ? 'Pause' : 'Play',
+                                pressedScale: 0.9,
+                                onTap: () {
+                                  player.togglePlay();
+                                  _pokeVideoUi();
+                                },
+                                child: _vidDisc(
+                                  90,
+                                  _PlayGlyph(playing: _playing, size: 44),
+                                ),
+                              ),
+                              const SizedBox(width: 30),
+                              _SkipSpinButton(
+                                size: 72,
+                                forward: true,
+                                pulse: _skipFwdPulse,
+                                label: 'Forward 10 seconds',
+                                onTap: () => _skip(10),
+                                child: _vidDisc(
+                                  66,
+                                  const Icon(
+                                    CupertinoIcons.goforward_10,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 22),
+                              _SpringButton(
+                                size: 56,
+                                label: 'Next track',
+                                onTap: _next,
+                                child: SpringPop(
+                                  pulse: _nextPulse,
+                                  dx: 8,
+                                  scale: 0.1,
+                                  child: _vidDisc(
+                                    50,
+                                    const Icon(
+                                      CupertinoIcons.forward_fill,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                // artist · title · seekbar (bottom)
-                Positioned(
-                  left: safe.left + 24,
-                  right: safe.right + 24,
-                  bottom: safe.bottom + 14,
-                  child: Opacity(
-                    opacity: o,
-                    child: Transform.translate(
-                      offset: Offset(0, 22 * (1 - o)),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          MarqueeScroll(
-                            resetKey: _trackKey,
-                            child: Text(
-                              artist,
-                              style: const TextStyle(
-                                fontFamily: 'SF Pro',
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
+                    // artist · title · seekbar (bottom)
+                    Positioned(
+                      left: safe.left + 24,
+                      right: safe.right + 24,
+                      bottom: safe.bottom + 14,
+                      child: Opacity(
+                        opacity: o,
+                        child: Transform.translate(
+                          offset: Offset(0, 22 * (1 - o)),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              MarqueeScroll(
+                                resetKey: _trackKey,
+                                animate: _playing,
+                                child: Text(
+                                  artist,
+                                  style: const TextStyle(
+                                    fontFamily: 'SF Pro',
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          MarqueeScroll(
-                            resetKey: _trackKey,
-                            child: Text(
-                              title,
-                              style: const TextStyle(
-                                fontFamily: 'SF Pro Display',
-                                color: Colors.white,
-                                fontSize: 26,
-                                height: 1.2,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.4,
+                              MarqueeScroll(
+                                resetKey: _trackKey,
+                                animate: _playing,
+                                child: Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontFamily: 'SF Pro Display',
+                                    color: Colors.white,
+                                    fontSize: 26,
+                                    height: 1.2,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.4,
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 6),
+                              XfadeLayer(
+                                crossDissolve: true,
+                                incoming: ScrubberSlider(
+                                  positionNotifier: player.positionNotifier,
+                                  duration: _duration,
+                                  onSeek: (pos) {
+                                    player.seek(pos);
+                                    _pokeVideoUi();
+                                  },
+                                  activeColor: Colors.white,
+                                  trackColor: Colors.white.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                  timeColor: Colors.white.withValues(
+                                    alpha: 0.75,
+                                  ),
+                                ),
+                                outgoing: (s) => ScrubberSlider(
+                                  positionNotifier:
+                                      CrossfadeController.instance.outPosition,
+                                  duration: s.fromDuration,
+                                  onSeek: (_) {},
+                                  activeColor: Colors.white,
+                                  trackColor: Colors.white.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                  timeColor: Colors.white.withValues(
+                                    alpha: 0.75,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 6),
-                          XfadeLayer(
-                            crossDissolve: true,
-                            incoming: ScrubberSlider(
-                              positionNotifier: player.positionNotifier,
-                              duration: _duration,
-                              onSeek: (pos) {
-                                player.seek(pos);
-                                _pokeVideoUi();
-                              },
-                              activeColor: Colors.white,
-                              trackColor: Colors.white.withValues(alpha: 0.3),
-                            ),
-                            outgoing: (s) => ScrubberSlider(
-                              positionNotifier: CrossfadeController.instance.outPosition,
-                              duration: s.fromDuration,
-                              onSeek: (_) {},
-                              activeColor: Colors.white,
-                              trackColor: Colors.white.withValues(alpha: 0.3),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           );
         },
       ),
@@ -3463,18 +4123,38 @@ class PlayerShellState extends State<PlayerShell>
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => _pokeVideoUi(toggle: true),
+      onTapUp: (d) => _onVideoTapUp(d.localPosition, size),
+      onScaleStart: (_) {
+        _vidScale = 1.0;
+        _vidDrag = 0.0;
+      },
+      onScaleUpdate: (d) {
+        if (d.pointerCount >= 2) {
+          _vidScale = d.scale;
+        } else {
+          _vidDrag += d.focalPointDelta.dy;
+        }
+      },
+      onScaleEnd: (d) {
+        if (_vidScale > 1.12 && !_videoFill) {
+          _toggleFill();
+        } else if (_vidScale < 0.88 && _videoFill) {
+          _toggleFill();
+        } else if (_vidScale == 1.0 &&
+            (_vidDrag > 90 ||
+                (_vidDrag > 30 && d.velocity.pixelsPerSecond.dy > 900))) {
+          _exitLandscapeToPortrait(); // swipe down
+        }
+        _vidScale = 1.0;
+        _vidDrag = 0.0;
+      },
       child: Stack(
         fit: StackFit.expand,
         children: [
-          const ColoredBox(color: Colors.black),
-          RepaintBoundary(
-            child: _TrackMediaView(
-              player: player,
-              coverUrl: _shownCover ?? '',
-              isVideo: true,
-              videoFit: BoxFit.contain,
-            ),
+          black,
+          videoLayer,
+          Positioned.fill(
+            child: IgnorePointer(child: _SkipFlashLayer(flash: _skipFlash)),
           ),
           ui,
         ],
@@ -3485,11 +4165,11 @@ class PlayerShellState extends State<PlayerShell>
   Widget _metaText(dynamic t, {bool compact = false, bool header = false}) {
     final titleText = header
         ? (t is Track
-            ? t.compactTitle
-            : MediaNormalizer.cleanCompactTitle(t?.title?.toString()))
+              ? t.compactTitle
+              : MediaNormalizer.cleanCompactTitle(t?.title?.toString()))
         : (t is Track
-            ? t.title
-            : MediaNormalizer.cleanTitle(t?.title?.toString()));
+              ? t.title
+              : MediaNormalizer.cleanTitle(t?.title?.toString()));
     final titleStyle = header
         ? const TextStyle(
             fontFamily: 'SF Pro',
@@ -3502,8 +4182,8 @@ class PlayerShellState extends State<PlayerShell>
         : TextStyle(
             fontFamily: 'SF Pro Display',
             color: Colors.white,
-            fontSize: compact ? 19 : 22,
-            height: compact ? 24 / 19 : 28 / 22,
+            fontSize: compact ? 21 : 22,
+            height: compact ? 26 / 21 : 28 / 22,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.45,
           );
@@ -3518,8 +4198,8 @@ class PlayerShellState extends State<PlayerShell>
         : TextStyle(
             fontFamily: 'SF Pro',
             color: Colors.white.withValues(alpha: 0.75),
-            fontSize: compact ? 15 : 17,
-            height: compact ? 20 / 15 : 22 / 17,
+            fontSize: compact ? 17.5 : 17,
+            height: compact ? 22 / 17.5 : 22 / 17,
             fontWeight: FontWeight.w500,
           );
 
@@ -3532,11 +4212,13 @@ class PlayerShellState extends State<PlayerShell>
           onTap: () => _showMediaNavigationSheet(t),
           child: MarqueeScroll(
             resetKey: _trackKey,
+            animate: _playing,
             child: SwapText(titleText, dir: _dir, style: titleStyle),
           ),
         ),
         MarqueeScroll(
           resetKey: _trackKey,
+          animate: _playing,
           child: InteractiveArtistsText(
             artists: _artistsOf(t),
             style: artistStyle,
@@ -3570,7 +4252,9 @@ class PlayerShellState extends State<PlayerShell>
                   child: XfadeLayer(
                     crossDissolve: true,
                     incoming: KeyedSubtree(
-                      key: CrossfadeController.instance.session.value != null ? ValueKey(_trackKey) : null,
+                      key: CrossfadeController.instance.session.value != null
+                          ? ValueKey(_trackKey)
+                          : null,
                       child: _metaText(track, header: true),
                     ),
                     outgoing: (s) => _metaText(s.from, header: true),
@@ -3649,10 +4333,10 @@ class PlayerShellState extends State<PlayerShell>
                   ),
           ),
           const SizedBox(width: 12),
-          // landscape: smaller buttons, right edge stays on the seekbar's end
+          // landscape: refined buttons matching title scale, right edge stays on seekbar end
           compact
               ? Transform.scale(
-                  scale: 0.82,
+                  scale: 0.92,
                   alignment: Alignment.centerRight,
                   child: actions,
                 )
@@ -3662,10 +4346,10 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  /// Landscape transport: sized from the seekbar width, never wider than it.
+  /// Landscape transport: bold Apple Music landscape controls.
   Widget _transportLandscape(PlayerState player, double w, double h) {
-    final play = math.min(h, w * 0.30).clamp(56.0, 96.0).toDouble();
-    final skip = play * 0.86;
+    final play = math.min(h, w * 0.32).clamp(68.0, 92.0).toDouble();
+    final skip = play * 0.88;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
@@ -3680,7 +4364,7 @@ class PlayerShellState extends State<PlayerShell>
             child: Icon(
               CupertinoIcons.backward_fill,
               color: Colors.white,
-              size: skip * 0.56,
+              size: skip * 0.58,
             ),
           ),
         ),
@@ -3689,7 +4373,7 @@ class PlayerShellState extends State<PlayerShell>
           label: _playing ? 'Pause' : 'Play',
           pressedScale: 0.9,
           onTap: player.togglePlay,
-          child: _PlayGlyph(playing: _playing, size: play * 0.64),
+          child: _PlayGlyph(playing: _playing, size: play * 0.68),
         ),
         _SpringButton(
           size: skip,
@@ -3702,7 +4386,7 @@ class PlayerShellState extends State<PlayerShell>
             child: Icon(
               CupertinoIcons.forward_fill,
               color: Colors.white,
-              size: skip * 0.56,
+              size: skip * 0.58,
             ),
           ),
         ),
@@ -4052,6 +4736,597 @@ class _TrackMediaView extends StatelessWidget {
           },
         ),
       ],
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Landscape volume bar: Apple Music style + seekbar-matched motion  */
+/* ------------------------------------------------------------------ */
+class _LandscapeVolumeSlider extends StatefulWidget {
+  const _LandscapeVolumeSlider({
+    required this.player,
+    required this.activeColor,
+    required this.trackColor,
+  });
+
+  final PlayerState player;
+  final Color activeColor;
+  final Color trackColor;
+
+  @override
+  State<_LandscapeVolumeSlider> createState() => _LandscapeVolumeSliderState();
+}
+
+class _LandscapeVolumeSliderState extends State<_LandscapeVolumeSlider>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _expandC = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 160),
+    reverseDuration: const Duration(milliseconds: 220),
+  );
+  bool _isDragging = false;
+  double _dragVol = 0.6;
+
+  void _setDrag(bool active, {double? initialVol}) {
+    if (active) {
+      if (initialVol != null) _dragVol = initialVol;
+      if (!_isDragging) {
+        setState(() => _isDragging = true);
+        _expandC.forward();
+        try {
+          HapticFeedback.selectionClick();
+        } catch (_) {}
+      }
+    } else if (_isDragging) {
+      setState(() => _isDragging = false);
+      _expandC.reverse();
+    }
+  }
+
+  void _stepBy(double delta) {
+    final next = (widget.player.systemVolumeNotifier.value + delta).clamp(
+      0.0,
+      1.0,
+    );
+    try {
+      HapticFeedback.selectionClick();
+    } catch (_) {}
+    widget.player.setSystemVolume(next);
+  }
+
+  @override
+  void dispose() {
+    _expandC.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<double>(
+      valueListenable: widget.player.systemVolumeNotifier,
+      builder: (_, sysVol, _) {
+        final targetVol = (_isDragging ? _dragVol : sysVol).clamp(0.0, 1.0);
+        return TweenAnimationBuilder<double>(
+          tween: Tween<double>(end: targetVol),
+          duration: _isDragging
+              ? Duration.zero
+              : const Duration(milliseconds: 140),
+          curve: Curves.easeOutCubic,
+          builder: (_, animVol, _) {
+            return AnimatedBuilder(
+              animation: _expandC,
+              builder: (_, _) {
+                final e = Curves.easeOutCubic.transform(_expandC.value);
+                final trackH = lerpDouble(7.5, 11.5, e)!;
+                final iconScale = 1.0 + 0.14 * e;
+                final iconAlpha = lerpDouble(0.62, 0.95, e)!;
+                final active =
+                    Color.lerp(
+                      widget.activeColor,
+                      Colors.white.withValues(alpha: 0.94),
+                      e,
+                    ) ??
+                    widget.activeColor;
+                final track =
+                    Color.lerp(
+                      widget.trackColor,
+                      Colors.white.withValues(alpha: 0.28),
+                      e * 0.6,
+                    ) ??
+                    widget.trackColor;
+
+                return SizedBox(
+                  height: 28,
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _stepBy(-0.10),
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: Transform.scale(
+                            scale: iconScale,
+                            child: Icon(
+                              animVol <= 0.01
+                                  ? CupertinoIcons.speaker_slash_fill
+                                  : CupertinoIcons.speaker_1_fill,
+                              size: 16,
+                              color: Colors.white.withValues(alpha: iconAlpha),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (_, constraints) {
+                            final trackW = math.max(1.0, constraints.maxWidth);
+                            return GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTapDown: (d) {
+                                final v = (d.localPosition.dx / trackW).clamp(
+                                  0.0,
+                                  1.0,
+                                );
+                                _dragVol = v;
+                                _expandC.forward().then((_) {
+                                  if (mounted && !_isDragging) {
+                                    _expandC.reverse();
+                                  }
+                                });
+                                try {
+                                  HapticFeedback.selectionClick();
+                                } catch (_) {}
+                                widget.player.setSystemVolume(v);
+                              },
+                              onHorizontalDragStart: (d) {
+                                final v = (d.localPosition.dx / trackW).clamp(
+                                  0.0,
+                                  1.0,
+                                );
+                                _setDrag(true, initialVol: v);
+                                widget.player.setSystemVolume(v);
+                              },
+                              onHorizontalDragUpdate: (d) {
+                                final v = (d.localPosition.dx / trackW).clamp(
+                                  0.0,
+                                  1.0,
+                                );
+                                setState(() => _dragVol = v);
+                                widget.player.setSystemVolume(v);
+                              },
+                              onHorizontalDragEnd: (_) {
+                                widget.player.setSystemVolume(_dragVol);
+                                _setDrag(false);
+                              },
+                              onHorizontalDragCancel: () => _setDrag(false),
+                              child: Container(
+                                height: 28,
+                                alignment: Alignment.center,
+                                child: Stack(
+                                  alignment: Alignment.centerLeft,
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    CustomPaint(
+                                      size: Size(trackW, trackH),
+                                      painter: _VolumeTrackPainter(
+                                        progress: animVol,
+                                        trackColor: track,
+                                        activeColor: active,
+                                      ),
+                                    ),
+                                    if (e > 0.05)
+                                      Positioned(
+                                        left: ((trackW - 14) * animVol).clamp(
+                                          0.0,
+                                          math.max(0.0, trackW - 14),
+                                        ),
+                                        child: Opacity(
+                                          opacity: e,
+                                          child: Container(
+                                            width: 14,
+                                            height: 14,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.96,
+                                              ),
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black
+                                                      .withValues(alpha: 0.35),
+                                                  blurRadius: 6,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _stepBy(0.10),
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 10),
+                          child: Transform.scale(
+                            scale: iconScale,
+                            child: Icon(
+                              CupertinoIcons.speaker_3_fill,
+                              size: 18,
+                              color: Colors.white.withValues(alpha: iconAlpha),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _VolumeTrackPainter extends CustomPainter {
+  const _VolumeTrackPainter({
+    required this.progress,
+    required this.trackColor,
+    required this.activeColor,
+  });
+
+  final double progress;
+  final Color trackColor;
+  final Color activeColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+
+    final radius = Radius.circular(size.height / 2);
+    final trackRRect = RRect.fromRectAndRadius(Offset.zero & size, radius);
+    canvas.drawRRect(
+      trackRRect,
+      Paint()
+        ..color = trackColor
+        ..style = PaintingStyle.fill
+        ..isAntiAlias = true,
+    );
+
+    if (progress > 0) {
+      final activeW = (size.width * progress).clamp(0.0, size.width);
+      if (activeW > 0) {
+        final effectiveW = math.max(activeW, size.height);
+        final activeRRect = RRect.fromRectAndRadius(
+          Rect.fromLTWH(0, 0, effectiveW, size.height),
+          radius,
+        );
+        canvas.save();
+        canvas.clipRRect(trackRRect);
+        canvas.drawRRect(
+          activeRRect,
+          Paint()
+            ..color = activeColor
+            ..style = PaintingStyle.fill
+            ..isAntiAlias = true,
+        );
+        canvas.restore();
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_VolumeTrackPainter old) =>
+      old.progress != progress ||
+      old.trackColor != trackColor ||
+      old.activeColor != activeColor;
+}
+
+/* ------------------------------------------------------------------ */
+/*  [ ] fullscreen brackets (expand) / inward brackets (collapse)       */
+/* ------------------------------------------------------------------ */
+class _BracketIcon extends StatelessWidget {
+  const _BracketIcon({
+    this.size = 18,
+    this.color = Colors.white,
+    this.collapse = false,
+  });
+  final double size;
+  final Color color;
+  final bool collapse;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: size,
+    height: size,
+    child: CustomPaint(painter: _BracketPainter(color, collapse)),
+  );
+}
+
+class _BracketPainter extends CustomPainter {
+  const _BracketPainter(this.color, this.collapse);
+  final Color color;
+  final bool collapse;
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    final w = s.width;
+    final sw = w * 0.11;
+    final p = sw / 2;
+    final len = w * 0.34;
+    final q = w * 0.30;
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = sw
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..isAntiAlias = true;
+    final path = Path();
+    for (final sx in const [1.0, -1.0]) {
+      for (final sy in const [1.0, -1.0]) {
+        final ox = sx > 0 ? 0.0 : w;
+        final oy = sy > 0 ? 0.0 : s.height;
+        double x(double v) => ox + sx * v;
+        double y(double v) => oy + sy * v;
+        if (!collapse) {
+          path
+            ..moveTo(x(p), y(p + len))
+            ..lineTo(x(p), y(p))
+            ..lineTo(x(p + len), y(p));
+        } else {
+          path
+            ..moveTo(x(p), y(q))
+            ..lineTo(x(q), y(q))
+            ..lineTo(x(q), y(p));
+        }
+      }
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_BracketPainter o) =>
+      o.color != color || o.collapse != collapse;
+}
+
+/* ------------------------------------------------------------------ */
+/*  ±10s button: the arrow kicks round with a spring + a ripple ring    */
+/* ------------------------------------------------------------------ */
+class _SkipSpinButton extends StatefulWidget {
+  const _SkipSpinButton({
+    required this.forward,
+    required this.pulse,
+    required this.onTap,
+    required this.label,
+    required this.child,
+    this.size = 72,
+  });
+  final bool forward;
+  final Listenable pulse;
+  final VoidCallback onTap;
+  final String label;
+  final Widget child; // the dark disc + glyph
+  final double size;
+
+  @override
+  State<_SkipSpinButton> createState() => _SkipSpinButtonState();
+}
+
+class _SkipSpinButtonState extends State<_SkipSpinButton>
+    with TickerProviderStateMixin {
+  late final AnimationController _spin = AnimationController.unbounded(
+    vsync: this,
+    value: 0,
+  );
+  late final AnimationController _ring = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 460),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    widget.pulse.addListener(_kick);
+  }
+
+  @override
+  void didUpdateWidget(covariant _SkipSpinButton old) {
+    super.didUpdateWidget(old);
+    if (old.pulse != widget.pulse) {
+      old.pulse.removeListener(_kick);
+      widget.pulse.addListener(_kick);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.pulse.removeListener(_kick);
+    _spin.dispose();
+    _ring.dispose();
+    super.dispose();
+  }
+
+  void _kick() {
+    if (!mounted) return;
+    _spin.value = 0;
+    _spin.animateWith(SpringSimulation(_kSkipSpring, 0, 0, 22));
+    _ring.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.size;
+    return _SpringButton(
+      size: s,
+      label: widget.label,
+      onTap: widget.onTap,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_spin, _ring]),
+        child: widget.child,
+        builder: (_, c) {
+          final v = _spin.value;
+          final ring = Curves.easeOutCubic.transform(_ring.value);
+          final ringA = _ring.isAnimating ? (1 - ring) * 0.4 : 0.0;
+          final d = s * (0.9 + 0.45 * ring);
+          return Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              if (ringA > 0.01)
+                Container(
+                  width: d,
+                  height: d,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: ringA),
+                      width: 2,
+                    ),
+                  ),
+                ),
+              Transform.rotate(
+                angle: (widget.forward ? 1 : -1) * 0.9 * v,
+                child: Transform.scale(
+                  scale: 1 + 0.1 * v.clamp(-0.3, 1.0),
+                  child: c,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Double-tap skip flash ("20 seconds" accumulates while tapping)      */
+/* ------------------------------------------------------------------ */
+class _SkipFlash {
+  const _SkipFlash(this.side, this.secs, this.tick);
+  final int side; // -1 left, 1 right
+  final int secs;
+  final int tick;
+}
+
+class _SkipFlashLayer extends StatefulWidget {
+  const _SkipFlashLayer({required this.flash});
+  final ValueListenable<_SkipFlash?> flash;
+
+  @override
+  State<_SkipFlashLayer> createState() => _SkipFlashLayerState();
+}
+
+class _SkipFlashLayerState extends State<_SkipFlashLayer>
+    with TickerProviderStateMixin {
+  late final AnimationController _pop = AnimationController.unbounded(
+    vsync: this,
+    value: 0,
+  );
+  late final AnimationController _fade = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 260),
+    value: 1,
+  );
+  Timer? _hold;
+  _SkipFlash? _cur;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.flash.addListener(_on);
+  }
+
+  @override
+  void dispose() {
+    widget.flash.removeListener(_on);
+    _hold?.cancel();
+    _pop.dispose();
+    _fade.dispose();
+    super.dispose();
+  }
+
+  void _on() {
+    final f = widget.flash.value;
+    if (f == null || !mounted) return;
+    _hold?.cancel();
+    setState(() => _cur = f);
+    _fade.value = 0; // visible
+    _pop.value = 0;
+    _pop.animateWith(SpringSimulation(_kSkipSpring, 0, 0, 14));
+    _hold = Timer(const Duration(milliseconds: 650), () {
+      if (mounted) _fade.forward();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final f = _cur;
+    if (f == null) return const SizedBox.shrink();
+    return AnimatedBuilder(
+      animation: Listenable.merge([_pop, _fade]),
+      builder: (_, _) {
+        final a = (1 - _fade.value).clamp(0.0, 1.0).toDouble();
+        if (a < 0.01) return const SizedBox.shrink();
+        final k = _pop.value.clamp(-0.3, 1.0).toDouble();
+        final disc = Transform.scale(
+          scale: 0.9 + 0.22 * k,
+          child: Opacity(
+            opacity: a,
+            child: Container(
+              width: 150,
+              height: 150,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.16),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    f.side < 0
+                        ? CupertinoIcons.backward_fill
+                        : CupertinoIcons.forward_fill,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${f.secs} seconds',
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro',
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        return Row(
+          children: [
+            Expanded(
+              child: Center(child: f.side < 0 ? disc : const SizedBox.shrink()),
+            ),
+            Expanded(
+              child: Center(child: f.side > 0 ? disc : const SizedBox.shrink()),
+            ),
+          ],
+        );
+      },
     );
   }
 }

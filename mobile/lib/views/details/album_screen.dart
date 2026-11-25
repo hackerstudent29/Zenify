@@ -19,13 +19,17 @@ import '../../design_system/widgets/media_navigation_sheet.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
 import '../../features/story_sharing/story_sharing.dart';
+import '../../models/artist_ref.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
+import '../../services/album_resolver.dart';
+import '../../services/artist_service.dart';
 import '../../services/download_service.dart';
 import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
 import '../../utils/media_normalizer.dart';
+import 'artist_screen.dart';
 
 /* ------------------------------------------------------------------ */
 /*  Spring primitives                                                   */
@@ -273,18 +277,40 @@ class _ActionCircle extends StatelessWidget {
 
 /// A release grouped from search results.
 class _Release {
-  _Release(this.title, this.artist, this.cover);
+  _Release(
+    this.title,
+    this.artist,
+    this.cover, {
+    this.browseId,
+    this.isSingle = false,
+  });
   final String title, artist, cover;
+  final String? browseId;
+  final bool isSingle;
   int count = 0;
 }
 
 List<_Release> _group(Iterable<Track> tracks, {String? skip}) {
   final map = <String, _Release>{};
   for (final t in tracks) {
-    final a = t.album;
-    final key = a.isEmpty ? t.title : a;
+    final a = t.album.trim();
+    final isSingle =
+        a.isEmpty ||
+        a.toLowerCase() == 'single' ||
+        AlbumResolver.isSingleReleaseTitle(a) ||
+        AlbumResolver.isSingleReleaseTitle(t.title);
+    final key = (a.isEmpty || a.toLowerCase() == 'single') ? t.title : a;
     if (skip != null && key.toLowerCase() == skip.toLowerCase()) continue;
-    final r = map.putIfAbsent(key, () => _Release(key, t.artist, t.coverUrl));
+    final r = map.putIfAbsent(
+      key,
+      () => _Release(
+        key,
+        t.artist,
+        t.coverUrl,
+        browseId: AlbumResolver.sanitizeAlbumBrowseId(t.albumBrowseId),
+        isSingle: isSingle,
+      ),
+    );
     r.count++;
   }
   return map.values.toList();
@@ -314,6 +340,7 @@ class AlbumScreen extends StatefulWidget {
     this.browseId,
     this.motionUrl,
     this.isVideo = false,
+    this.isSingle = false,
   });
 
   final String albumTitle;
@@ -322,6 +349,7 @@ class AlbumScreen extends StatefulWidget {
   final List<Track>? initialTracks;
   final String? browseId;
   final bool isVideo;
+  final bool isSingle;
 
   /// Optional short muted video loop (Apple-style motion artwork).
   final String? motionUrl;
@@ -335,6 +363,9 @@ class _AlbumScreenState extends State<AlbumScreen>
   final _sc = ScrollController();
   List<Track> _tracks = [];
   List<Track> _artistPool = [];
+  List<Track> _similarVideoPool = [];
+  final Map<String, String> _videoArtistImages = {};
+  ValidatedAlbumResult? _parentAlbum;
   bool _loading = true;
   bool _expanded = false;
   String? _resolvedCover;
@@ -536,13 +567,24 @@ class _AlbumScreenState extends State<AlbumScreen>
   }
 
   /* ---------------------------- data ---------------------------- */
+  bool get _isSingleReleaseView =>
+      widget.isSingle ||
+      (!_isVideoAlbum &&
+          (_albumType?.toLowerCase() == 'single' ||
+              (_tracks.length == 1 &&
+                  AlbumResolver.isSingleReleaseTitle(_displayAlbumTitle))));
+
   Future<void> _loadAlbum() async {
     try {
       if (_isVideoAlbum) {
         if (mounted) {
           setState(() {
-            _tracks = (widget.initialTracks != null && widget.initialTracks!.isNotEmpty)
-                ? widget.initialTracks!.map((t) => t.copyWith(isVideo: true)).toList()
+            _tracks =
+                (widget.initialTracks != null &&
+                    widget.initialTracks!.isNotEmpty)
+                ? widget.initialTracks!
+                      .map((t) => t.copyWith(isVideo: true))
+                      .toList()
                 : [
                     Track(
                       id: '',
@@ -605,27 +647,27 @@ class _AlbumScreenState extends State<AlbumScreen>
         }
       }
 
-      // If bId is a playlist ID but we have a song, discard the playlist ID so it doesn't hijack the album view
-      if (bId.startsWith('VLPL') ||
-          bId.startsWith('PL') ||
-          bId.startsWith('RD')) {
-        bId = '';
-      }
+      // Sanitize browseId so playlist IDs never hijack an album/single view
+      bId = AlbumResolver.sanitizeAlbumBrowseId(bId) ?? '';
 
-      // If bId is missing or not a true album release ID (MPREb_), resolve the song's true album from YouTube Music!
+      // If bId is missing or not a true album release ID (MPREb_), resolve via WatchNext
+      // and validate against variant mismatches (e.g. Unplugged / Remix).
       if ((bId.isEmpty || !bId.startsWith('MPREb_')) && firstTrack != null) {
         final details = await InnerTubeService.instance.resolveSongAlbumDetails(
           firstTrack.id,
         );
         if (details != null) {
-          if (details.albumBrowseId != null &&
-              details.albumBrowseId!.isNotEmpty) {
+          final sourceCtx = '${firstTrack.title} ${firstTrack.album}'.trim();
+          final candTitle = details.albumTitle ?? '';
+          if (AlbumResolver.isValidAlbumBrowseId(details.albumBrowseId) &&
+              !AlbumResolver.isVariantConflict(sourceCtx, candTitle)) {
             bId = details.albumBrowseId!;
           }
-          if (details.albumTitle != null && details.albumTitle!.isNotEmpty) {
-            _resolvedAlbumTitle = MediaNormalizer.cleanAlbumTitle(
-              details.albumTitle!,
-            );
+          if (candTitle.isNotEmpty &&
+              !AlbumResolver.isVariantConflict(sourceCtx, candTitle)) {
+            _resolvedAlbumTitle = widget.isSingle
+                ? MediaNormalizer.cleanTitle(candTitle)
+                : MediaNormalizer.cleanAlbumTitle(candTitle);
           }
           if (details.artistName != null && details.artistName!.isNotEmpty) {
             _resolvedArtistName = MediaNormalizer.formatArtists(
@@ -637,9 +679,17 @@ class _AlbumScreenState extends State<AlbumScreen>
 
       final res = await InnerTubeService.instance.getAlbum(
         bId,
-        albumTitle: MediaNormalizer.stripIdNoise(
-          MediaNormalizer.cleanTitle(_resolvedAlbumTitle ?? widget.albumTitle),
-        ),
+        albumTitle: widget.isSingle
+            ? MediaNormalizer.stripIdNoise(
+                MediaNormalizer.cleanTitle(
+                  _resolvedAlbumTitle ?? widget.albumTitle,
+                ),
+              )
+            : MediaNormalizer.stripIdNoise(
+                MediaNormalizer.cleanAlbumTitle(
+                  _resolvedAlbumTitle ?? widget.albumTitle,
+                ),
+              ),
         artistName: MediaNormalizer.stripIdNoise(
           MediaNormalizer.formatArtists(
             _resolvedArtistName ?? widget.artistName,
@@ -647,57 +697,138 @@ class _AlbumScreenState extends State<AlbumScreen>
         ),
         videoId: firstTrack?.id,
         songTitle: firstTrack?.title,
+        isSingle: widget.isSingle,
+        isVideo: false,
       );
+
       if (res != null && res.tracks.isNotEmpty) {
-        if (mounted) {
-          setState(() {
-            _tracks = res.tracks;
-            if (res.coverUrl.isNotEmpty) _resolvedCover = res.coverUrl;
-            if (res.title != null && res.title!.isNotEmpty) {
-              _resolvedAlbumTitle = MediaNormalizer.cleanAlbumTitle(res.title!);
-            }
-            if (res.artist != null && res.artist!.isNotEmpty) {
-              _resolvedArtistName = MediaNormalizer.formatArtists(res.artist!);
-            }
-            if (res.artists != null && res.artists!.isNotEmpty) {
-              _albumArtists = res.artists!;
-            }
-            if (res.year != null && res.year! > 0) {
-              _releaseYear = res.year;
-            }
-            if (res.label != null && res.label!.isNotEmpty) {
-              _recordLabel = res.label;
-            }
-            if (res.description != null && res.description!.isNotEmpty) {
-              _description = res.description;
-            }
-            _loading = false;
-          });
-          _inspectTracksMetadata();
+        final candidateTitle = res.title ?? widget.albumTitle;
+        final candidateArtist = res.artist ?? widget.artistName;
+        // Validate album when opened from a specific song so wrong albums/Unplugged editions are rejected
+        final bool passesSongValidation =
+            firstTrack == null ||
+            widget.isSingle ||
+            !AlbumResolver.isVariantConflict(
+              '${firstTrack.title} ${firstTrack.album}',
+              candidateTitle,
+            ) &&
+                res.tracks.any(
+                  (t) =>
+                      !AlbumResolver.isVariantConflict(
+                        firstTrack.title,
+                        t.title,
+                      ) &&
+                      AlbumResolver.titlesMatch(firstTrack.title, t.title) &&
+                      (AlbumResolver.artistsOverlap(
+                            firstTrack.artist,
+                            t.artist,
+                          ) ||
+                          AlbumResolver.artistsOverlap(
+                            firstTrack.artist,
+                            candidateArtist,
+                          )),
+                );
+
+        if (passesSongValidation) {
+          if (mounted) {
+            setState(() {
+              _tracks = res.tracks;
+              if (res.coverUrl.isNotEmpty) _resolvedCover = res.coverUrl;
+              if (res.title != null && res.title!.isNotEmpty) {
+                _resolvedAlbumTitle =
+                    (widget.isSingle || res.tracks.length == 1)
+                    ? MediaNormalizer.cleanTitle(res.title!)
+                    : MediaNormalizer.cleanAlbumTitle(res.title!);
+              }
+              if (res.artist != null && res.artist!.isNotEmpty) {
+                _resolvedArtistName = MediaNormalizer.formatArtists(
+                  res.artist!,
+                );
+              }
+              if (res.artists != null && res.artists!.isNotEmpty) {
+                _albumArtists = res.artists!;
+              }
+              if (res.year != null && res.year! > 0) {
+                _releaseYear = res.year;
+              }
+              if (res.label != null && res.label!.isNotEmpty) {
+                _recordLabel = res.label;
+              }
+              if (res.description != null && res.description!.isNotEmpty) {
+                _description = res.description;
+              }
+              if (res.albumType != null && res.albumType!.isNotEmpty) {
+                _albumType = widget.isSingle && res.tracks.length <= 1
+                    ? 'Single'
+                    : res.albumType;
+              }
+              _loading = false;
+            });
+            _inspectTracksMetadata();
+            _resolveParentAlbumForSingle();
+          }
+          return;
         }
-        return;
       }
 
+      // Strictly validated fallback when getAlbum returns nothing or fails validation:
+      // only match same-artist, non-variant tracks matching this release title — never dump random tracks.
+      final queryTitle = MediaNormalizer.stripIdNoise(widget.albumTitle);
+      final queryArtist = MediaNormalizer.stripIdNoise(widget.artistName);
       final r = await InnerTubeService.instance.search(
-        '${MediaNormalizer.stripIdNoise(widget.albumTitle)} ${MediaNormalizer.stripIdNoise(widget.artistName)}',
+        '$queryTitle $queryArtist'.trim(),
       );
-      final exact = r
-          .where(
-            (t) => t.album.toLowerCase() == widget.albumTitle.toLowerCase(),
-          )
-          .toList();
+      final validatedMatches = r.where((t) {
+        if (AlbumResolver.isVideoTrack(t)) return false;
+        if (AlbumResolver.isVariantConflict(queryTitle, '${t.title} ${t.album}')) {
+          return false;
+        }
+        if (!AlbumResolver.artistsOverlap(queryArtist, t.artist)) return false;
+        if (widget.isSingle || firstTrack != null) {
+          return AlbumResolver.titlesMatch(
+            firstTrack?.title ?? queryTitle,
+            t.title,
+          );
+        }
+        return AlbumResolver.titlesMatch(queryTitle, t.album);
+      }).toList();
+
       if (mounted) {
         setState(() {
-          _tracks = exact.isNotEmpty
-              ? exact
-              : (r.isNotEmpty ? r : (widget.initialTracks ?? []));
+          if (firstTrack != null) {
+            _tracks = [firstTrack];
+            _albumType = 'Single';
+          } else if (validatedMatches.isNotEmpty) {
+            _tracks = validatedMatches;
+          } else {
+            _tracks = widget.initialTracks ?? [];
+          }
           _loading = false;
         });
         _inspectTracksMetadata();
+        _resolveParentAlbumForSingle();
       }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _resolveParentAlbumForSingle() {
+    if (_isVideoAlbum || _tracks.isEmpty) return;
+    final isSing =
+        widget.isSingle ||
+        _albumType?.toLowerCase() == 'single' ||
+        _tracks.length == 1;
+    if (!isSing) return;
+
+    AlbumResolver.resolveValidatedParentAlbumForTrack(
+      _tracks.first,
+      excludeBrowseId: _resolvedBrowseId,
+    ).then((res) {
+      if (mounted && res != null) {
+        setState(() => _parentAlbum = res);
+      }
+    }).catchError((_) {});
   }
 
   void _inspectTracksMetadata() {
@@ -710,7 +841,9 @@ class _AlbumScreenState extends State<AlbumScreen>
       if (firstAlbum.isNotEmpty &&
           firstAlbum != 'Single' &&
           !firstAlbum.startsWith('UC')) {
-        _resolvedAlbumTitle = MediaNormalizer.cleanAlbumTitle(firstAlbum);
+        _resolvedAlbumTitle = widget.isSingle
+            ? MediaNormalizer.cleanTitle(firstAlbum)
+            : MediaNormalizer.cleanAlbumTitle(firstAlbum);
       }
     }
 
@@ -738,11 +871,74 @@ class _AlbumScreenState extends State<AlbumScreen>
 
   Future<void> _loadMore() async {
     if (_isVideoAlbum) {
+      final rawArtist = MediaNormalizer.formatArtists(
+        _resolvedArtistName ?? widget.artistName,
+      );
+      final artistList = MediaNormalizer.splitArtistNames(rawArtist);
+      final primaryArtist = artistList.isNotEmpty ? artistList.first : rawArtist;
+      final currentId =
+          widget.initialTracks?.firstOrNull?.id.replaceFirst('yt-', '') ?? '';
+
+      // 1. Pre-resolve artist avatars for bottom Artist cards
+      for (final art in artistList.take(3)) {
+        final clean = MediaNormalizer.cleanArtistName(art);
+        if (clean.isEmpty || clean == 'Unknown Artist') continue;
+        final cached = ArtistService.getCachedAvatar(clean);
+        if (cached != null && cached.isNotEmpty) {
+          _videoArtistImages[clean.toLowerCase()] = cached;
+        } else {
+          ArtistService.resolveArtistAvatar(clean).then((url) {
+            if (mounted && url.isNotEmpty) {
+              setState(() => _videoArtistImages[clean.toLowerCase()] = url);
+            }
+          });
+        }
+      }
+
       try {
-        final moreVids = await InnerTubeService.instance.searchVideos('${widget.artistName} music videos');
-        if (mounted && moreVids.isNotEmpty) {
+        // 2. Fetch artist music videos + recommended videos in parallel
+        final moreFut = primaryArtist.isNotEmpty &&
+                primaryArtist != 'Unknown Artist' &&
+                primaryArtist != 'Artist'
+            ? InnerTubeService.instance
+                  .searchVideos('$primaryArtist music videos')
+                  .catchError((_) => <Track>[])
+            : Future.value(<Track>[]);
+
+        final recQuery = '${MediaNormalizer.cleanCompactTitle(widget.albumTitle)} $primaryArtist music video'.trim();
+        final simFut = InnerTubeService.instance
+            .searchVideos(recQuery.isNotEmpty ? recQuery : 'official music videos')
+            .catchError((_) => <Track>[]);
+
+        final results = await Future.wait([moreFut, simFut]);
+        final seenIds = <String>{
+          if (currentId.isNotEmpty) 'yt-$currentId',
+          if (currentId.isNotEmpty) currentId,
+        };
+        final artistVids = <Track>[];
+        for (final v in results[0]) {
+          final vidKey = v.id.replaceFirst('yt-', '');
+          if (seenIds.contains(v.id) || seenIds.contains(vidKey)) continue;
+          seenIds.add(v.id);
+          seenIds.add(vidKey);
+          artistVids.add(v.copyWith(isVideo: true));
+          if (artistVids.length >= 10) break;
+        }
+
+        final recVids = <Track>[];
+        for (final v in results[1]) {
+          final vidKey = v.id.replaceFirst('yt-', '');
+          if (seenIds.contains(v.id) || seenIds.contains(vidKey)) continue;
+          seenIds.add(v.id);
+          seenIds.add(vidKey);
+          recVids.add(v.copyWith(isVideo: true));
+          if (recVids.length >= 10) break;
+        }
+
+        if (mounted) {
           setState(() {
-            _artistPool = moreVids.map((v) => v.copyWith(isVideo: true)).take(12).toList();
+            if (artistVids.isNotEmpty) _artistPool = artistVids;
+            if (recVids.isNotEmpty) _similarVideoPool = recVids;
           });
         }
       } catch (_) {}
@@ -857,26 +1053,67 @@ class _AlbumScreenState extends State<AlbumScreen>
     );
   }
 
-  void _openAlbum(_Release r) => Navigator.push(
-    context,
-    ZenPageRoute(
-      builder: (_) => AlbumScreen(
-        albumTitle: r.title,
-        artistName: r.artist,
-        coverUrl: r.cover,
+  void _openAlbum(_Release r) {
+    final isSing =
+        r.isSingle || AlbumResolver.isSingleReleaseTitle(r.title);
+    Navigator.push(
+      context,
+      ZenPageRoute(
+        builder: (_) => AlbumScreen(
+          albumTitle: isSing
+              ? MediaNormalizer.cleanTitle(r.title)
+              : MediaNormalizer.cleanAlbumTitle(r.title),
+          artistName: MediaNormalizer.formatArtists(r.artist),
+          coverUrl: r.cover,
+          browseId: r.browseId,
+          isSingle: isSing,
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   void _openArtist([String? specificArtist]) {
     final target = specificArtist ?? _displayArtistName;
+    if (_isVideoAlbum) {
+      // Video songs NEVER redirect to an album.
+      MediaNavigationSheet.show(
+        context: context,
+        track: _tracks.firstOrNull,
+        artistName: target,
+        showAlbum: false,
+        isVideo: true,
+      );
+      return;
+    }
+
+    if (_isSingleReleaseView) {
+      // On Singles pages, clicking the name opens sheet showing Artist + validated parent Album for redirection.
+      final first = _tracks.firstOrNull;
+      final List<ArtistRef> refs = first != null && first.resolvedArtists.isNotEmpty
+          ? first.resolvedArtists
+          : ArtistRef.splitFromName(target);
+      MediaNavigationSheet.show(
+        context: context,
+        track: first,
+        artists: refs,
+        artistName: target,
+        albumTitle: _parentAlbum?.title,
+        albumArtist: _parentAlbum?.artist ?? _displayArtistName,
+        albumCoverUrl: _parentAlbum?.coverUrl ?? _displayCoverUrl,
+        albumBrowseId: _parentAlbum?.browseId,
+        initialTracks: _parentAlbum?.tracks ?? _tracks,
+        excludeAlbumBrowseId: _resolvedBrowseId,
+        showAlbum: true,
+      );
+      return;
+    }
+
+    // Already on an Album page: show Artists in sheet cleanly.
     MediaNavigationSheet.show(
       context: context,
       artistName: target,
-      albumTitle: _resolvedAlbumTitle,
-      albumArtist: _displayArtistName,
-      albumCoverUrl: _displayCoverUrl,
-      albumBrowseId: _resolvedBrowseId,
+      albumTitle: null,
+      showAlbum: false,
       initialTracks: _tracks,
     );
   }
@@ -899,9 +1136,9 @@ class _AlbumScreenState extends State<AlbumScreen>
       IslandNotification(
         id: 'copy_album_${DateTime.now().millisecondsSinceEpoch}',
         title: 'Copied',
-        body: IslandNotification.artistOrTitle(
-          artist: _displayArtistName,
-          title: _displayAlbumTitle,
+        body: IslandNotification.itemTitle(
+          _displayAlbumTitle,
+          fallback: _displayArtistName,
         ),
         leading: const Icon(
           CupertinoIcons.link,
@@ -1128,6 +1365,7 @@ class _AlbumScreenState extends State<AlbumScreen>
 
   String get _computedAlbumType {
     if (_isVideoAlbum) return 'Music Video';
+    if (widget.isSingle && _tracks.length <= 1) return 'Single';
     if (_albumType != null && _albumType!.isNotEmpty) return _albumType!;
     final lower = _displayAlbumTitle.toLowerCase();
     if (lower.contains('soundtrack') || RegExp(r'\bost\b').hasMatch(lower)) {
@@ -1248,19 +1486,38 @@ class _AlbumScreenState extends State<AlbumScreen>
                               ),
                               child: Column(
                                 children: [
-                                  Text(
-                                    title,
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: _titleSize(title),
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: -0.6,
-                                      height: 1.12,
+                                  if (_isSingleReleaseView && !_isVideoAlbum)
+                                    _Press(
+                                      scale: 0.98,
+                                      onTap: () => _openArtist(),
+                                      child: Text(
+                                        title,
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: _titleSize(title),
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: -0.6,
+                                          height: 1.12,
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Text(
+                                      title,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: _titleSize(title),
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.6,
+                                        height: 1.12,
+                                      ),
                                     ),
-                                  ),
                                   const SizedBox(height: 5),
                                   _Press(
                                     scale: 0.95,
@@ -1285,7 +1542,13 @@ class _AlbumScreenState extends State<AlbumScreen>
                                   AnimatedSwitcher(
                                     duration: const Duration(milliseconds: 400),
                                     child: Text(
-                                      _loading ? 'Album' : _metaLine,
+                                      _loading
+                                          ? (_isVideoAlbum
+                                                ? 'Music Video'
+                                                : (widget.isSingle
+                                                      ? 'Single'
+                                                      : 'Album'))
+                                          : _metaLine,
                                       key: ValueKey('$_loading-$_metaLine'),
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
@@ -1582,7 +1845,7 @@ class _AlbumScreenState extends State<AlbumScreen>
                             if (_isVideoAlbum && _artistPool.isNotEmpty) ...[
                               _Reveal(
                                 child: _SecHeader(
-                                  'More Music Videos by ${widget.artistName}',
+                                  'More Music Videos by $_displayArtistName',
                                 ),
                               ),
                               _Reveal(
@@ -1602,8 +1865,19 @@ class _AlbumScreenState extends State<AlbumScreen>
                                         child: _AlbumVideoCard(
                                           track: t,
                                           onTap: () {
-                                            final pl = Provider.of<PlayerState>(context, listen: false);
-                                            pl.setQueue(_artistPool, startIndex: i);
+                                            Navigator.push(
+                                              context,
+                                              ZenPageRoute(
+                                                builder: (_) => AlbumScreen(
+                                                  albumTitle: MediaNormalizer.cleanTitle(t.title),
+                                                  artistName: MediaNormalizer.formatArtists(t.artist),
+                                                  coverUrl: t.coverUrl,
+                                                  initialTracks: [t.copyWith(isVideo: true)],
+                                                  isVideo: true,
+                                                  isSingle: true,
+                                                ),
+                                              ),
+                                            );
                                           },
                                         ),
                                       );
@@ -1611,35 +1885,180 @@ class _AlbumScreenState extends State<AlbumScreen>
                                   ),
                                 ),
                               ),
-                            ] else if (moreBy.isNotEmpty) ...[
-                              _Reveal(
-                                child: _SecHeader(
-                                  'More by ${widget.artistName}',
-                                ),
-                              ),
-                              _Reveal(
-                                child: _ReleaseShelf(
-                                  items: moreBy,
-                                  onTap: _openAlbum,
-                                  label: 'Album',
-                                ),
-                              ),
                             ],
 
-                            if (!_isVideoAlbum && similar.isNotEmpty) ...[
+                            if (_isVideoAlbum && _similarVideoPool.isNotEmpty) ...[
                               const _Reveal(
                                 child: _SecHeader('You might also like'),
                               ),
                               _Reveal(
-                                child: _ReleaseShelf(
-                                  items: similar,
-                                  onTap: _openAlbum,
-                                  showArtist: true,
+                                child: SizedBox(
+                                  height: (math.min(MediaQuery.sizeOf(context).width * 0.72, 320.0) * 9 / 16) + 54,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                                    physics: const BouncingScrollPhysics(),
+                                    itemCount: _similarVideoPool.length,
+                                    itemBuilder: (ctx, i) {
+                                      final t = _similarVideoPool[i];
+                                      final w = math.min(MediaQuery.sizeOf(context).width * 0.72, 320.0);
+                                      return Container(
+                                        width: w,
+                                        margin: const EdgeInsets.only(right: 14),
+                                        child: _AlbumVideoCard(
+                                          track: t,
+                                          onTap: () {
+                                            Navigator.push(
+                                              context,
+                                              ZenPageRoute(
+                                                builder: (_) => AlbumScreen(
+                                                  albumTitle: MediaNormalizer.cleanTitle(t.title),
+                                                  artistName: MediaNormalizer.formatArtists(t.artist),
+                                                  coverUrl: t.coverUrl,
+                                                  initialTracks: [t.copyWith(isVideo: true)],
+                                                  isVideo: true,
+                                                  isSingle: true,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      );
+                                    },
+                                  ),
                                 ),
                               ),
                             ],
 
-                            const SizedBox(height: 140),
+                            if (_isVideoAlbum && artists.isNotEmpty) ...[
+                              const _Reveal(
+                                child: _SecHeader('Artists'),
+                              ),
+                              _Reveal(
+                                child: SizedBox(
+                                  height: 118,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                                    physics: const BouncingScrollPhysics(),
+                                    itemCount: artists.length,
+                                    itemBuilder: (ctx, i) {
+                                      final rawA = artists[i];
+                                      final cleanA = MediaNormalizer.cleanArtistName(rawA);
+                                      final dispA = cleanA.isNotEmpty ? cleanA : rawA;
+                                      final avatar = _videoArtistImages[dispA.toLowerCase()] ?? '';
+                                      return Container(
+                                        width: 92,
+                                        margin: const EdgeInsets.only(right: 14),
+                                        child: _Press(
+                                          onTap: () {
+                                            Navigator.push(
+                                              context,
+                                              ZenPageRoute(
+                                                builder: (_) => ArtistScreen(
+                                                  artistName: dispA,
+                                                  imageUrl: avatar.isNotEmpty ? avatar : null,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              SizedBox(
+                                                width: 76,
+                                                height: 76,
+                                                child: ClipOval(
+                                                  child: avatar.isNotEmpty
+                                                      ? _Img(avatar, radius: 0)
+                                                      : DecoratedBox(
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.white.withValues(alpha: 0.1),
+                                                            shape: BoxShape.circle,
+                                                          ),
+                                                          child: const Center(
+                                                            child: Icon(
+                                                              CupertinoIcons.person_fill,
+                                                              color: Colors.white70,
+                                                              size: 30,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                dispA,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  letterSpacing: -0.1,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+
+                            if (!_isVideoAlbum) ...[
+                              for (final cleanMoreBy in [
+                                moreBy
+                                    .where(
+                                      (r) =>
+                                          AlbumResolver.isValidAlbumTitle(r.title) &&
+                                          !AlbumResolver.isVariantConflict(title, r.title),
+                                    )
+                                    .toList(),
+                              ])
+                                if (cleanMoreBy.isNotEmpty) ...[
+                                  _Reveal(
+                                    child: _SecHeader(
+                                      'More by $_displayArtistName',
+                                    ),
+                                  ),
+                                  _Reveal(
+                                    child: _ReleaseShelf(
+                                      items: cleanMoreBy,
+                                      onTap: _openAlbum,
+                                      label: 'Album',
+                                    ),
+                                  ),
+                                ],
+                              for (final cleanSimilar in [
+                                similar
+                                    .where(
+                                      (r) =>
+                                          AlbumResolver.isValidAlbumTitle(r.title) &&
+                                          !AlbumResolver.isVariantConflict(title, r.title),
+                                    )
+                                    .toList(),
+                              ])
+                                if (cleanSimilar.isNotEmpty) ...[
+                                  const _Reveal(
+                                    child: _SecHeader('You might also like'),
+                                  ),
+                                  _Reveal(
+                                    child: _ReleaseShelf(
+                                      items: cleanSimilar,
+                                      onTap: _openAlbum,
+                                      showArtist: true,
+                                    ),
+                                  ),
+                                ],
+                            ],
+
+                            SizedBox(
+                              height: 180 + MediaQuery.paddingOf(context).bottom,
+                            ),
                           ],
                         ),
                       ),
@@ -2116,7 +2535,10 @@ class _AlbumVideoCard extends StatelessWidget {
           ),
           const SizedBox(height: 7),
           Text(
-            MediaNormalizer.cleanCompactTitle(track.title),
+            MediaNormalizer.cleanVideoTitle(
+              track.title,
+              knownArtists: track.artist,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -2126,17 +2548,21 @@ class _AlbumVideoCard extends StatelessWidget {
               letterSpacing: -0.15,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            MediaNormalizer.formatArtists(track.artist),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 12.0,
-              fontWeight: FontWeight.w400,
+          if (!MediaNormalizer.isDistributorOrLabel(track.artist) &&
+              track.artist.trim().isNotEmpty &&
+              track.artist.toLowerCase() != 'unknown artist') ...[
+            const SizedBox(height: 2),
+            Text(
+              MediaNormalizer.formatArtists(track.artist),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12.0,
+                fontWeight: FontWeight.w400,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

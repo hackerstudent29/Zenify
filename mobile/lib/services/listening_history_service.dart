@@ -287,6 +287,49 @@ class ListeningHistoryService {
     _persist();
   }
 
+  /// Persists enriched metadata (clean title, true artists, release year) back into
+  /// stored history entries so video cards stay accurate across reloads without re-fetching.
+  Future<void> updateTrackMetadataBatch(List<Track> updatedTracks) async {
+    if (updatedTracks.isEmpty || _history.isEmpty) return;
+    final byId = <String, Track>{};
+    for (final t in updatedTracks) {
+      final cleanId = t.id.replaceFirst(RegExp(r'^(yt-|yt:)'), '').trim();
+      if (cleanId.isNotEmpty) {
+        byId[cleanId] = t;
+      }
+    }
+    bool changed = false;
+    for (var i = 0; i < _history.length; i++) {
+      final cur = _history[i];
+      final cleanId = cur.id.replaceFirst(RegExp(r'^(yt-|yt:)'), '').trim();
+      final next = byId[cleanId];
+      if (next == null) continue;
+
+      final nextArtistValid = next.artist.trim().isNotEmpty &&
+          next.artist.toLowerCase() != 'unknown artist' &&
+          !MediaNormalizer.isDistributorOrLabel(next.artist);
+      final nextYearValid = next.year != null && next.year!.isNotEmpty;
+      final useTitle = (next.title.isNotEmpty && next.title != cur.title) ? next.title : cur.title;
+      final useArtist = nextArtistValid ? next.artist : cur.artist;
+      final useArtists = nextArtistValid && next.artists.isNotEmpty ? next.artists : cur.artists;
+      final useYear = nextYearValid ? next.year : cur.year;
+
+      if (useTitle != cur.title || useArtist != cur.artist || useYear != cur.year) {
+        _history[i] = cur.copyWith(
+          title: useTitle,
+          artist: useArtist,
+          artists: useArtists,
+          year: useYear,
+        );
+        changed = true;
+      }
+    }
+    if (changed) {
+      historyNotifier.value++;
+      await _persist();
+    }
+  }
+
   Track? findTrackById(String trackId) {
     try {
       return _history.firstWhere((t) => t.id == trackId);

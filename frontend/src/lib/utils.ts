@@ -28,9 +28,7 @@ export function calculateCompressedCloudSize(durationSec: number): number {
 }
 
 export function getApiBaseUrl() {
-  // In local dev, use the Vite proxy path (/api) so requests go through the
-  // dev server proxy (vite.config.ts: /api → http://localhost:3000).
-  // This avoids CORS issues and works even when the backend port differs.
+  // Website service is disconnected; read configured env URL only (no production backend fallback).
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return '/api';
   }
@@ -41,9 +39,9 @@ export function getApiBaseUrl() {
  if (!envUrl && typeof process !== 'undefined' && process.env) {
  envUrl = (process.env.VITE_API_URL || process.env.NEXT_PUBLIC_API_URL || '') as string;
  }
- let rawUrl = envUrl || 'https://zenify-78e257420386.herokuapp.com/api';
- if (rawUrl.includes('railway.app') || rawUrl.includes('zenify-production')) {
- rawUrl = 'https://zenify-78e257420386.herokuapp.com/api';
+ let rawUrl = envUrl.trim();
+ if (!rawUrl) {
+   return '';
  }
  // If it's a relative path (proxy mode), keep it as-is
  if (rawUrl.startsWith('/')) {

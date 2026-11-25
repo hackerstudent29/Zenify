@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../design_system/widgets/apple_glass.dart';
 import '../design_system/zen.dart';
 import '../models/track.dart';
+import '../services/album_resolver.dart';
 import '../services/dock_visibility.dart';
 import '../services/player_state.dart';
 import '../services/room_deep_links.dart';
@@ -44,8 +45,26 @@ class ShellNavigationScope extends InheritedWidget {
   final void Function(Widget page) openInActiveTab;
   final VoidCallback closePlayerSheet;
 
+  static void Function(Widget page)? _activeOpenInTab;
+
   static ShellNavigationScope? of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<ShellNavigationScope>();
+
+  /// Opens [page] inside the currently active tab navigator, even when called
+  /// from a root-navigator modal/sheet or overlay above [ShellScreen].
+  static bool openPage(BuildContext context, Widget page) {
+    final scope = of(context);
+    if (scope != null) {
+      scope.openInActiveTab(page);
+      return true;
+    }
+    final active = _activeOpenInTab;
+    if (active != null) {
+      active(page);
+      return true;
+    }
+    return false;
+  }
 
   @override
   bool updateShouldNotify(ShellNavigationScope oldWidget) => false;
@@ -174,6 +193,7 @@ class _ShellScreenState extends State<ShellScreen>
   @override
   void initState() {
     super.initState();
+    ShellNavigationScope._activeOpenInTab = _openInActiveTab;
     _dockController = AnimationController(
       vsync: this,
       value: 1.0,
@@ -271,6 +291,9 @@ class _ShellScreenState extends State<ShellScreen>
 
   @override
   void dispose() {
+    if (identical(ShellNavigationScope._activeOpenInTab, _openInActiveTab)) {
+      ShellNavigationScope._activeOpenInTab = null;
+    }
     _notifSub?.cancel();
     RoomDeepLinks.instance.removeListener(_onRoomDeepLink);
     _dockController.dispose();
@@ -306,9 +329,23 @@ class _ShellScreenState extends State<ShellScreen>
   }
 
   void _openInActiveTab(Widget page) {
+    // Pop any root modals/dialogs stacked above ShellScreen so the active tab is visible.
+    final rootRoute = ModalRoute.of(context);
+    final rootNav = Navigator.of(context, rootNavigator: true);
+    if (rootRoute != null && !rootRoute.isCurrent) {
+      rootNav.popUntil((r) => r == rootRoute || r.isFirst);
+    }
+    DockVisibility.reset();
     final player = _playerShellKey.currentState;
     if (player != null && player.isOpen) {
       player.closeSheet();
+    }
+    if (_dockController.value != 1.0) {
+      _dockController.animateTo(
+        1.0,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+      );
     }
     _navKeys[_currentIndex].currentState?.push(
       ZenPageRoute(builder: (_) => page),
@@ -519,6 +556,7 @@ class _ShellScreenState extends State<ShellScreen>
     final title = isVideoTrack ? MediaNormalizer.cleanTitle(rawTitle) : MediaNormalizer.cleanAlbumTitle(rawTitle);
     final artist = MediaNormalizer.formatArtists(rawArtist);
 
+    // Video songs NEVER redirect to albums — always open the Video Singles page.
     if (isVideoTrack) {
       final vidTrack = (t ??
               Track(
@@ -538,20 +576,16 @@ class _ShellScreenState extends State<ShellScreen>
           browseId: null,
           initialTracks: [vidTrack],
           isVideo: true,
+          isSingle: true,
         ),
       );
       return;
     }
 
-    // CRITICAL: A song's album browseId MUST be an album (MPREb_... or OLAK5uy_...),
-    // NEVER a user or curated playlist (PL..., VLPL..., RD...).
-    String? albumBrowseId = t?.albumBrowseId;
-    if (albumBrowseId != null &&
-        (albumBrowseId.startsWith('VLPL') ||
-            albumBrowseId.startsWith('PL') ||
-            albumBrowseId.startsWith('RD'))) {
-      albumBrowseId = null;
-    }
+    // A song's album browseId MUST be a real album ID, NEVER a playlist/radio ID.
+    final albumBrowseId = AlbumResolver.sanitizeAlbumBrowseId(t?.albumBrowseId);
+    final isSingle =
+        albumBrowseId == null && AlbumResolver.isSingleReleaseTitle(rawTitle);
 
     _openInActiveTab(
       AlbumScreen(
@@ -560,6 +594,7 @@ class _ShellScreenState extends State<ShellScreen>
         coverUrl: cover,
         browseId: albumBrowseId,
         initialTracks: t != null ? [t] : null,
+        isSingle: isSingle,
       ),
     );
   }

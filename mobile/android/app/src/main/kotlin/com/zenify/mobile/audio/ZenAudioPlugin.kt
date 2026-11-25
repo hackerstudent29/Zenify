@@ -1,10 +1,16 @@
 package com.zenify.mobile.audio
 
 import android.content.Context
+import android.database.ContentObserver
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.media.AudioPlaybackConfiguration
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.provider.Settings
 import android.util.Log
 import android.view.Surface
 import androidx.annotation.OptIn
@@ -16,18 +22,24 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
+import androidx.media3.common.Timeline
 import androidx.media3.common.VideoSize
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.LoadControl
+import androidx.media3.exoplayer.analytics.PlayerId
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.source.TrackGroupArray
+import androidx.media3.exoplayer.trackselection.ExoTrackSelection
+import androidx.media3.exoplayer.upstream.Allocator
 import com.zenify.mobile.yt.YtDataSource
 import com.zenify.mobile.yt.YtEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -42,6 +54,7 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlinx.coroutines.CancellationException
@@ -93,6 +106,280 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     private val nextGeneration = AtomicInteger(0)
     private var lastDuration = -1L
     private var pending = PlaybackParameters(1f, 1f)
+
+    // ───────────────── AUDIO FOCUS & NETWORK POWER ENGINE ─────────────────
+    @Volatile private var allowNetworkBuffering: Boolean = true
+    @Volatile private var hasAudioFocus: Boolean = false
+    @Volatile private var resumeOnFocusGain: Boolean = false
+    @Volatile private var pausedFocusPositionMs: Long = 0L
+    @Volatile private var focusLostAtMs: Long = 0L
+    @Volatile private var sawExternalAudioAfterLoss: Boolean = false
+
+    private var focusRequest: AudioFocusRequest? = null
+    private var playbackCallback: Any? = null
+    private var quietResumeRunnable: Runnable? = null
+
+    private val audioManager: AudioManager?
+        get() = if (::ctx.isInitialized) ctx.getSystemService(Context.AUDIO_SERVICE) as? AudioManager else null
+
+    private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        main.post {
+            when (focusChange) {
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                    pauseForExternalAudio(permanentLoss = false)
+                }
+                AudioManager.AUDIOFOCUS_LOSS -> {
+                    pauseForExternalAudio(permanentLoss = true)
+                }
+                AudioManager.AUDIOFOCUS_GAIN -> {
+                    stopPlaybackMonitor()
+                    hasAudioFocus = true
+                    if (resumeOnFocusGain) {
+                        resumeAfterExternalAudio()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun requestAudioFocus(): Boolean {
+        val am = audioManager ?: return true
+        val res = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val req = focusRequest ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .setWillPauseWhenDucked(true)
+                .setAcceptsDelayedFocusGain(true)
+                .setOnAudioFocusChangeListener(focusChangeListener, main)
+                .build()
+                .also { focusRequest = it }
+            am.requestAudioFocus(req)
+        } else {
+            @Suppress("DEPRECATION")
+            am.requestAudioFocus(
+                focusChangeListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            )
+        }
+        return when (res) {
+            AudioManager.AUDIOFOCUS_REQUEST_GRANTED -> {
+                hasAudioFocus = true
+                true
+            }
+            AudioManager.AUDIOFOCUS_REQUEST_DELAYED -> {
+                hasAudioFocus = false
+                resumeOnFocusGain = true
+                false
+            }
+            else -> {
+                hasAudioFocus = false
+                false
+            }
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        hasAudioFocus = false
+        stopPlaybackMonitor()
+        val am = audioManager ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                focusRequest?.let { am.abandonAudioFocusRequest(it) }
+            } else {
+                @Suppress("DEPRECATION")
+                am.abandonAudioFocus(focusChangeListener)
+            }
+        } catch (_: Throwable) {}
+    }
+
+    private fun isExternalAudioActive(configs: List<AudioPlaybackConfiguration>?): Boolean {
+        val am = audioManager ?: return false
+        if (am.mode != AudioManager.MODE_NORMAL) return true
+        if (am.isMusicActive && player?.isPlaying != true) return true
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        val activeConfigs = configs ?: try {
+            am.activePlaybackConfigurations
+        } catch (_: Throwable) {
+            emptyList()
+        }
+        return activeConfigs.any { cfg ->
+            when (cfg.audioAttributes.usage) {
+                android.media.AudioAttributes.USAGE_MEDIA,
+                android.media.AudioAttributes.USAGE_GAME,
+                android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION,
+                android.media.AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE,
+                android.media.AudioAttributes.USAGE_ASSISTANT,
+                android.media.AudioAttributes.USAGE_UNKNOWN -> true
+                else -> false
+            }
+        }
+    }
+
+    private fun scheduleQuietResumeCheck(configs: List<AudioPlaybackConfiguration>?) {
+        quietResumeRunnable?.let { main.removeCallbacks(it) }
+        quietResumeRunnable = null
+        if (!resumeOnFocusGain) return
+        if (isExternalAudioActive(configs)) {
+            sawExternalAudioAfterLoss = true
+            return
+        }
+        val elapsedSinceLoss = SystemClock.elapsedRealtime() - focusLostAtMs
+        val delayMs = when {
+            sawExternalAudioAfterLoss -> 900L
+            elapsedSinceLoss < 1800L -> (1800L - elapsedSinceLoss).coerceAtLeast(900L)
+            else -> 900L
+        }
+        val runnable = Runnable {
+            quietResumeRunnable = null
+            if (!resumeOnFocusGain) return@Runnable
+            if (isExternalAudioActive(null)) {
+                sawExternalAudioAfterLoss = true
+                return@Runnable
+            }
+            resumeAfterExternalAudio()
+        }
+        quietResumeRunnable = runnable
+        main.postDelayed(runnable, delayMs)
+    }
+
+    private fun startPlaybackMonitor() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val am = audioManager ?: return
+        stopPlaybackMonitor()
+        val cb = object : AudioManager.AudioPlaybackCallback() {
+            override fun onPlaybackConfigChanged(configs: MutableList<AudioPlaybackConfiguration>?) {
+                if (!resumeOnFocusGain) {
+                    stopPlaybackMonitor()
+                    return
+                }
+                scheduleQuietResumeCheck(configs)
+            }
+        }
+        playbackCallback = cb
+        try {
+            am.registerAudioPlaybackCallback(cb, main)
+        } catch (_: Throwable) {}
+        scheduleQuietResumeCheck(null)
+    }
+
+    private fun stopPlaybackMonitor() {
+        quietResumeRunnable?.let { main.removeCallbacks(it) }
+        quietResumeRunnable = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val cb = playbackCallback as? AudioManager.AudioPlaybackCallback
+            playbackCallback = null
+            if (cb != null) {
+                try {
+                    audioManager?.unregisterAudioPlaybackCallback(cb)
+                } catch (_: Throwable) {}
+            }
+        } else {
+            playbackCallback = null
+        }
+    }
+
+    private fun pauseForExternalAudio(permanentLoss: Boolean) {
+        val p = player
+        val fp = fadePlayer
+        val wasActive = p?.playWhenReady == true ||
+            p?.isPlaying == true ||
+            fp?.isPlaying == true ||
+            xf != null
+
+        hasAudioFocus = false
+        allowNetworkBuffering = false
+
+        if (!wasActive) {
+            if (resumeOnFocusGain) {
+                focusLostAtMs = SystemClock.elapsedRealtime()
+                if (permanentLoss) startPlaybackMonitor()
+            }
+            return
+        }
+
+        pausedFocusPositionMs = (p?.currentPosition ?: pausedFocusPositionMs).coerceAtLeast(0L)
+        resumeOnFocusGain = true
+        focusLostAtMs = SystemClock.elapsedRealtime()
+        sawExternalAudioAfterLoss = false
+        videoJob?.cancel()
+        cancelXfade()
+
+        if (p != null) {
+            p.playWhenReady = false
+            if (p.isCommandAvailable(Player.COMMAND_PLAY_PAUSE)) {
+                p.pause()
+            }
+            if (!isAppInForeground && p.isCommandAvailable(Player.COMMAND_SET_VIDEO_SURFACE)) {
+                try {
+                    p.clearVideoSurface()
+                } catch (_: Throwable) {}
+            }
+        }
+        stopTicker()
+        updateSpectrumTickerState()
+        updateDueTickerState()
+        emit(mapOf("type" to "position", "ms" to pausedFocusPositionMs))
+        emitState()
+        emit(
+            mapOf(
+                "type" to "audioFocus",
+                "state" to "interrupted",
+                "positionMs" to pausedFocusPositionMs,
+                "permanent" to permanentLoss
+            )
+        )
+        if (permanentLoss) {
+            startPlaybackMonitor()
+        }
+    }
+
+    private fun resumeAfterExternalAudio() {
+        if (!resumeOnFocusGain) return
+        val p = player ?: run {
+            resumeOnFocusGain = false
+            stopPlaybackMonitor()
+            return
+        }
+        if (!requestAudioFocus()) return
+
+        resumeOnFocusGain = false
+        stopPlaybackMonitor()
+        allowNetworkBuffering = true
+        if (p.isCommandAvailable(Player.COMMAND_SET_VOLUME)) {
+            p.volume = userVol
+        }
+        if (abs(p.currentPosition - pausedFocusPositionMs) > 250L &&
+            p.playbackState != Player.STATE_ENDED
+        ) {
+            p.seekTo(pausedFocusPositionMs)
+        }
+        if (isCurrentVideo && isAppInForeground) {
+            attachVideoSurface(p)
+        }
+        if (p.playbackState == Player.STATE_IDLE && p.mediaItemCount > 0) {
+            p.prepare()
+        }
+        p.playWhenReady = true
+        if (p.isCommandAvailable(Player.COMMAND_PLAY_PAUSE)) {
+            p.play()
+        }
+        emitProgressSnapshot(p)
+        emitState()
+        updateTickerState()
+        emit(
+            mapOf(
+                "type" to "audioFocus",
+                "state" to "resumed",
+                "positionMs" to p.currentPosition.coerceAtLeast(0L)
+            )
+        )
+    }
 
     // ───────────────── CROSSFADE ENGINE ─────────────────
     private val XF_LEAD_MS = 2200L                 // how early Dart is told to arm
@@ -254,6 +541,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         }
         xf = null
         emit(mapOf("type" to "crossfade", "phase" to "end"))
+        updateTickerState()
     }
 
     private fun cancelXfade() {
@@ -275,13 +563,27 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         if (had) emit(mapOf("type" to "crossfade", "phase" to "end"))
     }
 
-    /** Replaces `p.prepare(); p.playWhenReady = true` everywhere. */
+        /** Replaces `p.prepare(); p.playWhenReady = true` everywhere. */
     private fun beginPlayback(p: ExoPlayer) {
-        p.prepare()
         if (xf?.inn === p) {                       // crossfade: buffer silently, xfTick starts it on time
+            allowNetworkBuffering = true
+            p.prepare()
             p.playWhenReady = false
             main.removeCallbacks(xfTick); main.post(xfTick)
-        } else p.playWhenReady = true
+        } else {
+            resumeOnFocusGain = false
+            stopPlaybackMonitor()
+            allowNetworkBuffering = true
+            val granted = requestAudioFocus()
+            p.prepare()
+            if (granted) {
+                p.playWhenReady = true
+            } else {
+                p.playWhenReady = false
+                emitState()
+            }
+            updateTickerState()
+        }
     }
 
     @Volatile
@@ -329,21 +631,25 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     @Volatile
     private var isTickerScheduled: Boolean = false
 
+    private fun isTickerActiveNow(p: ExoPlayer?): Boolean {
+        if (p == null) return false
+        val isSuppressed = p.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE
+        return !isSuppressed && p.playWhenReady && (
+            p.isPlaying ||
+            p.playbackState == Player.STATE_BUFFERING ||
+            p.playbackState == Player.STATE_READY
+        )
+    }
+
     private val ticker = object : Runnable {
         override fun run() {
             val p = player
-            val isSuppressed = p?.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE
-            val active = p != null && !isSuppressed && p.playWhenReady && (
-                p.isPlaying || p.playbackState == Player.STATE_BUFFERING
-            )
-            if (active && isAppInForeground) {
-                emitProgressSnapshot(p)
-                main.postDelayed(this, 500L)
+            if (isTickerActiveNow(p)) {
+                emitProgressSnapshot(p!!)
+                val intervalMs = if (isAppInForeground) 250L else 1000L
+                main.postDelayed(this, intervalMs)
                 isTickerScheduled = true
             } else {
-                if (active) {
-                    emitProgressSnapshot(p)
-                }
                 isTickerScheduled = false
             }
         }
@@ -359,11 +665,9 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     }
 
     private fun startTicker() {
-        if (!isTickerScheduled) {
-            isTickerScheduled = true
-            main.removeCallbacks(ticker)
-            main.post(ticker)
-        }
+        main.removeCallbacks(ticker)
+        isTickerScheduled = true
+        main.post(ticker)
     }
 
     private var bufferStallRunnable: Runnable? = null
@@ -394,12 +698,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     }
 
     private fun updateTickerState() {
-        val p = player
-        val isSuppressed = p?.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE
-        val active = p != null && !isSuppressed && p.playWhenReady && (
-            p.isPlaying || p.playbackState == Player.STATE_BUFFERING
-        )
-        if (active && isAppInForeground) {
+        if (isTickerActiveNow(player)) {
             startTicker()
         } else {
             stopTicker()
@@ -561,8 +860,14 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
 
         MethodChannel(b.binaryMessenger, "zenify/audio").setMethodCallHandler(this)
         EventChannel(b.binaryMessenger, "zenify/audio/events").setStreamHandler(object : EventChannel.StreamHandler {
-            override fun onListen(args: Any?, sink: EventChannel.EventSink?) { events = sink }
-            override fun onCancel(args: Any?) { events = null }
+            override fun onListen(args: Any?, sink: EventChannel.EventSink?) {
+                events = sink
+                registerVolObserver()
+            }
+            override fun onCancel(args: Any?) {
+                unregisterVolObserver()
+                events = null
+            }
         })
         EventChannel(b.binaryMessenger, "zenify/audio/spectrum").setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(args: Any?, sink: EventChannel.EventSink?) {
@@ -579,15 +884,56 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        unregisterVolObserver()
         stopTicker()
         main.removeCallbacksAndMessages(null)
         pluginScope.cancel()
+        abandonAudioFocus()
         releaseVideoTexture()
         textureRegistry = null
         cancelXfade()
         safeReleasePlayer(player)
         player = null
         sourceFactory = null
+    }
+
+    private var volObserver: ContentObserver? = null
+    private var lastObservedSysVol: Double = -1.0
+
+    private fun readSystemVolume(): Double {
+        val am = ctx.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return 1.0
+        val cur = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val min = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) am.getStreamMinVolume(AudioManager.STREAM_MUSIC) else 0
+        val span = (max - min).coerceAtLeast(1)
+        return ((cur - min).toDouble() / span.toDouble()).coerceIn(0.0, 1.0)
+    }
+
+    private fun registerVolObserver() {
+        if (volObserver != null) return
+        val obs = object : ContentObserver(main) {
+            override fun onChange(selfChange: Boolean) {
+                val v = readSystemVolume()
+                if (abs(v - lastObservedSysVol) > 0.002) {
+                    lastObservedSysVol = v
+                    emit(mapOf("type" to "systemVolume", "value" to v))
+                }
+            }
+        }
+        volObserver = obs
+        try {
+            ctx.contentResolver.registerContentObserver(Settings.System.CONTENT_URI, true, obs)
+            lastObservedSysVol = readSystemVolume()
+            emit(mapOf("type" to "systemVolume", "value" to lastObservedSysVol))
+        } catch (_: Throwable) {}
+    }
+
+    private fun unregisterVolObserver() {
+        val obs = volObserver ?: return
+        volObserver = null
+        try {
+            ctx.contentResolver.unregisterContentObserver(obs)
+        } catch (_: Throwable) {}
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
@@ -673,25 +1019,67 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
         sourceFactory = mediaSourceFactory
 
-        // Buffer control optimized for video streams & instant seeking: 4s buffer before playback, 6s on rebuffer
-        val loadControl = DefaultLoadControl.Builder()
+        // Ultra-fast startup buffer control + zero wasted network chunks while paused/interrupted
+        val baseLoadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs = */ 20_000,
-                /* maxBufferMs = */ 60_000,
-                /* bufferForPlaybackMs = */ 4_000,
-                /* bufferForPlaybackAfterRebufferMs = */ 6_000
+                /* minBufferMs = */ 15_000,
+                /* maxBufferMs = */ 50_000,
+                /* bufferForPlaybackMs = */ 400,
+                /* bufferForPlaybackAfterRebufferMs = */ 1_500
             )
-            .setBackBuffer(10_000, false)
-            .setTargetBufferBytes(128 * 1024 * 1024)
+            .setBackBuffer(5_000, false)
+            .setTargetBufferBytes(64 * 1024 * 1024)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
+
+        // Explicitly forward all LoadControl methods (including Java default methods added in
+        // Media3 1.5+ / 1.9+) because Kotlin `by baseLoadControl` does not delegate Java
+        // interface default methods like getBackBufferDurationUs(PlayerId).
+        val loadControl = object : LoadControl {
+            override fun onPrepared(playerId: PlayerId) = baseLoadControl.onPrepared(playerId)
+
+            override fun onTracksSelected(
+                parameters: LoadControl.Parameters,
+                trackGroups: TrackGroupArray,
+                trackSelections: Array<out ExoTrackSelection?>
+            ) = baseLoadControl.onTracksSelected(parameters, trackGroups, trackSelections)
+
+            override fun onStopped(playerId: PlayerId) = baseLoadControl.onStopped(playerId)
+
+            override fun onReleased(playerId: PlayerId) = baseLoadControl.onReleased(playerId)
+
+            override fun getAllocator(playerId: PlayerId): Allocator = baseLoadControl.getAllocator(playerId)
+
+            override fun getBackBufferDurationUs(playerId: PlayerId): Long =
+                baseLoadControl.getBackBufferDurationUs(playerId)
+
+            override fun retainBackBufferFromKeyframe(playerId: PlayerId): Boolean =
+                baseLoadControl.retainBackBufferFromKeyframe(playerId)
+
+            override fun shouldContinueLoading(parameters: LoadControl.Parameters): Boolean {
+                if (!allowNetworkBuffering && parameters.bufferedDurationUs >= 1_500_000L) {
+                    return false
+                }
+                return baseLoadControl.shouldContinueLoading(parameters)
+            }
+
+            override fun shouldStartPlayback(parameters: LoadControl.Parameters): Boolean =
+                baseLoadControl.shouldStartPlayback(parameters)
+
+            override fun shouldContinuePreloading(
+                playerId: PlayerId,
+                timeline: Timeline,
+                mediaPeriodId: MediaSource.MediaPeriodId,
+                bufferedDurationUs: Long
+            ): Boolean = baseLoadControl.shouldContinuePreloading(playerId, timeline, mediaPeriodId, bufferedDurationUs)
+        }
 
         val p = ExoPlayer.Builder(ctx, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
-                true,
+                /* handleAudioFocus = */ false,
             )
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
@@ -746,7 +1134,6 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
             override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
                 if (p !== player) return
                 if (playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE) {
-                    p.playWhenReady = false
                     stopTicker()
                 }
                 emitState()
@@ -809,6 +1196,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                     startVideoUpgrade(id, mediaItem.mediaMetadata)
                 }
                 emitState()
+                updateTickerState()
             }
             override fun onPlayerError(error: PlaybackException) {
                 if (p !== player) return
@@ -1052,18 +1440,22 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
 
         val mf = sourceFactory
         val wantsVideo = isVideo || !videoUrl.isNullOrBlank()
+        fun toUri(raw: String): Uri =
+            if (raw.startsWith("/")) Uri.parse("file://$raw") else Uri.parse(raw)
+        fun isLocal(raw: String): Boolean =
+            raw.startsWith("/") || raw.startsWith("file://")
         if (!videoUrl.isNullOrBlank() && videoUrl != url && mf != null) {
             attachVideoSurface(p)
             emit(mapOf("type" to "videoSize", "width" to 0, "height" to 0))
             val videoItem = MediaItem.Builder()
-                .setUri(videoUrl)
-                .apply { if (!mediaId.isNullOrBlank()) setCustomCacheKey("$mediaId#v") }
+                .setUri(toUri(videoUrl))
+                .apply { if (!mediaId.isNullOrBlank() && !isLocal(videoUrl)) setCustomCacheKey("$mediaId#v") }
                 .setMediaMetadata(metadata)
                 .setTag("video")
                 .build()
             val audioItem = MediaItem.Builder()
-                .setUri(url)
-                .apply { if (!mediaId.isNullOrBlank()) setCustomCacheKey(mediaId) }
+                .setUri(toUri(url))
+                .apply { if (!mediaId.isNullOrBlank() && !isLocal(url)) setCustomCacheKey(mediaId) }
                 .setMediaMetadata(metadata)
                 .setTag("video")
                 .build()
@@ -1087,8 +1479,8 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
             }
             emit(mapOf("type" to "videoSize", "width" to 0, "height" to 0))
             val mediaItem = MediaItem.Builder()
-                .setUri(url)
-                .apply { if (!mediaId.isNullOrBlank()) setCustomCacheKey(if (wantsVideo) "$mediaId#v" else mediaId) }
+                .setUri(toUri(url))
+                .apply { if (!mediaId.isNullOrBlank() && !isLocal(url)) setCustomCacheKey(if (wantsVideo) "$mediaId#v" else mediaId) }
                 .setMediaMetadata(metadata)
                 .setTag(if (wantsVideo) "video" else "audio")
                 .build()
@@ -1207,11 +1599,15 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                 }
                 "prefetch" -> {
                     val mediaIds = call.argument<List<String>>("mediaIds") ?: emptyList()
-                    YtEngine.prefetch(mediaIds)
+                    if (allowNetworkBuffering && !resumeOnFocusGain) {
+                        YtEngine.prefetch(mediaIds)
+                    }
                     result.success(null)
                 }
                 "prewarm" -> {
-                    YtEngine.prewarm()
+                    if (allowNetworkBuffering && !resumeOnFocusGain) {
+                        YtEngine.prewarm()
+                    }
                     result.success(null)
                 }
                 "setAudioQuality" -> {
@@ -1242,26 +1638,55 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                     result.success(null)
                 }
                 "pause" -> {
+                    resumeOnFocusGain = false
+                    allowNetworkBuffering = false
+                    abandonAudioFocus()
                     val p = player
-                    if (p != null && p.isCommandAvailable(Player.COMMAND_PLAY_PAUSE)) p.pause()
+                    if (p != null) {
+                        p.playWhenReady = false
+                        if (p.isCommandAvailable(Player.COMMAND_PLAY_PAUSE)) p.pause()
+                    }
                     val fp = fadePlayer
                     if (fp != null && fp.isCommandAvailable(Player.COMMAND_PLAY_PAUSE)) fp.pause()
                     stopTicker()
+                    updateSpectrumTickerState()
+                    updateDueTickerState()
+                    emitState()
                     result.success(null)
                 }
                 "resume" -> {
+                    resumeOnFocusGain = false
+                    stopPlaybackMonitor()
+                    allowNetworkBuffering = true
                     val p = player
-                    if (xf?.started != false && p != null && p.isCommandAvailable(Player.COMMAND_PLAY_PAUSE)) {
-                        p.play()
-                    }
-                    val fp = fadePlayer
-                    if (fp != null && fp.isCommandAvailable(Player.COMMAND_PLAY_PAUSE)) {
-                        fp.play()
+                    if (requestAudioFocus()) {
+                        if (xf?.started != false && p != null) {
+                            if (p.isCommandAvailable(Player.COMMAND_SET_VOLUME)) {
+                                p.volume = userVol
+                            }
+                            if (p.playbackState == Player.STATE_IDLE && p.mediaItemCount > 0) {
+                                p.prepare()
+                            }
+                            p.playWhenReady = true
+                            if (p.isCommandAvailable(Player.COMMAND_PLAY_PAUSE)) {
+                                p.play()
+                            }
+                        }
+                        val fp = fadePlayer
+                        if (fp != null && fp.isCommandAvailable(Player.COMMAND_PLAY_PAUSE)) {
+                            fp.play()
+                        }
+                    } else {
+                        p?.playWhenReady = false
+                        emitState()
                     }
                     updateTickerState()
                     result.success(null)
                 }
                 "stop" -> {
+                    resumeOnFocusGain = false
+                    allowNetworkBuffering = false
+                    abandonAudioFocus()
                     videoJob?.cancel()
                     videoIds.clear()
                     playGeneration.incrementAndGet()
@@ -1294,13 +1719,20 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                         val count = p.mediaItemCount
                         val idx = p.currentMediaItemIndex.coerceAtLeast(0)
                         if (p.playbackState == Player.STATE_IDLE && count > 0 && idx < count) {
+                            resumeOnFocusGain = false
+                            allowNetworkBuffering = true
+                            requestAudioFocus()
                             p.seekTo(idx, ms)
                             p.prepare()
                             p.playWhenReady = true
                         } else if (p.playbackState == Player.STATE_ENDED && count > 0 && idx < count) {
+                            resumeOnFocusGain = false
+                            allowNetworkBuffering = true
+                            requestAudioFocus()
                             p.seekTo(idx, ms)
                             p.playWhenReady = true
                         } else {
+                            if (resumeOnFocusGain) pausedFocusPositionMs = ms
                             p.seekTo(ms)
                         }
                         emit(mapOf("type" to "position", "ms" to ms))
@@ -1311,20 +1743,30 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                 "setLifecycle" -> {
                     val wasForeground = isAppInForeground
                     isAppInForeground = call.argument<Boolean>("isForeground") ?: true
-                    if (!wasForeground && isAppInForeground) {
-                        player?.let { p ->
+                    player?.let { p ->
+                        if (!wasForeground && isAppInForeground) {
                             emitState()
                             emitProgressSnapshot(p)
                             if (isCurrentVideo) {
                                 attachVideoSurface(p)
                             }
                         }
-                        updateTickerState()
-                    } else if (!isAppInForeground) {
-                        stopTicker()
-                        updateSpectrumTickerState()
                     }
+                    updateTickerState()
                     result.success(null)
+                }
+                "getPosition" -> {
+                    val p = player
+                    val posMs = p?.currentPosition?.coerceAtLeast(0L) ?: 0L
+                    val durMs = p?.duration?.let { if (it != C.TIME_UNSET && it > 0L) it else -1L } ?: -1L
+                    if (p != null && isTickerActiveNow(p)) {
+                        updateTickerState()
+                    }
+                    result.success(mapOf(
+                        "positionMs" to posMs,
+                        "durationMs" to durMs,
+                        "isPlaying" to (p?.isPlaying == true)
+                    ))
                 }
                 "setMaxCacheSize" -> {
                     val bytes = call.argument<Number>("bytes")?.toLong() ?: (256L * 1024L * 1024L)
@@ -1338,6 +1780,22 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                         if (p != null && p.isCommandAvailable(Player.COMMAND_SET_VOLUME)) {
                             p.volume = userVol
                         }
+                    }
+                    result.success(null)
+                }
+                "getSystemVolume" -> {
+                    result.success(readSystemVolume())
+                }
+                "setSystemVolume" -> {
+                    val v = (call.argument<Number>("v")?.toDouble() ?: 0.5).coerceIn(0.0, 1.0)
+                    val am = ctx.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                    if (am != null) {
+                        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                        val min = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) am.getStreamMinVolume(AudioManager.STREAM_MUSIC) else 0
+                        val span = (max - min).coerceAtLeast(1)
+                        val idx = (min + (v * span).toFloat().roundToInt()).coerceIn(min, max)
+                        am.setStreamVolume(AudioManager.STREAM_MUSIC, idx, 0)
+                        lastObservedSysVol = ((idx - min).toDouble() / span.toDouble()).coerceIn(0.0, 1.0)
                     }
                     result.success(null)
                 }
@@ -1382,6 +1840,9 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                 "getVideoTextureId" -> { result.success(getOrCreateVideoTextureId()) }
                 "releaseVideoSurface" -> { releaseVideoTexture(); result.success(null) }
                 "dispose" -> {
+                    resumeOnFocusGain = false
+                    allowNetworkBuffering = false
+                    abandonAudioFocus()
                     videoJob?.cancel()
                     videoIds.clear()
                     playGeneration.incrementAndGet()

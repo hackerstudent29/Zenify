@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:math' as math;
 
+import '../../models/artist_ref.dart';
 import '../../models/track.dart';
 import 'search_models.dart';
 
@@ -47,45 +48,45 @@ class RankingWeights {
   final double personalization;
   final double quality;
 
-  /// Exact song search: Textual title match is dominant (55%), artist helps disambiguate (17%).
-  /// Personalization is a gentle tie-breaker (3%) that can never overpower query intent.
+  /// Exact song search: Textual title match leads (44%), balanced by popularity (14%) and provider rank (13%)
+  /// so iconic official hits consistently outrank amateur covers with literal exact titles.
   static const exactSong = RankingWeights(
-    textMatch: 0.55,
-    artistMatch: 0.17,
+    textMatch: 0.44,
+    artistMatch: 0.16,
     entityFit: 0.10,
-    providerRank: 0.08,
-    popularity: 0.07,
+    providerRank: 0.13,
+    popularity: 0.14,
     personalization: 0.03,
   );
 
-  /// Broad music search: Blends text, entity fit, popularity, provider ranking, and discovery context.
+  /// Broad music search: Blends text, popularity, entity fit, provider ranking, and discovery context.
   static const broad = RankingWeights(
-    textMatch: 0.40,
+    textMatch: 0.36,
     artistMatch: 0.00,
-    entityFit: 0.15,
-    popularity: 0.17,
-    providerRank: 0.12,
-    personalization: 0.12, // 7% regional + 5% personal
+    entityFit: 0.14,
+    popularity: 0.21,
+    providerRank: 0.14,
+    personalization: 0.11, // regional + personal
     quality: 0.04,
   );
 
-  /// Artist-focused search: Prioritizes exact artist identity and popularity.
+  /// Artist-focused search: Prioritizes exact artist identity and verified audience scale.
   static const exactArtist = RankingWeights(
-    textMatch: 0.50,
-    artistMatch: 0.20,
+    textMatch: 0.44,
+    artistMatch: 0.18,
     entityFit: 0.12,
-    providerRank: 0.08,
-    popularity: 0.07,
+    providerRank: 0.10,
+    popularity: 0.13,
     personalization: 0.03,
   );
 
   /// Album-focused search: Prioritizes album title, correct artist attribution, and release popularity.
   static const exactAlbum = RankingWeights(
-    textMatch: 0.50,
-    artistMatch: 0.18,
+    textMatch: 0.44,
+    artistMatch: 0.16,
     entityFit: 0.12,
-    providerRank: 0.08,
-    popularity: 0.09,
+    providerRank: 0.11,
+    popularity: 0.14,
     personalization: 0.03,
   );
 }
@@ -118,6 +119,22 @@ class QueryPreprocessor {
     // Collapse multiple spaces
     s = s.replaceAll(_whitespaceRegex, ' ').trim();
     return s;
+  }
+
+  static final RegExp _trailingTagRegex = RegExp(
+    r'\s*(?:\([^)]*\)|\[[^\]]*\])\s*$',
+  );
+
+  /// Strips trailing parenthetical/bracketed suffixes such as "(feat. Daft Punk)" or
+  /// "(From \"Brahmastra\")" so canonical songs aren't penalized behind short spam titles.
+  static String coreTitle(String input) {
+    var s = input.trim();
+    while (_trailingTagRegex.hasMatch(s)) {
+      final next = s.replaceAll(_trailingTagRegex, '').trim();
+      if (next.isEmpty || next == s) break;
+      s = next;
+    }
+    return normalize(s);
   }
 
   /// Global phonetic key:
@@ -394,8 +411,12 @@ class SearchIntentDetector {
     return null;
   }
 
-  /// Analyzes query terms and candidate items to detect intent and layout mode.
-  static SearchIntent detectIntent(String rawQuery, List<SearchItem> rawItems) {
+  /// Analyzes query terms, candidate items, and autocomplete predictions to detect intent and layout mode.
+  static SearchIntent detectIntent(
+    String rawQuery,
+    List<SearchItem> rawItems, {
+    List<String> querySuggestions = const [],
+  }) {
     final normalized = QueryPreprocessor.normalize(rawQuery);
     final tokens = QueryPreprocessor.tokenize(normalized);
 
@@ -416,27 +437,43 @@ class SearchIntentDetector {
     final entityText = remainingTokens.join(' ').trim();
     final effectiveEntity = entityText.isNotEmpty ? entityText : normalized;
 
-    // 1. Direct song title match check
+    // 1. Direct song title match check (considering core title without feat/from suffixes)
     double bestSongScore = 0.0;
     for (final it in rawItems.whereType<SearchSongItem>()) {
       final sNorm = QueryPreprocessor.normalize(it.title);
-      final isExact = sNorm == effectiveEntity;
+      final sCore = QueryPreprocessor.coreTitle(it.title);
+      final isExact = sNorm == effectiveEntity || sCore == effectiveEntity;
       final isPrefix =
-          sNorm.startsWith(effectiveEntity) && effectiveEntity.length >= 3;
+          (sNorm.startsWith(effectiveEntity) ||
+              sCore.startsWith(effectiveEntity)) &&
+          effectiveEntity.length >= 3;
       final score = isExact
           ? 1.0
-          : (isPrefix ? 0.90 : _computeTextScore(effectiveEntity, sNorm));
+          : (isPrefix
+                ? 0.90
+                : math.max(
+                    _computeTextScore(effectiveEntity, sNorm),
+                    _computeTextScore(effectiveEntity, sCore) * 0.99,
+                  ));
       if (score > bestSongScore) {
         bestSongScore = score;
       }
     }
     final hasStrongSongMatch = bestSongScore >= 0.82;
 
-    // 2. Direct artist name match check
+    // 2. Direct artist name match check (preferring notable artists and avoiding tiny spam channels)
     bool artistIntent = false;
     String? matchedArtistBrowseId;
     String? matchedArtistName;
     double bestArtistScore = 0.0;
+    double bestQualifyingArtistWeight = -1.0;
+
+    final topSugNorm =
+        querySuggestions.isNotEmpty &&
+            effectiveEntity.length >= 3 &&
+            effectiveEntity.length <= 6
+        ? QueryPreprocessor.normalize(querySuggestions.first)
+        : '';
 
     final artistCandidates = rawItems.whereType<SearchArtistItem>().toList();
     for (final artist in artistCandidates) {
@@ -452,15 +489,47 @@ class SearchIntentDetector {
       if (score > bestArtistScore) {
         bestArtistScore = score;
       }
+
+      final subCount =
+          artist.subscriberCount ??
+          QueryPreprocessor.parseCountString(artist.subscriberText);
+      final hasUnknownCount = subCount <= 0;
+      final isNotableArtist =
+          artist.isVerified ||
+          artist.sourceStream == 'suggestion' ||
+          subCount >= 25000 ||
+          (hasUnknownCount &&
+              ((artist.rawRank == 0 && artist.providerRank == 0) ||
+                  artist.subscriberText == null ||
+                  artist.subscriberText!.trim().isEmpty ||
+                  artist.subscriberText!.trim().toLowerCase() == 'artist'));
+      final matchesTopSugArtist =
+          topSugNorm.isNotEmpty &&
+          topSugNorm == artistNorm &&
+          (topSugNorm.startsWith(effectiveEntity) ||
+              TextSimilarity.damerauLevenshtein(effectiveEntity, topSugNorm) >=
+                  0.72);
+
       final isExplicitArtist = intentType == SearchItemType.artist;
-      if (isExplicitArtist ||
-          isExact ||
-          (isPrefix && !hasStrongSongMatch) ||
-          (score >= 0.88 && !hasStrongSongMatch)) {
-        artistIntent = true;
-        matchedArtistBrowseId = artist.browseId;
-        matchedArtistName = artist.name;
-        break;
+      final qualifies =
+          isExplicitArtist ||
+          (isNotableArtist &&
+              (isExact ||
+                  (isPrefix && !hasStrongSongMatch) ||
+                  (score >= 0.88 && !hasStrongSongMatch) ||
+                  (matchesTopSugArtist && !hasStrongSongMatch)));
+
+      if (qualifies) {
+        final weight =
+            (score * 100.0) +
+            (artist.isVerified ? 5.0 : 0.0) +
+            math.log(1.0 + subCount);
+        if (weight > bestQualifyingArtistWeight) {
+          bestQualifyingArtistWeight = weight;
+          artistIntent = true;
+          matchedArtistBrowseId = artist.browseId;
+          matchedArtistName = artist.name;
+        }
       }
     }
 
@@ -621,7 +690,11 @@ class SearchRanker {
     double maxTextMatch = 0.0;
     final textScores = <String, double>{};
     for (final it in dedupedItems) {
-      final s = _calculateTextMatch(it, intent);
+      final s = _calculateTextMatch(
+        it,
+        intent,
+        querySuggestions: querySuggestions,
+      );
       textScores[it.id] = s;
       if (s > maxTextMatch) maxTextMatch = s;
     }
@@ -664,9 +737,16 @@ class SearchRanker {
 
     // 6. Resolve Top Result (Hero Card) strictly matching detected intent & popularity
     SearchTopResult? topResult;
+    final topScore = scoredItems.isNotEmpty ? scoredItems.first.finalScore : 0.0;
+    final initialMatchedItem = initialTopResult == null
+        ? null
+        : scoredItems
+              .where((e) => e.id == initialTopResult.item.id)
+              .firstOrNull;
+
     if (intent.layoutMode == SearchLayoutMode.exactArtist) {
       final artistItem = scoredItems.whereType<SearchArtistItem>().firstOrNull;
-      if (artistItem != null) {
+      if (artistItem != null && artistItem.finalScore >= topScore - 0.15) {
         topResult = _createTopResultFromItem(artistItem);
       }
     } else if (intent.layoutMode == SearchLayoutMode.albumOrPlaylist) {
@@ -676,22 +756,38 @@ class SearchRanker {
       final albumItem = scoredItems.whereType<SearchAlbumItem>().firstOrNull;
       if (intent.intentType == SearchItemType.playlist ||
           (playlistItem != null && albumItem == null)) {
-        if (playlistItem != null) {
+        if (playlistItem != null && playlistItem.finalScore >= topScore - 0.15) {
           topResult = _createTopResultFromItem(playlistItem);
         }
-      } else if (albumItem != null) {
+      } else if (albumItem != null && albumItem.finalScore >= topScore - 0.15) {
         topResult = _createTopResultFromItem(albumItem);
       }
     } else if (intent.layoutMode == SearchLayoutMode.songTitle) {
-      final songItem = scoredItems.whereType<SearchSongItem>().firstOrNull;
-      if (songItem != null) {
-        topResult = _createTopResultFromItem(songItem);
+      if (initialTopResult != null &&
+          initialTopResult.item is SearchSongItem &&
+          initialMatchedItem != null &&
+          initialMatchedItem.finalScore >= topScore - 0.08) {
+        topResult = _createTopResultFromItem(initialMatchedItem);
+      } else {
+        final songItem = scoredItems.whereType<SearchSongItem>().firstOrNull;
+        if (songItem != null) {
+          topResult = _createTopResultFromItem(songItem);
+        }
       }
     }
 
-    if (topResult == null && initialTopResult != null) {
-      topResult = initialTopResult;
-    } else if (topResult == null && scoredItems.isNotEmpty) {
+    if (topResult == null &&
+        initialTopResult != null &&
+        initialTopResult.item is! SearchPodcastItem) {
+      final initScore = initialMatchedItem?.finalScore ?? 0.65;
+      // Honor YTM's verified Top Card unless an expanded canonical hit decisively outscores it
+      if (initScore >= topScore - 0.12) {
+        topResult = initialMatchedItem != null
+            ? _createTopResultFromItem(initialMatchedItem)
+            : initialTopResult;
+      }
+    }
+    if (topResult == null && scoredItems.isNotEmpty) {
       final best = scoredItems.first;
       if (best.finalScore >= 0.40) {
         topResult = _createTopResultFromItem(best);
@@ -875,10 +971,22 @@ class SearchRanker {
       }
       if ((tLower.contains('8d') ||
               tLower.contains('slowed') ||
-              tLower.contains('reverb')) &&
+              tLower.contains('reverb') ||
+              tLower.contains('sped up') ||
+              tLower.contains('nightcore')) &&
           !qLower.contains('8d') &&
-          !qLower.contains('slowed')) {
+          !qLower.contains('slowed') &&
+          !qLower.contains('sped') &&
+          !qLower.contains('nightcore')) {
         penalties += 0.20;
+      }
+      if (tLower.contains('lofi') &&
+          !qLower.contains('lofi') &&
+          !qLower.contains('lo-fi')) {
+        penalties += 0.15;
+      }
+      if (tLower.contains('instrumental') && !qLower.contains('instrumental')) {
+        penalties += 0.18;
       }
     } else if (item is SearchArtistItem) {
       if (item.isVerified) qualityBoost += 0.08;
@@ -940,11 +1048,17 @@ class SearchRanker {
       final count =
           item.subscriberCount ??
           QueryPreprocessor.parseCountString(item.subscriberText);
+      var base = 0.35;
       if (count > 0) {
-        // 20M subscribers = 1.0, 1M = 0.82, 100K = 0.68
-        return (math.log(1.0 + count) / math.ln10 / 7.3).clamp(0.0, 1.0);
+        // 50M+ = 1.0, 1M = 0.78, 100K = 0.65, 200 = 0.30
+        base = (math.log(1.0 + count) / math.ln10 / 7.7).clamp(0.0, 1.0);
+      } else if (item.isVerified) {
+        base = 0.68;
       }
-      return 0.35;
+      if (item.sourceStream == 'suggestion' && base < 0.88) {
+        base = 0.88;
+      }
+      return base;
     }
     if (item is SearchVideoItem) {
       final views = item.views > 0
@@ -954,11 +1068,34 @@ class SearchRanker {
         // 100M views = 1.0, 10M = 0.875, 1M = 0.75
         return (math.log(1.0 + views) / math.ln10 / 8.0).clamp(0.0, 1.0);
       }
-      return 0.35;
+      return item.sourceStream == 'suggestion' ? 0.82 : 0.35;
     }
     if (item is SearchSongItem) {
-      if (item.isOfficialAudio) return 0.70;
-      return 0.45;
+      var base = item.isOfficialAudio ? 0.62 : 0.42;
+      final plays =
+          item.playCount ?? QueryPreprocessor.parseCountString(item.playCountText);
+      if (plays > 0) {
+        // 4.1B plays = ~1.0, 100M = 0.86, 1M = 0.65, 10K = 0.43
+        base = (math.log(1.0 + plays) / math.ln10 / 9.3).clamp(0.38, 1.0);
+      }
+      if (item.sourceStream == 'suggestion' && base < 0.88) {
+        base = 0.88;
+      }
+      return base;
+    }
+    if (item is SearchAlbumItem) {
+      var base = item.albumType.toLowerCase() == 'album' ? 0.58 : 0.48;
+      if (item.sourceStream == 'suggestion' && base < 0.85) {
+        base = 0.85;
+      }
+      return base;
+    }
+    if (item is SearchPlaylistItem) {
+      var base = item.isOfficial ? 0.68 : 0.48;
+      if (item.sourceStream == 'suggestion' && base < 0.82) {
+        base = 0.82;
+      }
+      return base;
     }
     return 0.35;
   }
@@ -972,7 +1109,13 @@ class SearchRanker {
 
     for (final it in items) {
       final rank = it.providerRank;
-      final weight = it.sourceStream == 'general' ? 1.0 : 1.1;
+      final weight = switch (it.sourceStream) {
+        'suggestion' => 1.35,
+        'general' => 1.15,
+        'expanded_general' || 'expanded_songs' => 1.05,
+        'communityPlaylists' => 0.85,
+        _ => 1.0,
+      };
       final score = weight / (k + rank);
       rrfMap[it.id] = (rrfMap[it.id] ?? 0.0) + score;
     }
@@ -987,7 +1130,11 @@ class SearchRanker {
 
   // ─────────────────────────── Text Match Calculation ────────────────────────
 
-  static double _calculateTextMatch(SearchItem item, SearchIntent intent) {
+  static double _calculateTextMatch(
+    SearchItem item,
+    SearchIntent intent, {
+    List<String> querySuggestions = const [],
+  }) {
     final q = intent.entityText.isNotEmpty
         ? intent.entityText
         : intent.normalizedQuery;
@@ -995,20 +1142,66 @@ class SearchRanker {
     final qPhonetic = QueryPreprocessor.phoneticKey(q);
 
     String targetText;
+    String coreTarget;
     String? artistText;
     if (item is SearchSongItem) {
       targetText = QueryPreprocessor.normalize(item.title);
-      artistText = QueryPreprocessor.normalize(item.subtitle);
+      coreTarget = QueryPreprocessor.coreTitle(item.title);
+      artistText = QueryPreprocessor.normalize(
+        item.artists.isNotEmpty
+            ? ArtistRef.formatList(item.artists)
+            : item.subtitle,
+      );
     } else {
       targetText = QueryPreprocessor.normalize(item.title);
+      coreTarget = QueryPreprocessor.coreTitle(item.title);
     }
 
-    final titleScore = _scoreString(q, qTokens, qPhonetic, targetText);
+    var titleScore = _scoreString(q, qTokens, qPhonetic, targetText);
+    if (coreTarget.isNotEmpty && coreTarget != targetText) {
+      titleScore = math.max(
+        titleScore,
+        _scoreString(q, qTokens, qPhonetic, coreTarget) * 0.99,
+      );
+    }
+
+    // For short prefixes / typos / suggestion-backed items, score against live YTM autocomplete
+    // predictions so "star" -> "Starboy (feat. Daft Punk)" gets proper canonical match strength.
+    if (querySuggestions.isNotEmpty &&
+        (q.length <= 6 ||
+            item.sourceStream == 'suggestion' ||
+            item.sourceStream.startsWith('expanded_'))) {
+      for (int i = 0; i < querySuggestions.length && i < 5; i++) {
+        final sNorm = QueryPreprocessor.normalize(querySuggestions[i]);
+        if (sNorm.isEmpty || sNorm == q) continue;
+        final matchesPrefixOrTypo =
+            sNorm.startsWith(q) ||
+            TextSimilarity.damerauLevenshtein(q, sNorm) >= 0.72;
+        if (!matchesPrefixOrTypo) continue;
+
+        final sTokens = QueryPreprocessor.tokenize(sNorm);
+        final sPhonetic = QueryPreprocessor.phoneticKey(sNorm);
+        final sDirect = math.max(
+          _scoreString(sNorm, sTokens, sPhonetic, targetText),
+          (coreTarget.isNotEmpty && coreTarget != targetText)
+              ? _scoreString(sNorm, sTokens, sPhonetic, coreTarget) * 0.99
+              : 0.0,
+        );
+        final confidence = (0.96 - (i * 0.02)).clamp(0.86, 0.96);
+        titleScore = math.max(titleScore, sDirect * confidence);
+      }
+    }
 
     if (item is SearchSongItem && artistText != null && artistText.isNotEmpty) {
       // Also check if user typed combined "Song Artist" (e.g. "Kesariya Arijit Singh")
       final combined = '$targetText $artistText'.trim();
-      final combinedScore = _scoreString(q, qTokens, qPhonetic, combined);
+      final coreCombined = coreTarget.isNotEmpty
+          ? '$coreTarget $artistText'.trim()
+          : combined;
+      final combinedScore = math.max(
+        _scoreString(q, qTokens, qPhonetic, combined),
+        _scoreString(q, qTokens, qPhonetic, coreCombined) * 0.99,
+      );
       if (combinedScore > 0.85) {
         return math.max(titleScore, combinedScore);
       }
@@ -1112,6 +1305,7 @@ class SearchRanker {
     final seenAlbumBrowseIds = <String>{};
     final seenArtistBrowseIds = <String>{};
     final seenPlaylistIds = <String>{};
+    final seenVideoIds = <String>{};
     final deduped = <SearchItem>[];
 
     for (final it in items) {
@@ -1124,11 +1318,17 @@ class SearchRanker {
         )) {
           continue; // Discard non-music videos, tech reviews, tutorials, and shorts
         }
+        final vKey = (it.videoId != null && it.videoId!.isNotEmpty)
+            ? it.videoId!
+            : it.id;
+        if (!seenVideoIds.add(vKey)) continue;
+        deduped.add(it);
+        continue;
       }
       if (it is SearchSongItem &&
-          it.durationSeconds < 60 &&
+          it.durationSeconds < 25 &&
           it.durationSeconds > 0) {
-        continue; // Discard shorts
+        continue; // Discard ultra-short clips/shorts while keeping legitimate themes/OSTs
       }
 
       if (it is SearchSongItem) {
@@ -1143,14 +1343,15 @@ class SearchRanker {
 
         if (seenSongSignatures.containsKey(sig)) {
           final existing = seenSongSignatures[sig]!;
-          // If current is official ATV audio and existing is not, replace it
-          if (it.isOfficialAudio && !existing.isOfficialAudio) {
-            deduped.remove(existing);
-            deduped.add(it);
-            seenSongSignatures[sig] = it;
-          } else if (it.isOfficialAudio == existing.isOfficialAudio &&
-              it.providerRank < existing.providerRank) {
-            // Prefer candidate with better provider rank
+          final betterPop =
+              (it.playCount ?? 0) > (existing.playCount ?? 0) &&
+              it.isOfficialAudio == existing.isOfficialAudio;
+          // If current is official ATV audio and existing is not, or has higher playCount/better rank, replace it
+          if ((it.isOfficialAudio && !existing.isOfficialAudio) ||
+              betterPop ||
+              (it.isOfficialAudio == existing.isOfficialAudio &&
+                  (it.playCount ?? 0) >= (existing.playCount ?? 0) &&
+                  it.providerRank < existing.providerRank)) {
             deduped.remove(existing);
             deduped.add(it);
             seenSongSignatures[sig] = it;

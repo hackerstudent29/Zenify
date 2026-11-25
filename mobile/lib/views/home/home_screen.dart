@@ -5,11 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart'
-    show
-        CupertinoActivityIndicator,
-        CupertinoIcons,
-        CupertinoSliverRefreshControl,
-        RefreshIndicatorMode;
+    show CupertinoActivityIndicator, CupertinoIcons;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
@@ -29,10 +25,12 @@ import '../details/artist_popup.dart';
 import '../details/category_screen.dart';
 import '../../models/artist_ref.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
+import '../../services/album_resolver.dart';
 import '../../services/artist_service.dart';
 import '../../services/country_service.dart';
 import '../../services/listening_history_service.dart';
 import '../../services/innertube_service.dart';
+import '../../services/media_router.dart';
 import '../../services/recommendation_engine.dart';
 import '../../services/user_preferences_service.dart';
 import '../../services/update_service.dart';
@@ -53,6 +51,18 @@ const _kGray = ColorFilter.matrix(<double>[
   0.2126, 0.7152, 0.0722, 0, 0,
   0, 0, 0, 1, 0,
 ]);
+
+/// +70% saturation matrix matching Zenify Liquid Glass over artwork.
+const _kHeroGlassSat = ColorFilter.matrix(<double>[
+  1.5512, -0.5006, -0.0506, 0, 0, //
+  -0.1488, 1.1994, -0.0506, 0, 0,
+  -0.1488, -0.5006, 1.6494, 0, 0,
+  0, 0, 0, 1, 0,
+]);
+
+const _kHeroTextShadows = <Shadow>[
+  Shadow(color: Color(0x55000000), blurRadius: 8, offset: Offset(0, 1)),
+];
 
 /// Horizontal shelf physics: flings settle on a card with a real spring.
 class SnapSpringPhysics extends ScrollPhysics {
@@ -226,11 +236,13 @@ class _Img extends StatelessWidget {
     this.radius = 10,
     this.circular = false,
     this.cacheWidth = 520,
+    this.fit = BoxFit.cover,
   });
   final String url;
   final double radius;
   final bool circular;
   final int cacheWidth;
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
@@ -240,7 +252,7 @@ class _Img extends StatelessWidget {
     );
     final img = CachedNetworkImage(
       imageUrl: resolved,
-      fit: BoxFit.cover,
+      fit: fit,
       memCacheWidth: cacheWidth,
       fadeInDuration: const Duration(milliseconds: 220),
       placeholder: (context, url) => Container(color: AppColors.surface2),
@@ -248,13 +260,13 @@ class _Img extends StatelessWidget {
         if (errUrl.contains('maxresdefault.jpg')) {
           return CachedNetworkImage(
             imageUrl: errUrl.replaceAll('maxresdefault.jpg', 'sddefault.jpg'),
-            fit: BoxFit.cover,
+            fit: fit,
             memCacheWidth: cacheWidth,
             fadeInDuration: const Duration(milliseconds: 220),
             placeholder: (_, _) => Container(color: AppColors.surface2),
             errorWidget: (_, sdUrl, _) => CachedNetworkImage(
               imageUrl: sdUrl.replaceAll('sddefault.jpg', 'hqdefault.jpg'),
-              fit: BoxFit.cover,
+              fit: fit,
               memCacheWidth: cacheWidth,
               errorWidget: (_, _, _) => Container(
                 color: AppColors.surface2,
@@ -664,8 +676,9 @@ class _HeroState extends State<_Hero> with WidgetsBindingObserver {
     final items = widget.items;
     final w = MediaQuery.sizeOf(context).width;
     final cardW = w * 0.72 - 14;
-    const captionH = 106.0;
-    final cardH = cardW + captionH; // square artwork + 106px caption window
+    const captionH = 100.0;
+    final cardH =
+        cardW * 0.85 + captionH; // compact hero card + 100px caption window
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -732,16 +745,17 @@ class _HeroState extends State<_Hero> with WidgetsBindingObserver {
                               borderRadius: BorderRadius.circular(18),
                               child: Stack(
                                 children: [
-                                  // 1. Full-bleed background artwork that seamlessly spans the entire card
+                                  // 1. Full-bleed background artwork stretched vertically to cover the bottom caption without horizontal zoom
                                   Positioned.fill(
                                     child: _Img(
                                       t.coverUrl,
                                       radius: 0,
                                       cacheWidth: 800,
+                                      fit: BoxFit.fill,
                                     ),
                                   ),
 
-                                  // 2. Apple Music frosted glass bar at bottom directly sampling and blurring the underlying artwork
+                                  // 2. Apple Music transparent Liquid Glass bar at bottom directly refracting the underlying artwork
                                   Positioned(
                                     left: 0,
                                     right: 0,
@@ -752,94 +766,165 @@ class _HeroState extends State<_Hero> with WidgetsBindingObserver {
                                         bottom: Radius.circular(18),
                                       ),
                                       child: BackdropFilter(
-                                        filter: ui.ImageFilter.blur(
-                                          sigmaX: 28,
-                                          sigmaY: 28,
+                                        filter: ui.ImageFilter.compose(
+                                          outer: ui.ImageFilter.blur(
+                                            sigmaX: 7.5,
+                                            sigmaY: 7.5,
+                                            tileMode: ui.TileMode.mirror,
+                                          ),
+                                          inner: _kHeroGlassSat,
                                         ),
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              begin: Alignment.topCenter,
-                                              end: Alignment.bottomCenter,
-                                              colors: [
-                                                Colors.black.withValues(
-                                                  alpha: 0.16,
+                                        child: Stack(
+                                          children: [
+                                            // Crystal-transparent liquid sheen + subtle bottom legibility scrim
+                                            Positioned.fill(
+                                              child: IgnorePointer(
+                                                child: DecoratedBox(
+                                                  decoration: BoxDecoration(
+                                                    gradient: LinearGradient(
+                                                      begin: Alignment.topLeft,
+                                                      end:
+                                                          Alignment.bottomRight,
+                                                      colors: [
+                                                        Colors.white.withValues(
+                                                          alpha: 0.08,
+                                                        ),
+                                                        Colors.transparent,
+                                                        Colors.black.withValues(
+                                                          alpha: 0.14,
+                                                        ),
+                                                        Colors.black.withValues(
+                                                          alpha: 0.34,
+                                                        ),
+                                                      ],
+                                                      stops: const [
+                                                        0.0,
+                                                        0.36,
+                                                        0.72,
+                                                        1.0,
+                                                      ],
+                                                    ),
+                                                  ),
                                                 ),
-                                                Colors.black.withValues(
-                                                  alpha: 0.52,
-                                                ),
-                                              ],
+                                              ),
                                             ),
-                                            border: Border(
-                                              top: BorderSide(
-                                                color: Colors.white.withValues(
-                                                  alpha: 0.22,
+                                            // Hairline liquid refraction gleam along top edge (no heavy white border)
+                                            Positioned(
+                                              left: 0,
+                                              right: 0,
+                                              top: 0,
+                                              height: 0.5,
+                                              child: IgnorePointer(
+                                                child: DecoratedBox(
+                                                  decoration: BoxDecoration(
+                                                    gradient: LinearGradient(
+                                                      colors: [
+                                                        Colors.transparent,
+                                                        Colors.white.withValues(
+                                                          alpha: 0.16,
+                                                        ),
+                                                        Colors.white.withValues(
+                                                          alpha: 0.05,
+                                                        ),
+                                                        Colors.white.withValues(
+                                                          alpha: 0.14,
+                                                        ),
+                                                        Colors.transparent,
+                                                      ],
+                                                      stops: const [
+                                                        0.0,
+                                                        0.22,
+                                                        0.52,
+                                                        0.80,
+                                                        1.0,
+                                                      ],
+                                                    ),
+                                                  ),
                                                 ),
-                                                width: 0.8,
                                               ),
                                             ),
-                                          ),
-                                          padding: const EdgeInsets.fromLTRB(
-                                            14,
-                                            8,
-                                            14,
-                                            10,
-                                          ),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                it.tag.isNotEmpty
-                                                    ? it.tag.toUpperCase()
-                                                    : 'RECENTLY ADDED',
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontFamily: 'SF Pro Text',
-                                                  color: Colors.white
-                                                      .withValues(alpha: 0.78),
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700,
-                                                  letterSpacing: 0.6,
-                                                ),
+                                            // Caption typography
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.fromLTRB(
+                                                    14,
+                                                    7,
+                                                    14,
+                                                    8,
+                                                  ),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    it.tag.isNotEmpty
+                                                        ? it.tag.toUpperCase()
+                                                        : 'RECENTLY ADDED',
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontFamily: 'SF Pro Text',
+                                                      color: Colors.white
+                                                          .withValues(
+                                                            alpha: 0.84,
+                                                          ),
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      letterSpacing: 0.6,
+                                                      shadows:
+                                                          _kHeroTextShadows,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    MediaNormalizer.cleanCompactTitle(
+                                                      t.title,
+                                                    ),
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontFamily:
+                                                          'SF Pro Display',
+                                                      color: Colors.white,
+                                                      fontSize: 15.5,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      letterSpacing: -0.3,
+                                                      height: 1.18,
+                                                      shadows:
+                                                          _kHeroTextShadows,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    MediaNormalizer.formatArtists(
+                                                      t.artist,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontFamily: 'SF Pro Text',
+                                                      color: Colors.white
+                                                          .withValues(
+                                                            alpha: 0.90,
+                                                          ),
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w400,
+                                                      letterSpacing: -0.1,
+                                                      shadows:
+                                                          _kHeroTextShadows,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                              const SizedBox(height: 3),
-                                              Text(
-                                                MediaNormalizer
-                                                    .cleanCompactTitle(
-                                                  t.title,
-                                                ),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontFamily: 'SF Pro Display',
-                                                  color: Colors.white,
-                                                  fontSize: 15.5,
-                                                  fontWeight: FontWeight.w600,
-                                                  letterSpacing: -0.3,
-                                                  height: 1.18,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 3),
-                                              Text(
-                                                MediaNormalizer.formatArtists(
-                                                  t.artist,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontFamily: 'SF Pro Text',
-                                                  color: Colors.white
-                                                      .withValues(alpha: 0.85),
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w400,
-                                                  letterSpacing: -0.1,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
@@ -991,6 +1076,31 @@ class _CoverCard extends StatelessWidget {
 }
 
 /// 16:9 widescreen video card for home screen (artwork, clean title, and artist).
+String _homeVideoArtistLabel(Track track) {
+  final raw = track.artist.trim();
+  if (raw.isEmpty ||
+      raw.toLowerCase() == 'unknown artist' ||
+      raw.toLowerCase() == 'youtube music' ||
+      MediaNormalizer.isDistributorOrLabel(raw) ||
+      MediaNormalizer.isNonArtistCreditSegment(raw)) {
+    final extracted = MediaNormalizer.extractArtistsFromVideoTitle(track.title);
+    if (extracted.isNotEmpty &&
+        !MediaNormalizer.isDistributorOrLabel(extracted) &&
+        !MediaNormalizer.isNonArtistCreditSegment(extracted)) {
+      return extracted;
+    }
+    return '';
+  }
+  final formatted = MediaNormalizer.formatArtists(raw);
+  if (formatted.isEmpty ||
+      formatted.toLowerCase() == 'unknown artist' ||
+      MediaNormalizer.isDistributorOrLabel(formatted) ||
+      MediaNormalizer.isNonArtistCreditSegment(formatted)) {
+    return '';
+  }
+  return formatted;
+}
+
 class _HomeVideoCard extends StatelessWidget {
   const _HomeVideoCard({
     required this.track,
@@ -1005,6 +1115,11 @@ class _HomeVideoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final artistLabel = _homeVideoArtistLabel(track);
+    final cleanTitle = MediaNormalizer.cleanVideoTitle(
+      track.title,
+      knownArtists: artistLabel,
+    );
     return SpringPress(
       onTap: onTap,
       child: Column(
@@ -1089,7 +1204,7 @@ class _HomeVideoCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            MediaNormalizer.cleanCompactTitle(track.title),
+            cleanTitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -1100,19 +1215,21 @@ class _HomeVideoCard extends StatelessWidget {
               letterSpacing: -0.2,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            MediaNormalizer.formatArtists(track.artist),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: 'SF Pro Text',
-              color: AppColors.textSecondary,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w400,
-              letterSpacing: -0.1,
+          if (artistLabel.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              artistLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'SF Pro Text',
+                color: AppColors.textSecondary,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w400,
+                letterSpacing: -0.1,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -2197,20 +2314,28 @@ class _SongRow extends StatelessWidget {
                                 behavior: HitTestBehavior.opaque,
                                 onTap: () {
                                   HapticFeedback.lightImpact();
-                                  Navigator.of(context).push(
-                                    ZenPageRoute(
-                                      builder: (_) => AlbumScreen(
-                                        albumTitle: MediaNormalizer.cleanTitle(
-                                          track.album,
-                                        ),
-                                        artistName:
-                                            MediaNormalizer.formatArtists(
-                                              track.artist,
-                                            ),
-                                        coverUrl: track.coverUrl,
-                                      ),
-                                    ),
-                                  );
+                                  if (track is Track) {
+                                    MediaRouter.openForTrack(
+                                      context,
+                                      track,
+                                      forceSingle:
+                                          !AlbumResolver.isValidAlbumTitle(
+                                            track.album,
+                                          ) ||
+                                          AlbumResolver.isSingleReleaseTitle(
+                                            track.album,
+                                          ),
+                                      useShellTab: true,
+                                    );
+                                  } else {
+                                    MediaRouter.openRelease(
+                                      context,
+                                      albumTitle: '${track.album ?? ''}',
+                                      artistName: '${track.artist ?? ''}',
+                                      coverUrl: track.coverUrl as String?,
+                                      useShellTab: true,
+                                    );
+                                  }
                                 },
                                 child: Text(
                                   MediaNormalizer.cleanCompactTitle(
@@ -2267,23 +2392,27 @@ class _SongRow extends StatelessWidget {
                             );
                           }
                         },
-                        onGoToAlbum:
-                            track.album.isNotEmpty && track.album != 'Single'
-                            ? () => Navigator.push(
-                                context,
-                                ZenPageRoute(
-                                  builder: (_) => AlbumScreen(
-                                    albumTitle: MediaNormalizer.cleanTitle(
-                                      track.album,
-                                    ),
-                                    artistName: MediaNormalizer.formatArtists(
-                                      track.artist,
-                                    ),
-                                    coverUrl: track.coverUrl,
-                                  ),
-                                ),
-                              )
-                            : null,
+                        onGoToAlbum: track is Track
+                            ? (AlbumResolver.isValidAlbumTitle(track.album)
+                                  ? () => MediaRouter.openForTrack(
+                                      context,
+                                      track,
+                                      forceSingle:
+                                          AlbumResolver.isSingleReleaseTitle(
+                                            track.album,
+                                          ),
+                                      useShellTab: true,
+                                    )
+                                  : null)
+                            : (track.album.isNotEmpty && track.album != 'Single'
+                                  ? () => MediaRouter.openRelease(
+                                      context,
+                                      albumTitle: '${track.album}',
+                                      artistName: '${track.artist ?? ''}',
+                                      coverUrl: track.coverUrl as String?,
+                                      useShellTab: true,
+                                    )
+                                  : null),
                       );
                     },
                   ),
@@ -2756,17 +2885,38 @@ class _SectionSheetState extends State<_SectionSheet>
         if (artists.length > 1) {
           showArtistPopup(context, artists: artists);
         } else if (artists.isNotEmpty) {
-          _go(ArtistScreen(artistName: artists.first.name));
+          _go(
+            ArtistScreen(
+              artistName: artists.first.name,
+              browseId:
+                  artists.first.id.isNotEmpty &&
+                      !artists.first.id.contains('_')
+                  ? artists.first.id
+                  : null,
+            ),
+          );
         }
       },
-      onGoToAlbum: t.album.isNotEmpty && t.album != 'Single'
-          ? () => _go(
-              AlbumScreen(
-                albumTitle: MediaNormalizer.cleanTitle(t.album),
-                artistName: MediaNormalizer.formatArtists(t.artist),
-                coverUrl: t.coverUrl,
-              ),
-            )
+      onGoToAlbum:
+          !AlbumResolver.isVideoTrack(t) &&
+              AlbumResolver.isValidAlbumTitle(t.album)
+          ? () {
+              final bId = AlbumResolver.sanitizeAlbumBrowseId(t.albumBrowseId);
+              final isSing =
+                  bId == null && AlbumResolver.isSingleReleaseTitle(t.album);
+              _go(
+                AlbumScreen(
+                  albumTitle: isSing
+                      ? MediaNormalizer.cleanTitle(t.album)
+                      : MediaNormalizer.cleanAlbumTitle(t.album),
+                  artistName: MediaNormalizer.formatArtists(t.artist),
+                  coverUrl: t.coverUrl,
+                  browseId: bId,
+                  initialTracks: [t],
+                  isSingle: isSing,
+                ),
+              );
+            }
           : null,
     );
   }
@@ -3099,6 +3249,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Track> _newReleases = [];
   List<Track> _moodTracks = [];
   List<Track> _homeVideos = [];
+  List<ReleaseSummary> _homeAlbums = [];
+  List<ReleaseSummary> _homeSingles = [];
 
   static bool _isAudioTrack(Track t) =>
       !t.isVideo &&
@@ -3135,15 +3287,87 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> get _effectiveArtists =>
       UserPreferencesService.instance.effectiveArtists;
 
+  final Set<String> _enrichedHomeVideoIds = <String>{};
+
+  Future<void> _enrichVideoShelf(
+    List<Track> source, {
+    bool isHome = false,
+    bool isWatchAgain = false,
+    bool isRediscover = false,
+    bool persistToHistory = false,
+  }) async {
+    if (source.isEmpty || !mounted) return;
+    final candidates = <Track>[];
+    for (final v in source) {
+      final cleanId = v.id.replaceFirst(RegExp(r'^(yt-|yt:)'), '').trim();
+      if (cleanId.isEmpty) continue;
+      if (InnerTubeService.needsVideoEnrichment(v) &&
+          _enrichedHomeVideoIds.add(cleanId)) {
+        candidates.add(v);
+      } else {
+        // Hydrate immediately from any already-cached video details without re-fetching
+        final cached = InnerTubeService.instance.getCachedVideoDetails(cleanId);
+        if (cached != null) {
+          candidates.add(v);
+        }
+      }
+    }
+    if (candidates.isEmpty) return;
+
+    await InnerTubeService.instance.enrichVideoTracks(
+      candidates,
+      maxConcurrent: 3,
+      onBatchProgress: (updatedBatch) {
+        if (!mounted || updatedBatch.isEmpty) return;
+        final byId = <String, Track>{
+          for (final u in updatedBatch)
+            u.id.replaceFirst(RegExp(r'^(yt-|yt:)'), '').trim(): u,
+        };
+        List<Track> applyUpdates(List<Track> target) {
+          var changed = false;
+          final out = List<Track>.of(target);
+          for (var i = 0; i < out.length; i++) {
+            final cid =
+                out[i].id.replaceFirst(RegExp(r'^(yt-|yt:)'), '').trim();
+            final u = byId[cid];
+            if (u != null &&
+                (u.title != out[i].title ||
+                    u.artist != out[i].artist ||
+                    u.year != out[i].year)) {
+              out[i] = u;
+              changed = true;
+            }
+          }
+          return changed ? out : target;
+        }
+
+        setState(() {
+          if (isHome) _homeVideos = applyUpdates(_homeVideos);
+          if (isWatchAgain) {
+            _watchAgainVideos = applyUpdates(_watchAgainVideos);
+          }
+          if (isRediscover) {
+            _rediscoverVideos = applyUpdates(_rediscoverVideos);
+          }
+        });
+        if (persistToHistory) {
+          ListeningHistoryService.instance.updateTrackMetadataBatch(
+            updatedBatch,
+          );
+        }
+      },
+    );
+  }
+
   void _onHistoryChanged() {
     if (mounted) {
       setState(() {
         _recentHistory = ListeningHistoryService.instance.getRecentTracks();
         _rediscover = ListeningHistoryService.instance.getRediscoverTracks();
-        _watchAgainVideos =
-            ListeningHistoryService.instance.getWatchAgainVideos();
-        _rediscoverVideos =
-            ListeningHistoryService.instance.getRediscoverVideos();
+        _watchAgainVideos = ListeningHistoryService.instance
+            .getWatchAgainVideos();
+        _rediscoverVideos = ListeningHistoryService.instance
+            .getRediscoverVideos();
         final userArtists = _effectiveArtists;
         final fav =
             ListeningHistoryService.instance.getFavoriteArtist() ??
@@ -3160,6 +3384,16 @@ class _HomeScreenState extends State<HomeScreen> {
           if (secondFav != null) _loadSecondFavoriteArtistTracks(secondFav);
         }
       });
+      _enrichVideoShelf(
+        _watchAgainVideos,
+        isWatchAgain: true,
+        persistToHistory: true,
+      );
+      _enrichVideoShelf(
+        _rediscoverVideos,
+        isRediscover: true,
+        persistToHistory: true,
+      );
     }
   }
 
@@ -3178,7 +3412,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadAllHomeData({bool refresh = false}) async {
     if (!mounted) return;
-    setState(() => _loading = true);
+    if (!refresh) {
+      setState(() => _loading = true);
+    } else {
+      _enrichedHomeVideoIds.clear();
+      InnerTubeService.instance.clearCache();
+    }
 
     try {
       final country = CountryService.instance.currentCountry;
@@ -3191,8 +3430,20 @@ class _HomeScreenState extends State<HomeScreen> {
       // 1. Load User Listening Telemetry (with saved onboarding tastes as Day-1 seed)
       _recentHistory = ListeningHistoryService.instance.getRecentTracks();
       _rediscover = ListeningHistoryService.instance.getRediscoverTracks();
-      _watchAgainVideos = ListeningHistoryService.instance.getWatchAgainVideos();
-      _rediscoverVideos = ListeningHistoryService.instance.getRediscoverVideos();
+      _watchAgainVideos = ListeningHistoryService.instance
+          .getWatchAgainVideos();
+      _rediscoverVideos = ListeningHistoryService.instance
+          .getRediscoverVideos();
+      _enrichVideoShelf(
+        _watchAgainVideos,
+        isWatchAgain: true,
+        persistToHistory: true,
+      );
+      _enrichVideoShelf(
+        _rediscoverVideos,
+        isRediscover: true,
+        persistToHistory: true,
+      );
       _favoriteArtist =
           ListeningHistoryService.instance.getFavoriteArtist() ??
           (userArtists.isNotEmpty ? userArtists.first : null);
@@ -3207,81 +3458,95 @@ class _HomeScreenState extends State<HomeScreen> {
           ? '$primaryLang $primaryGenre • ${timeCtx.greeting}'
           : timeCtx.moodLabel;
 
+      final pendingTasks = <Future<void>>[];
+
       // 3. Time-of-day shelf powered by Global Recommendation Engine
-      RecommendationEngine.instance
-          .getTimeOfDayRecommendations()
-          .then((tracks) {
-            if (mounted && tracks.isNotEmpty) {
-              setState(
-                () => _timeOfDayTracks = tracks.where(_isAudioTrack).toList(),
-              );
-            }
-          })
-          .catchError((_) {});
-
-      // 4. Truly Personalized Quick Picks (Made for You):
-      // Filters for user's selected + qualified languages & top artists with anti-repetition
-      RecommendationEngine.instance
-          .getPersonalizedQuickPicks()
-          .then((tracks) {
-            if (mounted && tracks.isNotEmpty) {
-              setState(() {
-                _quickPicks = tracks.where(_isAudioTrack).toList();
-                _loading = false;
-              });
-            }
-          })
-          .catchError((_) {});
-
-      // 5. #1 Favorite Artist Spotlight
-      if (_favoriteArtist != null && _favoriteArtist!.isNotEmpty) {
+      pendingTasks.add(
         RecommendationEngine.instance
-            .getFavoriteArtistTracks(_favoriteArtist!)
+            .getTimeOfDayRecommendations(forceRefresh: refresh)
             .then((tracks) {
               if (mounted && tracks.isNotEmpty) {
                 setState(
-                  () => _favoriteArtistTracks = tracks
-                      .where(_isAudioTrack)
-                      .toList(),
+                  () => _timeOfDayTracks = tracks.where(_isAudioTrack).toList(),
                 );
               }
             })
-            .catchError((_) {});
+            .catchError((_) {}),
+      );
+
+      // 4. Truly Personalized Quick Picks (Made for You):
+      pendingTasks.add(
+        RecommendationEngine.instance
+            .getPersonalizedQuickPicks(forceRefresh: refresh)
+            .then((tracks) {
+              if (mounted && tracks.isNotEmpty) {
+                setState(() {
+                  _quickPicks = tracks.where(_isAudioTrack).toList();
+                  _loading = false;
+                });
+              }
+            })
+            .catchError((_) {}),
+      );
+
+      // 5. #1 Favorite Artist Spotlight
+      if (_favoriteArtist != null && _favoriteArtist!.isNotEmpty) {
+        pendingTasks.add(
+          RecommendationEngine.instance
+              .getFavoriteArtistTracks(_favoriteArtist!, forceRefresh: refresh)
+              .then((tracks) {
+                if (mounted && tracks.isNotEmpty) {
+                  setState(
+                    () => _favoriteArtistTracks = tracks
+                        .where(_isAudioTrack)
+                        .toList(),
+                  );
+                }
+              })
+              .catchError((_) {}),
+        );
       }
 
       // 6. #2 Favorite Artist Spotlight
       if (_secondFavoriteArtist != null && _secondFavoriteArtist!.isNotEmpty) {
-        RecommendationEngine.instance
-            .getFavoriteArtistTracks(_secondFavoriteArtist!)
-            .then((tracks) {
-              if (mounted && tracks.isNotEmpty) {
-                setState(
-                  () => _secondFavoriteArtistTracks = tracks
-                      .where(_isAudioTrack)
-                      .toList(),
-                );
-              }
-            })
-            .catchError((_) {});
+        pendingTasks.add(
+          RecommendationEngine.instance
+              .getFavoriteArtistTracks(
+                _secondFavoriteArtist!,
+                forceRefresh: refresh,
+              )
+              .then((tracks) {
+                if (mounted && tracks.isNotEmpty) {
+                  setState(
+                    () => _secondFavoriteArtistTracks = tracks
+                        .where(_isAudioTrack)
+                        .toList(),
+                  );
+                }
+              })
+              .catchError((_) {}),
+        );
       }
 
       // 7. Multi-language New Releases strictly matching qualified languages & artists
-      RecommendationEngine.instance
-          .getRecommendedNewReleases()
-          .then((tracks) {
-            if (mounted && tracks.isNotEmpty) {
-              setState(() {
-                _newReleases = tracks.where(_isAudioTrack).toList();
-                _loading = false;
-              });
-            }
-          })
-          .catchError((_) {});
+      pendingTasks.add(
+        RecommendationEngine.instance
+            .getRecommendedNewReleases(forceRefresh: refresh)
+            .then((tracks) {
+              if (mounted && tracks.isNotEmpty) {
+                setState(() {
+                  _newReleases = tracks.where(_isAudioTrack).toList();
+                  _loading = false;
+                });
+              }
+            })
+            .catchError((_) {}),
+      );
 
       // 8. Regional Charts & Personalized Artists
       final chartsFutures = <Future>[
         InnerTubeService.instance
-            .getCharts(countryCode: country.code)
+            .getCharts(countryCode: country.code, forceRefresh: refresh)
             .timeout(
               const Duration(seconds: 5),
               onTimeout: () => (
@@ -3299,213 +3564,252 @@ class _HomeScreenState extends State<HomeScreen> {
       if (primaryLang.isNotEmpty) {
         chartsFutures.add(
           InnerTubeService.instance
-              .search('top $primaryLang songs charts')
+              .search('top $primaryLang songs charts', forceRefresh: refresh)
               .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
               .catchError((_) => <Track>[]),
         );
       }
 
-      Future.wait(chartsFutures)
-          .then((results) {
-            if (!mounted) return;
-            final chartData =
-                results[0]
-                    as ({
-                      List<({String image, String name, String subs})> artists,
-                      List<Track> tracks,
-                    });
-            final langChartTracks = results.length > 1
-                ? (results[1] as List<Track>)
-                : <Track>[];
+      pendingTasks.add(
+        Future.wait(chartsFutures)
+            .then((results) {
+              if (!mounted) return;
+              final chartData =
+                  results[0]
+                      as ({
+                        List<({String image, String name, String subs})>
+                        artists,
+                        List<Track> tracks,
+                      });
+              final langChartTracks = results.length > 1
+                  ? (results[1] as List<Track>)
+                  : <Track>[];
 
-            // Interleave language chart songs with national chart songs
-            final seen = <String>{};
-            final combinedChartTracks = <Track>[];
-            for (final t in langChartTracks.take(8)) {
-              if (seen.add(t.id)) combinedChartTracks.add(t);
-            }
-            for (final t in chartData.tracks) {
-              if (seen.add(t.id)) combinedChartTracks.add(t);
-            }
-
-            // Build Personalized Artists shelf:
-            // 1. History top played artists
-            // 2. Favorite artists chosen by user
-            // 3. Curated artists for user's selected languages
-            // 4. Regional chart artists
-            final personalizedArtists =
-                <({String image, String name, String subs})>[];
-            final seenArtists = <String>{};
-            final prefs = UserPreferencesService.instance.currentPrefs;
-
-            String resolveArtistImg(String artistName) {
-              final target = artistName.trim().toLowerCase();
-              for (final a in chartData.artists) {
-                if (a.name.trim().toLowerCase() == target &&
-                    a.image.isNotEmpty) {
-                  return a.image;
-                }
+              // Interleave language chart songs with national chart songs
+              final seen = <String>{};
+              final combinedChartTracks = <Track>[];
+              for (final t in langChartTracks.take(8)) {
+                if (seen.add(t.id)) combinedChartTracks.add(t);
               }
+              for (final t in chartData.tracks) {
+                if (seen.add(t.id)) combinedChartTracks.add(t);
+              }
+
+              final personalizedArtists =
+                  <({String image, String name, String subs})>[];
+              final seenArtists = <String>{};
+              final prefs = UserPreferencesService.instance.currentPrefs;
+
+              String resolveArtistImg(String artistName) {
+                final target = artistName.trim().toLowerCase();
+                for (final a in chartData.artists) {
+                  if (a.name.trim().toLowerCase() == target &&
+                      a.image.isNotEmpty) {
+                    return a.image;
+                  }
+                }
+                for (final fa in prefs.favoriteArtists) {
+                  if (fa.name.trim().toLowerCase() == target &&
+                      fa.image.isNotEmpty) {
+                    return fa.image;
+                  }
+                }
+                final cached = ArtistService.getCachedAvatar(artistName);
+                if (cached != null && cached.isNotEmpty) {
+                  return cached;
+                }
+                return '';
+              }
+
+              // 1. User favorite artists (already have high-res photo)
               for (final fa in prefs.favoriteArtists) {
-                if (fa.name.trim().toLowerCase() == target &&
-                    fa.image.isNotEmpty) {
-                  return fa.image;
-                }
-              }
-              final cached = ArtistService.getCachedAvatar(artistName);
-              if (cached != null && cached.isNotEmpty) {
-                return cached;
-              }
-              return '';
-            }
-
-            // 1. User favorite artists (already have high-res photo)
-            for (final fa in prefs.favoriteArtists) {
-              final split = MediaNormalizer.splitArtistNames(fa.name);
-              for (final name in split) {
-                final lower = name.trim().toLowerCase();
-                if (lower.isNotEmpty && seenArtists.add(lower)) {
-                  personalizedArtists.add((
-                    name: name,
-                    subs: 'Favorite Artist',
-                    image: resolveArtistImg(name).isNotEmpty
-                        ? resolveArtistImg(name)
-                        : fa.image,
-                  ));
-                }
-              }
-            }
-
-            // 2. From user's actual listening history (proven affinity)
-            final topHistory = ListeningHistoryService.instance.getTopArtists(
-              limit: 10,
-            );
-            for (final h in topHistory) {
-              final split = MediaNormalizer.splitArtistNames(h.name);
-              for (final name in split) {
-                final lower = name.trim().toLowerCase();
-                if (name.isNotEmpty &&
-                    lower != 'unknown artist' &&
-                    seenArtists.add(lower)) {
-                  personalizedArtists.add((
-                    name: name,
-                    subs: '${h.plays} plays • Top Artist',
-                    image: resolveArtistImg(name),
-                  ));
-                }
-              }
-            }
-
-            // 3. From user's qualified languages
-            if (userLangs.isNotEmpty) {
-              final curated = UserPreferencesService.curatedArtistsForLanguages(
-                userLangs,
-              );
-              for (final raw in curated.take(5)) {
-                final split = MediaNormalizer.splitArtistNames(raw);
+                final split = MediaNormalizer.splitArtistNames(fa.name);
                 for (final name in split) {
                   final lower = name.trim().toLowerCase();
                   if (lower.isNotEmpty && seenArtists.add(lower)) {
                     personalizedArtists.add((
                       name: name,
-                      subs: 'Top Artist • ${userLangs.first}',
+                      subs: 'Favorite Artist',
+                      image: resolveArtistImg(name).isNotEmpty
+                          ? resolveArtistImg(name)
+                          : fa.image,
+                    ));
+                  }
+                }
+              }
+
+              // 2. From user's actual listening history (proven affinity)
+              final topHistory = ListeningHistoryService.instance.getTopArtists(
+                limit: 10,
+              );
+              for (final h in topHistory) {
+                final split = MediaNormalizer.splitArtistNames(h.name);
+                for (final name in split) {
+                  final lower = name.trim().toLowerCase();
+                  if (name.isNotEmpty &&
+                      lower != 'unknown artist' &&
+                      seenArtists.add(lower)) {
+                    personalizedArtists.add((
+                      name: name,
+                      subs: '${h.plays} plays • Top Artist',
                       image: resolveArtistImg(name),
                     ));
                   }
                 }
               }
-            }
 
-            // 4. Regional chart artists (only as controlled discovery fill-in)
-            if (personalizedArtists.length < 8) {
-              for (final a in chartData.artists) {
-                final split = MediaNormalizer.splitArtistNames(a.name);
-                for (final name in split) {
-                  final lower = name.trim().toLowerCase();
-                  if (lower.isNotEmpty && seenArtists.add(lower)) {
-                    personalizedArtists.add((
-                      name: name,
-                      subs: a.subs.isNotEmpty
-                          ? a.subs
-                          : 'Top Artist • ${country.name}',
-                      image: a.image.isNotEmpty
-                          ? a.image
-                          : resolveArtistImg(name),
-                    ));
+              // 3. From user's qualified languages
+              if (userLangs.isNotEmpty) {
+                final curated =
+                    UserPreferencesService.curatedArtistsForLanguages(
+                      userLangs,
+                    );
+                for (final raw in curated.take(5)) {
+                  final split = MediaNormalizer.splitArtistNames(raw);
+                  for (final name in split) {
+                    final lower = name.trim().toLowerCase();
+                    if (lower.isNotEmpty && seenArtists.add(lower)) {
+                      personalizedArtists.add((
+                        name: name,
+                        subs: 'Top Artist • ${userLangs.first}',
+                        image: resolveArtistImg(name),
+                      ));
+                    }
+                  }
+                }
+              }
+
+              // 4. Regional chart artists (only as controlled discovery fill-in)
+              if (personalizedArtists.length < 8) {
+                for (final a in chartData.artists) {
+                  final split = MediaNormalizer.splitArtistNames(a.name);
+                  for (final name in split) {
+                    final lower = name.trim().toLowerCase();
+                    if (lower.isNotEmpty && seenArtists.add(lower)) {
+                      personalizedArtists.add((
+                        name: name,
+                        subs: a.subs.isNotEmpty
+                            ? a.subs
+                            : 'Top Artist • ${country.name}',
+                        image: a.image.isNotEmpty
+                            ? a.image
+                            : resolveArtistImg(name),
+                      ));
+                    }
+                    if (personalizedArtists.length >= 10) break;
                   }
                   if (personalizedArtists.length >= 10) break;
                 }
-                if (personalizedArtists.length >= 10) break;
               }
-            }
 
-            // Pre-resolve missing authentic artist avatars in background and update UI as they arrive
-            for (final a in personalizedArtists) {
-              if (a.image.isEmpty) {
-                ArtistService.resolveArtistAvatar(a.name).then((url) {
-                  if (mounted && url.isNotEmpty) {
-                    setState(() {
-                      final idx = _chartArtists.indexWhere(
-                        (x) => x.name.toLowerCase() == a.name.toLowerCase(),
-                      );
-                      if (idx != -1) {
-                        final old = _chartArtists[idx];
-                        _chartArtists[idx] = (
-                          name: old.name,
-                          subs: old.subs,
-                          image: url,
+              // Pre-resolve missing authentic artist avatars in background and update UI as they arrive
+              for (final a in personalizedArtists) {
+                if (a.image.isEmpty) {
+                  ArtistService.resolveArtistAvatar(a.name).then((url) {
+                    if (mounted && url.isNotEmpty) {
+                      setState(() {
+                        final idx = _chartArtists.indexWhere(
+                          (x) => x.name.toLowerCase() == a.name.toLowerCase(),
                         );
-                      }
-                    });
+                        if (idx != -1) {
+                          final old = _chartArtists[idx];
+                          _chartArtists[idx] = (
+                            name: old.name,
+                            subs: old.subs,
+                            image: url,
+                          );
+                        }
+                      });
+                    }
+                  });
+                }
+              }
+
+              // Ensure artists with resolved images appear first
+              personalizedArtists.sort((a, b) {
+                if (a.image.isNotEmpty && b.image.isEmpty) return -1;
+                if (a.image.isEmpty && b.image.isNotEmpty) return 1;
+                return 0;
+              });
+
+              setState(() {
+                if (combinedChartTracks.isNotEmpty) {
+                  _chartTracks = combinedChartTracks
+                      .where(_isAudioTrack)
+                      .take(16)
+                      .toList();
+                }
+                if (personalizedArtists.isNotEmpty) {
+                  _chartArtists = personalizedArtists;
+                }
+                _loading = false;
+              });
+            })
+            .catchError((_) {}),
+      );
+
+      // 8b. Dedicated Verified Albums & Singles (Real AlbumItems, never raw songs)
+      pendingTasks.add(
+        InnerTubeService.instance
+            .getHomeAlbumsAndSingles(
+              countryCode: country.code,
+              primaryLanguage: primaryLang,
+              favoriteArtists: userArtists,
+              forceRefresh: refresh,
+            )
+            .then((releases) {
+              if (!mounted) return;
+              if (releases.albums.isNotEmpty || releases.singles.isNotEmpty) {
+                setState(() {
+                  if (releases.albums.isNotEmpty) {
+                    _homeAlbums = releases.albums;
+                  }
+                  if (releases.singles.isNotEmpty) {
+                    _homeSingles = releases.singles;
                   }
                 });
               }
-            }
-
-            // Ensure artists with resolved images appear first
-            personalizedArtists.sort((a, b) {
-              if (a.image.isNotEmpty && b.image.isEmpty) return -1;
-              if (a.image.isEmpty && b.image.isNotEmpty) return 1;
-              return 0;
-            });
-
-            setState(() {
-              if (combinedChartTracks.isNotEmpty) {
-                _chartTracks = combinedChartTracks
-                    .where(_isAudioTrack)
-                    .take(16)
-                    .toList();
-              }
-              if (personalizedArtists.isNotEmpty) {
-                _chartArtists = personalizedArtists;
-              }
-              _loading = false;
-            });
-          })
-          .catchError((_) {});
+            })
+            .catchError((_) {}),
+      );
 
       // 9. Dedicated Music Videos Shelf
       final vidQuery = primaryLang.isNotEmpty
           ? '$primaryLang music video songs'
           : '${country.name} top music video songs';
-      InnerTubeService.instance
-          .searchVideos(vidQuery)
-          .then((videos) {
-            if (mounted && videos.isNotEmpty) {
-              setState(() {
-                _homeVideos = videos
+      pendingTasks.add(
+        InnerTubeService.instance
+            .searchVideos(vidQuery, forceRefresh: refresh)
+            .then((videos) {
+              if (mounted && videos.isNotEmpty) {
+                final initialVids = videos
                     .map((v) => v.copyWith(isVideo: true))
                     .take(12)
                     .toList();
-              });
-            }
-          })
-          .catchError((_) {});
+                setState(() {
+                  _homeVideos = initialVids;
+                });
+                _enrichVideoShelf(initialVids, isHome: true);
+              }
+            })
+            .catchError((_) {}),
+      );
 
-      // Fallback guard: ensure loading spinner is dismissed after 3s
-      Future.delayed(const Duration(milliseconds: 3000), () {
-        if (mounted && _loading) setState(() => _loading = false);
-      });
+      // Fallback guard: ensure loading spinner is dismissed after 3s on initial load
+      if (!refresh) {
+        Future.delayed(const Duration(milliseconds: 3000), () {
+          if (mounted && _loading) setState(() => _loading = false);
+        });
+      } else {
+        // When user pulls to refresh, actually await fresh shelf fetches (capped at 6s)
+        // so the refresh indicator spins until real fresh data renders.
+        await Future.wait(
+          pendingTasks,
+        ).timeout(const Duration(seconds: 6), onTimeout: () => const []);
+        if (mounted) {
+          setState(() => _loading = false);
+        }
+      }
     } catch (e) {
       if (kDebugMode) debugPrint('[HomeScreen] load error: $e');
       if (mounted) setState(() => _loading = false);
@@ -3669,9 +3973,16 @@ class _HomeScreenState extends State<HomeScreen> {
   List<_ListEntry> _trackEntries(List<Track> list) => [
     for (var i = 0; i < list.length; i++)
       _ListEntry(
-        title: MediaNormalizer.cleanCompactTitle(list[i].title),
+        title: list[i].isVideo
+            ? MediaNormalizer.cleanVideoTitle(
+                list[i].title,
+                knownArtists: _homeVideoArtistLabel(list[i]),
+              )
+            : MediaNormalizer.cleanCompactTitle(list[i].title),
         subtitle: list[i].isVideo
-            ? 'Music Video • ${MediaNormalizer.formatArtists(list[i].artist)}'
+            ? (_homeVideoArtistLabel(list[i]).isNotEmpty
+                  ? 'Music Video • ${_homeVideoArtistLabel(list[i])}'
+                  : 'Music Video')
             : 'Song • ${MediaNormalizer.formatArtists(list[i].artist)}',
         cover: list[i].coverUrl,
         track: list[i],
@@ -3758,25 +4069,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ? audioNewReleases.take(9).toList()
         : const <Track>[];
 
-    // Albums for you (extracted from real dynamic releases & quickpicks, audio-only)
-    final albumMap = <String, Track>{};
-    for (final t in [
-      ...audioNewReleases,
-      ...audioQuickPicks,
-      ...audioChartTracks,
-      ...audioHistory,
-    ]) {
-      final alb = MediaNormalizer.cleanTitle(t.album);
-      if (alb.isNotEmpty &&
-          alb.toLowerCase() != 'single' &&
-          alb.toLowerCase() != 'music video' &&
-          alb.toLowerCase() != 'video' &&
-          !Track.detectIsVideo(alb, alb) &&
-          !MediaNormalizer.isMetadataNoise(alb)) {
-        albumMap.putIfAbsent(alb, () => t);
-      }
-    }
-    final albums = albumMap.values.take(10).toList();
+    // Genuine albums & singles come from `_homeAlbums` / `_homeSingles` (never extracted from raw tracks).
 
     // Hero items (mixed from real audio data, de-duplicated, strictly NO video songs)
     final heroItems = <_HeroItem>[];
@@ -3898,429 +4191,465 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           : Stack(
               children: [
-                CustomScrollView(
-                  controller: _homeScrollController,
-                  physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics(),
-                  ),
-                  // ignore: deprecated_member_use
-                  cacheExtent: 900,
-                  slivers: [
-                    SliverToBoxAdapter(child: SizedBox(height: top + 56)),
-                    CupertinoSliverRefreshControl(
-                      onRefresh: () async {
-                        await _loadAllHomeData(refresh: true);
-                        if (mounted) setState(() => _refresh++);
-                      },
-                      builder: (ctx, mode, pulled, trigger, extent) {
-                        final p = (pulled / trigger).clamp(0.0, 1.0).toDouble();
-                        final spinning =
-                            mode == RefreshIndicatorMode.refresh ||
-                            mode == RefreshIndicatorMode.done;
-                        return Center(
-                          child: Opacity(
-                            opacity: p,
-                            child: spinning
-                                ? const CupertinoActivityIndicator(
-                                    color: Colors.white70,
-                                    radius: 12,
-                                  )
-                                : CupertinoActivityIndicator.partiallyRevealed(
-                                    color: Colors.white70,
-                                    radius: 12,
-                                    progress: p,
-                                  ),
-                          ),
-                        );
-                      },
+                RefreshIndicator(
+                  edgeOffset: math.max(54.0, top + 4.0) + 50.0,
+                  displacement: 20.0,
+                  color: AppColors.crimson,
+                  backgroundColor: const Color(0xFF1C1C1E),
+                  triggerMode: RefreshIndicatorTriggerMode.anywhere,
+                  onRefresh: () async {
+                    HapticFeedback.lightImpact();
+                    await _loadAllHomeData(refresh: true);
+                    if (mounted) setState(() => _refresh++);
+                  },
+                  child: CustomScrollView(
+                    controller: _homeScrollController,
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
                     ),
+                    // ignore: deprecated_member_use
+                    cacheExtent: 900,
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: SizedBox(
+                          height: math.max(54.0, top + 4.0) + 52.0,
+                        ),
+                      ),
 
-                    // In-App Update Banner
-                    SliverToBoxAdapter(
-                      child: ValueListenableBuilder<UpdateInfo?>(
-                        valueListenable:
-                            UpdateService.instance.availableUpdateNotifier,
-                        builder: (context, update, _) {
-                          if (update == null || !update.hasUpdate) {
-                            return const SizedBox.shrink();
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface2,
-                                borderRadius: BorderRadius.circular(_kCardR),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 34,
-                                    height: 34,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.crimson.withValues(
-                                        alpha: 0.18,
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.system_update_rounded,
-                                      color: AppColors.crimson,
-                                      size: 18,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Zenify v${update.latestVersion} Available',
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
-                                            color: Colors.white,
-                                          ),
+                      // In-App Update Banner
+                      SliverToBoxAdapter(
+                        child: ValueListenableBuilder<UpdateInfo?>(
+                          valueListenable:
+                              UpdateService.instance.availableUpdateNotifier,
+                          builder: (context, update, _) {
+                            if (update == null || !update.hasUpdate) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface2,
+                                  borderRadius: BorderRadius.circular(_kCardR),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 34,
+                                      height: 34,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.crimson.withValues(
+                                          alpha: 0.18,
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Tap to view release notes & update',
-                                          style: TextStyle(
-                                            fontSize: 11.5,
-                                            color: Colors.white.withValues(
-                                              alpha: 0.6,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(
+                                        Icons.system_update_rounded,
+                                        color: AppColors.crimson,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Zenify v${update.latestVersion} Available',
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white,
                                             ),
                                           ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Tap to view release notes & update',
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              color: Colors.white.withValues(
+                                                alpha: 0.6,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    SpringPress(
+                                      scale: 0.92,
+                                      onTap: () {
+                                        HapticFeedback.lightImpact();
+                                        UpdateService.instance.showUpdateSheet(
+                                          context,
+                                          update,
+                                        );
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                  SpringPress(
-                                    scale: 0.92,
-                                    onTap: () {
-                                      HapticFeedback.lightImpact();
-                                      UpdateService.instance.showUpdateSheet(
-                                        context,
-                                        update,
-                                      );
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.crimson,
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Text(
-                                        'UPDATE',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w900,
-                                          color: Colors.white,
-                                          letterSpacing: 0.8,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.crimson,
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'UPDATE',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.white,
+                                            letterSpacing: 0.8,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
-                    ),
 
-                    // HERO (Apple Music top-picks carousel) + mood pills
-                    SliverToBoxAdapter(
-                      child: Column(
-                        children: [
-                          if (heroItems.isNotEmpty)
-                            _Hero(
-                              key: ValueKey(
-                                'hero-$_refresh-${heroItems.length}',
-                              ),
-                              items: heroItems,
-                              player: player,
-                              onTapItem: (i) {
-                                final t = heroTracks[i];
-                                final isVid =
-                                    t.isVideo ||
-                                    Track.detectIsVideo(t.title, t.album) ||
-                                    t.album.toLowerCase() == 'music video';
-                                final albumName = isVid
-                                    ? MediaNormalizer.cleanTitle(t.title)
-                                    : (t.album.isNotEmpty &&
-                                              t.album.toLowerCase() != 'single'
-                                          ? MediaNormalizer.cleanTitle(t.album)
-                                          : MediaNormalizer.cleanTitle(
-                                              t.title,
-                                            ));
-                                _open(
-                                  AlbumScreen(
-                                    albumTitle: albumName,
-                                    artistName: MediaNormalizer.formatArtists(
-                                      t.artist,
-                                    ),
-                                    coverUrl: t.coverUrl,
-                                    initialTracks: [
-                                      t.copyWith(
-                                        isVideo: isVid ? true : t.isVideo,
-                                      ),
-                                    ],
-                                    isVideo: isVid,
-                                  ),
-                                );
-                              },
-                            ),
-                          _Chips(selected: _mood, onSelect: _onSelectMood),
-                        ],
-                      ),
-                    ),
-
-                    // 1. Mood Spotlight Shelf (Active when a mood chip is tapped)
-                    if (_mood != -1)
-                      _sec(
-                        'mood-spotlight',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      // HERO (Apple Music top-picks carousel) + mood pills
+                      SliverToBoxAdapter(
+                        child: Column(
                           children: [
-                            _SecHeader(
-                              title: '${_moods[_mood]} Spotlight',
-                              overline: 'Curated for this moment',
-                              onMore: () => _openSection(
+                            if (heroItems.isNotEmpty)
+                              _Hero(
+                                key: ValueKey(
+                                  'hero-$_refresh-${heroItems.length}',
+                                ),
+                                items: heroItems,
+                                player: player,
+                                onTapItem: (i) {
+                                  final t = heroTracks[i];
+                                  final isSingleOnly =
+                                      !AlbumResolver.isValidAlbumTitle(t.album) ||
+                                      AlbumResolver.isSingleReleaseTitle(
+                                        t.album,
+                                      );
+                                  MediaRouter.openForTrack(
+                                    context,
+                                    t,
+                                    forceSingle: isSingleOnly,
+                                    useShellTab: true,
+                                  );
+                                },
+                              ),
+                            _Chips(selected: _mood, onSelect: _onSelectMood),
+                          ],
+                        ),
+                      ),
+
+                      // 1. Mood Spotlight Shelf (Active when a mood chip is tapped)
+                      if (_mood != -1)
+                        _sec(
+                          'mood-spotlight',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
                                 title: '${_moods[_mood]} Spotlight',
                                 overline: 'Curated for this moment',
-                                entries: _trackEntries(_moodTracks),
-                              ),
-                            ),
-                            if (_loadingMood)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 36),
-                                child: Center(
-                                  child: CupertinoActivityIndicator(
-                                    color: Colors.white70,
-                                    radius: 12,
-                                  ),
-                                ),
-                              )
-                            else if (_moodTracks.isNotEmpty)
-                              _PagedRows(
-                                tracks: _moodTracks.take(16).toList(),
-                                rows: 4,
-                                player: player,
-                                onPlay: (i) => play(_moodTracks, i),
-                              ),
-                          ],
-                        ),
-                      ),
-
-                    // 2. Time-of-day
-                    if (_timeOfDayTracks.isNotEmpty)
-                      _sec(
-                        'time-of-day',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SecHeader(
-                              title: _timeOfDayMoodLabel,
-                              overline: _timeOfDayGreeting,
-                              onMore: () => Navigator.push(
-                                context,
-                                ZenPageRoute(
-                                  builder: (_) => CategoryScreen(
-                                    title: _timeOfDayMoodLabel,
-                                    initialTracks: _timeOfDayTracks,
-                                  ),
+                                onMore: () => _openSection(
+                                  title: '${_moods[_mood]} Spotlight',
+                                  overline: 'Curated for this moment',
+                                  entries: _trackEntries(_moodTracks),
                                 ),
                               ),
-                            ),
-                            _Shelf(
-                              height: cw + 60,
-                              itemExtent: ext,
-                              count: _timeOfDayTracks.length,
-                              builder: (c, i) {
-                                final t = _timeOfDayTracks[i];
-                                final cur = player.currentTrack?.id == t.id;
-                                return _CoverCard(
-                                  url: t.coverUrl,
-                                  title: t.title,
-                                  subtitle: t.artist,
-                                  artists: t.resolvedArtists,
-                                  current: cur,
-                                  playing: cur && player.isPlaying,
-                                  onTap: () => play(_timeOfDayTracks, i),
-                                );
-                              },
-                            ),
-                          ],
+                              if (_loadingMood)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 36),
+                                  child: Center(
+                                    child: CupertinoActivityIndicator(
+                                      color: Colors.white70,
+                                      radius: 12,
+                                    ),
+                                  ),
+                                )
+                              else if (_moodTracks.isNotEmpty)
+                                _PagedRows(
+                                  tracks: _moodTracks.take(16).toList(),
+                                  rows: 4,
+                                  player: player,
+                                  onPlay: (i) => play(_moodTracks, i),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
 
-                    // 3. Listen again (audio only)
-                    if (listenAgain.isNotEmpty)
-                      _sec(
-                        'again',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SecHeader(
-                              title: 'Listen again',
-                              onMore: () => _openSection(
+                      // 2. Time-of-day
+                      if (_timeOfDayTracks.isNotEmpty)
+                        _sec(
+                          'time-of-day',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
+                                title: _timeOfDayMoodLabel,
+                                overline: _timeOfDayGreeting,
+                                onMore: () => Navigator.push(
+                                  context,
+                                  ZenPageRoute(
+                                    builder: (_) => CategoryScreen(
+                                      title: _timeOfDayMoodLabel,
+                                      initialTracks: _timeOfDayTracks,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              _Shelf(
+                                height: cw + 60,
+                                itemExtent: ext,
+                                count: _timeOfDayTracks.length,
+                                builder: (c, i) {
+                                  final t = _timeOfDayTracks[i];
+                                  final cur = player.currentTrack?.id == t.id;
+                                  return _CoverCard(
+                                    url: t.coverUrl,
+                                    title: t.title,
+                                    subtitle: t.artist,
+                                    artists: t.resolvedArtists,
+                                    current: cur,
+                                    playing: cur && player.isPlaying,
+                                    onTap: () => play(_timeOfDayTracks, i),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      // 3. Listen again (audio only)
+                      if (listenAgain.isNotEmpty)
+                        _sec(
+                          'again',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
                                 title: 'Listen again',
-                                entries: _trackEntries(listenAgain),
+                                onMore: () => _openSection(
+                                  title: 'Listen again',
+                                  entries: _trackEntries(listenAgain),
+                                ),
                               ),
-                            ),
-                            _Shelf(
-                              height: cw + 60,
-                              itemExtent: ext,
-                              count: listenAgain.length,
-                              builder: (c, i) {
-                                final t = listenAgain[i];
-                                final cur = player.currentTrack?.id == t.id;
-                                return _CoverCard(
-                                  url: t.coverUrl,
-                                  title: t.title,
-                                  subtitle: t.artist,
-                                  artists: t.resolvedArtists,
-                                  current: cur,
-                                  playing: cur && player.isPlaying,
-                                  onTap: () => play(listenAgain, i),
-                                );
-                              },
-                            ),
-                          ],
+                              _Shelf(
+                                height: cw + 60,
+                                itemExtent: ext,
+                                count: listenAgain.length,
+                                builder: (c, i) {
+                                  final t = listenAgain[i];
+                                  final cur = player.currentTrack?.id == t.id;
+                                  return _CoverCard(
+                                    url: t.coverUrl,
+                                    title: t.title,
+                                    subtitle: t.artist,
+                                    artists: t.resolvedArtists,
+                                    current: cur,
+                                    playing: cur && player.isPlaying,
+                                    onTap: () => play(listenAgain, i),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
 
-                    // Dedicated "Watch again" (Music videos from listening history)
-                    if (watchAgain.isNotEmpty)
-                      _sec(
-                        'watch-again',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SecHeader(
-                              title: 'Watch again',
-                              overline: 'Recent Music Videos',
-                              onMore: () => _openSection(
+                      // Dedicated "Watch again" (Music videos from listening history)
+                      if (watchAgain.isNotEmpty)
+                        _sec(
+                          'watch-again',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
                                 title: 'Watch again',
                                 overline: 'Recent Music Videos',
-                                entries: _trackEntries(watchAgain),
+                                onMore: () => _openSection(
+                                  title: 'Watch again',
+                                  overline: 'Recent Music Videos',
+                                  entries: _trackEntries(watchAgain),
+                                ),
                               ),
-                            ),
-                            _Shelf(
-                              height: videoH,
-                              itemExtent: videoExt,
-                              count: watchAgain.length,
-                              builder: (c, i) {
-                                final t = watchAgain[i];
-                                final cur = player.currentTrack?.id == t.id;
-                                return _HomeVideoCard(
-                                  track: t,
-                                  current: cur,
-                                  playing: cur && player.isPlaying,
-                                  onTap: () => play(watchAgain, i),
-                                );
-                              },
-                            ),
-                          ],
+                              _Shelf(
+                                height: videoH,
+                                itemExtent: videoExt,
+                                count: watchAgain.length,
+                                builder: (c, i) {
+                                  final t = watchAgain[i];
+                                  final cur = player.currentTrack?.id == t.id;
+                                  return _HomeVideoCard(
+                                    track: t,
+                                    current: cur,
+                                    playing: cur && player.isPlaying,
+                                    onTap: () => play(watchAgain, i),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
 
-                    // 4. Quick picks
-                    if (quick.isNotEmpty)
-                      _sec(
-                        'quick',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SecHeader(
-                              title: 'Quick picks',
-                              onMore: () => _openSection(
+                      // 4. Quick picks
+                      if (quick.isNotEmpty)
+                        _sec(
+                          'quick',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
                                 title: 'Quick picks',
-                                entries: _trackEntries(quick),
+                                onMore: () => _openSection(
+                                  title: 'Quick picks',
+                                  entries: _trackEntries(quick),
+                                ),
                               ),
-                            ),
-                            _Shelf(
-                              height: cw + 60,
-                              itemExtent: ext,
-                              count: quick.length,
-                              builder: (c, i) {
-                                final t = quick[i];
-                                final cur = player.currentTrack?.id == t.id;
-                                return _CoverCard(
-                                  url: t.coverUrl,
-                                  title: t.title,
-                                  subtitle: t.artist,
-                                  artists: t.resolvedArtists,
-                                  current: cur,
-                                  playing: cur && player.isPlaying,
-                                  onTap: () => play(quick, i),
-                                );
-                              },
-                            ),
-                          ],
+                              _Shelf(
+                                height: cw + 60,
+                                itemExtent: ext,
+                                count: quick.length,
+                                builder: (c, i) {
+                                  final t = quick[i];
+                                  final cur = player.currentTrack?.id == t.id;
+                                  return _CoverCard(
+                                    url: t.coverUrl,
+                                    title: t.title,
+                                    subtitle: t.artist,
+                                    artists: t.resolvedArtists,
+                                    current: cur,
+                                    playing: cur && player.isPlaying,
+                                    onTap: () => play(quick, i),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
 
-                    // 5. Artists
-                    if (_chartArtists.isNotEmpty)
-                      _sec(
-                        'artists',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SecHeader(
-                              title: 'Top Artists for You',
-                              onMore: () => _openSection(
+                      // 5. Artists
+                      if (_chartArtists.isNotEmpty)
+                        _sec(
+                          'artists',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
                                 title: 'Top Artists for You',
-                                entries: [
-                                  for (final a in _chartArtists.take(10))
-                                    _ListEntry(
-                                      title: a.name,
-                                      subtitle: 'Artist',
-                                      cover: a.image.isNotEmpty
-                                          ? a.image
-                                          : (ArtistService.getCachedAvatar(
-                                                  a.name,
-                                                ) ??
-                                                ''),
-                                      circular: true,
-                                      closeOnTap: true,
-                                      onTap: () => _open(
-                                        ArtistScreen(
-                                          artistName: a.name,
-                                          imageUrl: a.image.isNotEmpty
-                                              ? a.image
-                                              : ArtistService.getCachedAvatar(
-                                                  a.name,
-                                                ),
+                                onMore: () => _openSection(
+                                  title: 'Top Artists for You',
+                                  entries: [
+                                    for (final a in _chartArtists.take(10))
+                                      _ListEntry(
+                                        title: a.name,
+                                        subtitle: 'Artist',
+                                        cover: a.image.isNotEmpty
+                                            ? a.image
+                                            : (ArtistService.getCachedAvatar(
+                                                    a.name,
+                                                  ) ??
+                                                  ''),
+                                        circular: true,
+                                        closeOnTap: true,
+                                        onTap: () => _open(
+                                          ArtistScreen(
+                                            artistName: a.name,
+                                            imageUrl: a.image.isNotEmpty
+                                                ? a.image
+                                                : ArtistService.getCachedAvatar(
+                                                    a.name,
+                                                  ),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            _Shelf(
-                              height: artistSize + 56,
-                              itemExtent: artistExt,
-                              count: artistCount,
-                              builder: (c, i) {
-                                final a = _chartArtists[i];
-                                return _ArtistCircle(
-                                  name: a.name,
-                                  image: a.image,
-                                  onTap: () => _open(
-                                    ArtistScreen(
-                                      artistName: a.name,
-                                      imageUrl: a.image,
+                              _Shelf(
+                                height: artistSize + 56,
+                                itemExtent: artistExt,
+                                count: artistCount,
+                                builder: (c, i) {
+                                  final a = _chartArtists[i];
+                                  return _ArtistCircle(
+                                    name: a.name,
+                                    image: a.image,
+                                    onTap: () => _open(
+                                      ArtistScreen(
+                                        artistName: a.name,
+                                        imageUrl: a.image,
+                                      ),
                                     ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      // Dedicated Music Videos Shelf
+                      if (_homeVideos.isNotEmpty)
+                        _sec(
+                          'music-videos',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
+                                title: 'Music Videos',
+                                onMore: () => _openSection(
+                                  title: 'Music Videos',
+                                  overline: 'Official Releases',
+                                  entries: _trackEntries(_homeVideos),
+                                ),
+                              ),
+                              _Shelf(
+                                height: videoH,
+                                itemExtent: videoExt,
+                                count: _homeVideos.length,
+                                builder: (c, i) {
+                                  final t = _homeVideos[i];
+                                  final cur = player.currentTrack?.id == t.id;
+                                  return _HomeVideoCard(
+                                    track: t,
+                                    current: cur,
+                                    playing: cur && player.isPlaying,
+                                    onTap: () => play(_homeVideos, i),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      // 6. Made for you: mix tiles
+                      _sec(
+                        'mixes',
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const _SecHeader(title: 'Made for You'),
+                            _Shelf(
+                              height: mixSize + 20,
+                              itemExtent: mixExt,
+                              count: mixes.length,
+                              builder: (c, i) {
+                                final m = mixes[i];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 20),
+                                  child: _MixTile(
+                                    spec: m,
+                                    active: _activeMix == m.id,
+                                    playing: player.isPlaying,
+                                    onTap: () => _playMix(m.id),
                                   ),
                                 );
                               },
@@ -4329,405 +4658,383 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // Dedicated Music Videos Shelf
-                    if (_homeVideos.isNotEmpty)
-                      _sec(
-                        'music-videos',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SecHeader(
-                              title: 'Music Videos',
-                              onMore: () => _openSection(
-                                title: 'Music Videos',
-                                overline: 'Official Releases',
-                                entries: [
-                                  for (var i = 0; i < _homeVideos.length; i++)
-                                    _ListEntry(
-                                      title: MediaNormalizer.cleanCompactTitle(
-                                        _homeVideos[i].title,
-                                      ),
-                                      subtitle:
-                                          'Music Video • ${MediaNormalizer.formatArtists(_homeVideos[i].artist)}',
-                                      cover: _homeVideos[i].coverUrl,
-                                      track: _homeVideos[i],
-                                      onTap: () => play(_homeVideos, i),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            _Shelf(
-                              height: videoH,
-                              itemExtent: videoExt,
-                              count: _homeVideos.length,
-                              builder: (c, i) {
-                                final t = _homeVideos[i];
-                                final cur = player.currentTrack?.id == t.id;
-                                return _HomeVideoCard(
-                                  track: t,
-                                  current: cur,
-                                  playing: cur && player.isPlaying,
-                                  onTap: () => play(_homeVideos, i),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    // 6. Made for you: mix tiles
-                    _sec(
-                      'mixes',
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const _SecHeader(title: 'Made for You'),
-                          _Shelf(
-                            height: mixSize + 20,
-                            itemExtent: mixExt,
-                            count: mixes.length,
-                            builder: (c, i) {
-                              final m = mixes[i];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 20),
-                                child: _MixTile(
-                                  spec: m,
-                                  active: _activeMix == m.id,
-                                  playing: player.isPlaying,
-                                  onTap: () => _playMix(m.id),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // 7. Your top artist
-                    if (_favoriteArtist != null &&
-                        _favoriteArtistTracks.isNotEmpty)
-                      _sec(
-                        'similar',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SecHeader(
-                              title: _favoriteArtist!,
-                              onMore: () => _openSection(
+                      // 7. Your top artist
+                      if (_favoriteArtist != null &&
+                          _favoriteArtistTracks.isNotEmpty)
+                        _sec(
+                          'similar',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
                                 title: _favoriteArtist!,
-                                entries: _trackEntries(_favoriteArtistTracks),
-                              ),
-                            ),
-                            _Shelf(
-                              height: cw + 60,
-                              itemExtent: ext,
-                              count: _favoriteArtistTracks.length,
-                              builder: (c, i) {
-                                final t = _favoriteArtistTracks[i];
-                                final cur = player.currentTrack?.id == t.id;
-                                return _CoverCard(
-                                  url: t.coverUrl,
-                                  title: t.title,
-                                  subtitle: t.artist,
-                                  artists: t.resolvedArtists,
-                                  current: cur,
-                                  playing: cur && player.isPlaying,
-                                  onTap: () => play(_favoriteArtistTracks, i),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    // 8. Second favorite artist
-                    if (_secondFavoriteArtist != null &&
-                        _secondFavoriteArtistTracks.isNotEmpty)
-                      _sec(
-                        'similar-second',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SecHeader(
-                              title: _secondFavoriteArtist!,
-                              onMore: () => _openSection(
-                                title: _secondFavoriteArtist!,
-                                entries: _trackEntries(
-                                  _secondFavoriteArtistTracks,
+                                onMore: () => _openSection(
+                                  title: _favoriteArtist!,
+                                  entries: _trackEntries(_favoriteArtistTracks),
                                 ),
                               ),
-                            ),
-                            _Shelf(
-                              height: cw + 60,
-                              itemExtent: ext,
-                              count: _secondFavoriteArtistTracks.length,
-                              builder: (c, i) {
-                                final t = _secondFavoriteArtistTracks[i];
-                                final cur = player.currentTrack?.id == t.id;
-                                return _CoverCard(
-                                  url: t.coverUrl,
-                                  title: t.title,
-                                  subtitle: t.artist,
-                                  artists: t.resolvedArtists,
-                                  current: cur,
-                                  playing: cur && player.isPlaying,
-                                  onTap: () =>
-                                      play(_secondFavoriteArtistTracks, i),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    // 9. Rediscover favorites (strictly audio songs in square cards)
-                    if (audioRediscover.isNotEmpty)
-                      _sec(
-                        'rediscover',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SecHeader(
-                              title: 'Rediscover your favorites',
-                              onMore: () => _openSection(
-                                title: 'Rediscover your favorites',
-                                entries: _trackEntries(audioRediscover),
+                              _Shelf(
+                                height: cw + 60,
+                                itemExtent: ext,
+                                count: _favoriteArtistTracks.length,
+                                builder: (c, i) {
+                                  final t = _favoriteArtistTracks[i];
+                                  final cur = player.currentTrack?.id == t.id;
+                                  return _CoverCard(
+                                    url: t.coverUrl,
+                                    title: t.title,
+                                    subtitle: t.artist,
+                                    artists: t.resolvedArtists,
+                                    current: cur,
+                                    playing: cur && player.isPlaying,
+                                    onTap: () => play(_favoriteArtistTracks, i),
+                                  );
+                                },
                               ),
-                            ),
-                            _Shelf(
-                              height: cw + 60,
-                              itemExtent: ext,
-                              count: audioRediscover.length,
-                              builder: (c, i) {
-                                final t = audioRediscover[i];
-                                final cur = player.currentTrack?.id == t.id;
-                                return _CoverCard(
-                                  url: t.coverUrl,
-                                  title: t.title,
-                                  subtitle: t.artist,
-                                  artists: t.resolvedArtists,
-                                  current: cur,
-                                  playing: cur && player.isPlaying,
-                                  onTap: () => play(audioRediscover, i),
-                                );
-                              },
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
 
-                    // Dedicated "Rediscover music videos" (video classics from history in 16:9 cards)
-                    if (videoRediscover.isNotEmpty)
-                      _sec(
-                        'rediscover-videos',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SecHeader(
-                              title: 'Rediscover music videos',
-                              overline: 'Visual Classics',
-                              onMore: () => _openSection(
+                      // 8. Second favorite artist
+                      if (_secondFavoriteArtist != null &&
+                          _secondFavoriteArtistTracks.isNotEmpty)
+                        _sec(
+                          'similar-second',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
+                                title: _secondFavoriteArtist!,
+                                onMore: () => _openSection(
+                                  title: _secondFavoriteArtist!,
+                                  entries: _trackEntries(
+                                    _secondFavoriteArtistTracks,
+                                  ),
+                                ),
+                              ),
+                              _Shelf(
+                                height: cw + 60,
+                                itemExtent: ext,
+                                count: _secondFavoriteArtistTracks.length,
+                                builder: (c, i) {
+                                  final t = _secondFavoriteArtistTracks[i];
+                                  final cur = player.currentTrack?.id == t.id;
+                                  return _CoverCard(
+                                    url: t.coverUrl,
+                                    title: t.title,
+                                    subtitle: t.artist,
+                                    artists: t.resolvedArtists,
+                                    current: cur,
+                                    playing: cur && player.isPlaying,
+                                    onTap: () =>
+                                        play(_secondFavoriteArtistTracks, i),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      // 9. Rediscover favorites (strictly audio songs in square cards)
+                      if (audioRediscover.isNotEmpty)
+                        _sec(
+                          'rediscover',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
+                                title: 'Rediscover your favorites',
+                                onMore: () => _openSection(
+                                  title: 'Rediscover your favorites',
+                                  entries: _trackEntries(audioRediscover),
+                                ),
+                              ),
+                              _Shelf(
+                                height: cw + 60,
+                                itemExtent: ext,
+                                count: audioRediscover.length,
+                                builder: (c, i) {
+                                  final t = audioRediscover[i];
+                                  final cur = player.currentTrack?.id == t.id;
+                                  return _CoverCard(
+                                    url: t.coverUrl,
+                                    title: t.title,
+                                    subtitle: t.artist,
+                                    artists: t.resolvedArtists,
+                                    current: cur,
+                                    playing: cur && player.isPlaying,
+                                    onTap: () => play(audioRediscover, i),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      // Dedicated "Rediscover music videos" (video classics from history in 16:9 cards)
+                      if (videoRediscover.isNotEmpty)
+                        _sec(
+                          'rediscover-videos',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
                                 title: 'Rediscover music videos',
                                 overline: 'Visual Classics',
-                                entries: _trackEntries(videoRediscover),
+                                onMore: () => _openSection(
+                                  title: 'Rediscover music videos',
+                                  overline: 'Visual Classics',
+                                  entries: _trackEntries(videoRediscover),
+                                ),
                               ),
-                            ),
-                            _Shelf(
-                              height: videoH,
-                              itemExtent: videoExt,
-                              count: videoRediscover.length,
-                              builder: (c, i) {
-                                final t = videoRediscover[i];
-                                final cur = player.currentTrack?.id == t.id;
-                                return _HomeVideoCard(
-                                  track: t,
-                                  current: cur,
-                                  playing: cur && player.isPlaying,
-                                  onTap: () => play(videoRediscover, i),
-                                );
-                              },
-                            ),
-                          ],
+                              _Shelf(
+                                height: videoH,
+                                itemExtent: videoExt,
+                                count: videoRediscover.length,
+                                builder: (c, i) {
+                                  final t = videoRediscover[i];
+                                  final cur = player.currentTrack?.id == t.id;
+                                  return _HomeVideoCard(
+                                    track: t,
+                                    current: cur,
+                                    playing: cur && player.isPlaying,
+                                    onTap: () => play(videoRediscover, i),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
 
-                    // 10. New releases
-                    if (fresh.isNotEmpty)
-                      _sec(
-                        'new',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SecHeader(
-                              title: 'New releases',
-                              onMore: () => _openSection(
+                      // 10. New releases
+                      if (fresh.isNotEmpty)
+                        _sec(
+                          'new',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
                                 title: 'New releases',
-                                entries: _trackEntries(fresh),
+                                onMore: () => _openSection(
+                                  title: 'New releases',
+                                  entries: _trackEntries(fresh),
+                                ),
                               ),
-                            ),
-                            _Shelf(
-                              height: cw + 60,
-                              itemExtent: ext,
-                              count: fresh.length,
-                              builder: (c, i) {
-                                final t = fresh[i];
-                                final cur = player.currentTrack?.id == t.id;
-                                return _CoverCard(
-                                  url: t.coverUrl,
-                                  title: t.title,
-                                  subtitle: t.artist,
-                                  artists: t.resolvedArtists,
-                                  current: cur,
-                                  playing: cur && player.isPlaying,
-                                  onTap: () => play(fresh, i),
-                                );
-                              },
-                            ),
-                          ],
+                              _Shelf(
+                                height: cw + 60,
+                                itemExtent: ext,
+                                count: fresh.length,
+                                builder: (c, i) {
+                                  final t = fresh[i];
+                                  final cur = player.currentTrack?.id == t.id;
+                                  return _CoverCard(
+                                    url: t.coverUrl,
+                                    title: t.title,
+                                    subtitle: t.artist,
+                                    artists: t.resolvedArtists,
+                                    current: cur,
+                                    playing: cur && player.isPlaying,
+                                    onTap: () => play(fresh, i),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
 
-                    // 11. Top Hits
-                    if (charts.isNotEmpty)
-                      _sec(
-                        'charts',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SecHeader(
-                              title: 'Top Hits in ${country.name}',
-                              onMore: () => _openSection(
+                      // 11. Top Hits
+                      if (charts.isNotEmpty)
+                        _sec(
+                          'charts',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
                                 title: 'Top Hits in ${country.name}',
-                                entries: _trackEntries(charts),
+                                onMore: () => _openSection(
+                                  title: 'Top Hits in ${country.name}',
+                                  entries: _trackEntries(charts),
+                                ),
                               ),
-                            ),
-                            _Shelf(
-                              height: cw + 60,
-                              itemExtent: ext,
-                              count: charts.length,
-                              builder: (c, i) {
-                                final t = charts[i];
-                                final cur = player.currentTrack?.id == t.id;
-                                return _CoverCard(
-                                  url: t.coverUrl,
-                                  title: t.title,
-                                  subtitle: t.artist,
-                                  artists: t.resolvedArtists,
-                                  current: cur,
-                                  playing: cur && player.isPlaying,
-                                  onTap: () => play(charts, i),
-                                );
-                              },
-                            ),
-                          ],
+                              _Shelf(
+                                height: cw + 60,
+                                itemExtent: ext,
+                                count: charts.length,
+                                builder: (c, i) {
+                                  final t = charts[i];
+                                  final cur = player.currentTrack?.id == t.id;
+                                  return _CoverCard(
+                                    url: t.coverUrl,
+                                    title: t.title,
+                                    subtitle: t.artist,
+                                    artists: t.resolvedArtists,
+                                    current: cur,
+                                    playing: cur && player.isPlaying,
+                                    onTap: () => play(charts, i),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
 
-                    // 12. Albums for you
-                    if (albums.isNotEmpty)
-                      _sec(
-                        'albums',
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SecHeader(
-                              title: 'Albums for you',
-                              onMore: () => _openSection(
+                      // 12. Albums for you (genuine AlbumItem releases only — never raw songs)
+                      if (_homeAlbums.isNotEmpty)
+                        _sec(
+                          'albums',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
                                 title: 'Albums for you',
-                                entries: [
-                                  for (final t in albums)
-                                    _ListEntry(
-                                      title: MediaNormalizer.cleanTitle(
-                                        t.album,
-                                      ),
-                                      subtitle:
-                                          'Album • ${MediaNormalizer.formatArtists(t.artist)}',
-                                      cover: t.coverUrl,
-                                      closeOnTap: true,
-                                      onTap: () => _open(
-                                        AlbumScreen(
-                                          albumTitle:
-                                              MediaNormalizer.cleanTitle(
-                                                t.album,
-                                              ),
-                                          artistName:
-                                              MediaNormalizer.formatArtists(
-                                                t.artist,
-                                              ),
-                                          coverUrl: t.coverUrl,
+                                onMore: () => _openSection(
+                                  title: 'Albums for you',
+                                  entries: [
+                                    for (final alb in _homeAlbums)
+                                      _ListEntry(
+                                        title: MediaNormalizer.cleanAlbumTitle(
+                                          alb.title,
+                                        ),
+                                        subtitle:
+                                            'Album${alb.artist.isNotEmpty ? ' • ${MediaNormalizer.formatArtists(alb.artist)}' : ''}',
+                                        cover: alb.coverUrl,
+                                        closeOnTap: true,
+                                        onTap: () => MediaRouter.openSummary(
+                                          context,
+                                          alb,
+                                          useShellTab: true,
                                         ),
                                       ),
-                                    ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            _Shelf(
-                              height: cw + 60,
-                              itemExtent: ext,
-                              count: albums.length,
-                              builder: (c, i) {
-                                final t = albums[i];
-                                return _CoverCard(
-                                  url: t.coverUrl,
-                                  title: t.album,
-                                  subtitle: t.artist,
-                                  artists: t.resolvedArtists,
-                                  onTap: () => _open(
-                                    AlbumScreen(
-                                      albumTitle: MediaNormalizer.cleanTitle(
-                                        t.album,
-                                      ),
-                                      artistName: MediaNormalizer.formatArtists(
-                                        t.artist,
-                                      ),
-                                      coverUrl: t.coverUrl,
+                              _Shelf(
+                                height: cw + 60,
+                                itemExtent: ext,
+                                count: _homeAlbums.length,
+                                builder: (c, i) {
+                                  final alb = _homeAlbums[i];
+                                  return _CoverCard(
+                                    url: alb.coverUrl,
+                                    title: MediaNormalizer.cleanAlbumTitle(
+                                      alb.title,
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
+                                    subtitle: MediaNormalizer.formatArtists(
+                                      alb.artist,
+                                    ),
+                                    artists: ArtistRef.splitFromName(
+                                      alb.artist,
+                                    ),
+                                    onTap: () => MediaRouter.openSummary(
+                                      context,
+                                      alb,
+                                      useShellTab: true,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      // 13. Singles & EPs (opens Singles page, never auto-redirects to album)
+                      if (_homeSingles.isNotEmpty)
+                        _sec(
+                          'singles',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SecHeader(
+                                title: 'Singles',
+                                onMore: () => _openSection(
+                                  title: 'Singles',
+                                  entries: [
+                                    for (final sgl in _homeSingles)
+                                      _ListEntry(
+                                        title: MediaNormalizer.cleanTitle(
+                                          sgl.title,
+                                        ),
+                                        subtitle:
+                                            'Single${sgl.artist.isNotEmpty ? ' • ${MediaNormalizer.formatArtists(sgl.artist)}' : ''}',
+                                        cover: sgl.coverUrl,
+                                        closeOnTap: true,
+                                        onTap: () => MediaRouter.openSummary(
+                                          context,
+                                          sgl,
+                                          useShellTab: true,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              _Shelf(
+                                height: cw + 60,
+                                itemExtent: ext,
+                                count: _homeSingles.length,
+                                builder: (c, i) {
+                                  final sgl = _homeSingles[i];
+                                  return _CoverCard(
+                                    url: sgl.coverUrl,
+                                    title: MediaNormalizer.cleanTitle(
+                                      sgl.title,
+                                    ),
+                                    subtitle: MediaNormalizer.formatArtists(
+                                      sgl.artist,
+                                    ),
+                                    artists: ArtistRef.splitFromName(
+                                      sgl.artist,
+                                    ),
+                                    onTap: () => MediaRouter.openSummary(
+                                      context,
+                                      sgl,
+                                      useShellTab: true,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      // 13. Browse categories: two drifting marquee rows (unchanged)
+                      SliverToBoxAdapter(
+                        child: Reveal(
+                          key: ValueKey('$_seed-genres'),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _SecHeader(
+                                title: 'Moods & genres',
+                                overline: 'Browse all',
+                              ),
+                              _MarqueeRow(
+                                indices: const [0, 2, 4, 6, 8, 10],
+                                artFor: genreArt,
+                                onTap: playGenre,
+                                speed: 26,
+                              ),
+                              const SizedBox(height: 6),
+                              _MarqueeRow(
+                                indices: const [1, 3, 5, 7, 9, 11],
+                                artFor: genreArt,
+                                onTap: playGenre,
+                                reverse: true,
+                                speed: 20,
+                                startOffset: 160,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
 
-                    // 13. Browse categories: two drifting marquee rows (unchanged)
-                    SliverToBoxAdapter(
-                      child: Reveal(
-                        key: ValueKey('$_seed-genres'),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const _SecHeader(
-                              title: 'Moods & genres',
-                              overline: 'Browse all',
-                            ),
-                            _MarqueeRow(
-                              indices: const [0, 2, 4, 6, 8, 10],
-                              artFor: genreArt,
-                              onTap: playGenre,
-                              speed: 26,
-                            ),
-                            const SizedBox(height: 6),
-                            _MarqueeRow(
-                              indices: const [1, 3, 5, 7, 9, 11],
-                              artFor: genreArt,
-                              onTap: playGenre,
-                              reverse: true,
-                              speed: 20,
-                              startOffset: 160,
-                            ),
-                          ],
+                      // Clearance for floating mini player + persistent dock
+                      SliverToBoxAdapter(
+                        child: SizedBox(
+                          height: 180 + MediaQuery.paddingOf(context).bottom,
                         ),
                       ),
-                    ),
-
-                    // Clearance for floating mini player + persistent dock
-                    SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: 180 + MediaQuery.paddingOf(context).bottom,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 Positioned(
                   top: 0,

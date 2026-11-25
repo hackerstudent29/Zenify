@@ -22,10 +22,13 @@ import '../../design_system/widgets/section_header.dart';
 import '../../design_system/widgets/spring_kit.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
+import '../../models/artist_ref.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
+import '../../services/album_resolver.dart';
 import '../../services/auth_state.dart';
 import '../../services/library_store.dart';
+import '../../services/media_router.dart';
 import '../../services/player_state.dart';
 import '../../services/search_nav.dart';
 import '../details/album_screen.dart';
@@ -228,7 +231,11 @@ String _videoMeta(SearchVideoItem v) {
 String _typeLabel(SearchItem it) => switch (it) {
   SearchSongItem _ => 'Song',
   SearchArtistItem _ => 'Artist',
-  SearchAlbumItem _ => 'Album',
+  SearchAlbumItem a =>
+    (a.albumType.toLowerCase() == 'single' ||
+            AlbumResolver.isSingleReleaseTitle(a.title))
+        ? 'Single'
+        : (a.albumType.toLowerCase() == 'ep' ? 'EP' : 'Album'),
   SearchPlaylistItem _ => 'Playlist',
   SearchVideoItem _ => 'Video',
   _ => '',
@@ -640,8 +647,10 @@ class _SearchScreenState extends State<SearchScreen>
       final raw = p.getString(_kMetaKey);
       if (raw == null) return;
       final map = jsonDecode(raw) as Map<String, dynamic>;
-      map.forEach((k, v) =>
-          _recentMeta[k] = _RecentMeta.fromJson(v as Map<String, dynamic>));
+      map.forEach(
+        (k, v) =>
+            _recentMeta[k] = _RecentMeta.fromJson(v as Map<String, dynamic>),
+      );
       if (mounted) setState(() {});
     } catch (_) {}
   }
@@ -662,16 +671,17 @@ class _SearchScreenState extends State<SearchScreen>
         );
         return;
       case 'album':
-        Navigator.push(
+        final cleanAlbArt = _cleanSub(m.rawSub);
+        final isSingMeta =
+            m.rawSub.toLowerCase().contains('single') ||
+            AlbumResolver.isSingleReleaseTitle(m.title);
+        MediaRouter.openRelease(
           context,
-          ZenPageRoute(
-            builder: (_) => AlbumScreen(
-              albumTitle: m.title,
-              artistName: m.rawSub,
-              coverUrl: m.image,
-              browseId: m.browseId,
-            ),
-          ),
+          albumTitle: m.title,
+          artistName: cleanAlbArt.isNotEmpty ? cleanAlbArt : 'Artist',
+          coverUrl: m.image,
+          browseId: m.browseId,
+          isSingle: isSingMeta,
         );
         return;
       case 'playlist':
@@ -702,10 +712,12 @@ class _SearchScreenState extends State<SearchScreen>
         _playSong([track], 0);
         return;
       case 'video':
-        final rawVidId =
-            (m.id != null && m.id!.isNotEmpty) ? m.id! : _norm(m.title);
-        final vidId =
-            rawVidId.startsWith('yt-') ? rawVidId.substring(3) : rawVidId;
+        final rawVidId = (m.id != null && m.id!.isNotEmpty)
+            ? m.id!
+            : _norm(m.title);
+        final vidId = rawVidId.startsWith('yt-')
+            ? rawVidId.substring(3)
+            : rawVidId;
         final track = Track(
           id: 'yt-$vidId',
           title: m.title,
@@ -736,11 +748,13 @@ class _SearchScreenState extends State<SearchScreen>
   int _searchRequestId = 0;
   String _lastTyped = '';
   List<String> _liveSuggestions = [];
+  List<SearchItem> _liveSuggestedEntities = [];
 
   // Search results (keyed by query+filter so stale/duplicate requests are safe)
   String _submittedQuery = '';
   String _wantedKey = '';
   String _resultsKey = '';
+  final Map<String, SearchResult> _tabResultCache = {};
   bool _isLoading = false;
   bool _isLoadingMore = false;
   SearchResult _searchResults = _emptyResult();
@@ -863,13 +877,14 @@ class _SearchScreenState extends State<SearchScreen>
     final suggestId = ++_suggestId;
 
     if (q.isEmpty) {
+      _wantedKey = '';
       setState(() {
         _liveSuggestions = [];
-        if (_submittedQuery.isNotEmpty) {
+        _liveSuggestedEntities = [];
+        if (_submittedQuery.isNotEmpty || !_searchResults.isEmpty) {
           _submittedQuery = '';
           _searchResults = _emptyResult();
           _resultsKey = '';
-          _wantedKey = '';
           _isLoading = false;
           _selectedFilter = SearchFilter.all;
         }
@@ -878,35 +893,37 @@ class _SearchScreenState extends State<SearchScreen>
     }
 
     final searchId = ++_searchRequestId;
+    final queryChangedFromSubmitted =
+        q.toLowerCase() != _submittedQuery.toLowerCase();
 
-    // Instant local / catalog matches so answers populate live while typing (0ms)
-    final localFallback = _dataService.getFallbackResult(q, _selectedFilter);
-    final hasLocalMatches =
-        localFallback.songs.isNotEmpty ||
-        localFallback.albums.isNotEmpty ||
-        localFallback.artists.isNotEmpty;
-
+    // Show live YTM suggestions + entities while typing instead of polluting with Home Feed tracks.
     setState(() {
       _liveSuggestions = _dataService.getInstantLocalSuggestions(q);
-      if (hasLocalMatches) {
-        _searchResults = localFallback;
-        _submittedQuery = q;
+      if (queryChangedFromSubmitted) {
+        _submittedQuery = '';
+        _searchResults = _emptyResult();
+        _resultsKey = '';
+        _wantedKey = '';
+        _liveSuggestedEntities = [];
+        _isLoading = false;
       }
-      _isLoading = true;
     });
 
-    // 1. Live suggestions (40ms)
+    // 1. Live suggestions + recommended entities (40ms)
     _suggestTimer = Timer(const Duration(milliseconds: 40), () async {
       try {
-        final s = await _dataService.getSuggestions(q);
+        final bundle = await _dataService.getSuggestionBundle(q);
         if (mounted && suggestId == _suggestId) {
-          setState(() => _liveSuggestions = s);
+          setState(() {
+            _liveSuggestions = bundle.queries;
+            _liveSuggestedEntities = bundle.recommendedItems;
+          });
         }
       } catch (_) {}
     });
 
-    // 2. High-speed debounced search execution (350ms)
-    _debounceTimer = Timer(const Duration(milliseconds: 350), () {
+    // 2. Debounced full search execution (420ms) after typing pauses
+    _debounceTimer = Timer(const Duration(milliseconds: 420), () {
       if (mounted && _lastTyped == q) {
         _executeSearch(q, searchId, filter: _selectedFilter);
       }
@@ -924,6 +941,20 @@ class _SearchScreenState extends State<SearchScreen>
   }) async {
     final key = _keyOf(query, filter);
     _wantedKey = key;
+
+    final cachedTab = _tabResultCache[key];
+    if (cachedTab != null && !cachedTab.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _searchResults = cachedTab;
+          _resultsKey = key;
+          _submittedQuery = query;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
     if (!_isLoading) {
       setState(() => _isLoading = true);
     }
@@ -940,13 +971,16 @@ class _SearchScreenState extends State<SearchScreen>
           .search(query: query, filter: filter)
           .timeout(
             const Duration(seconds: 12),
-            onTimeout: () => _dataService.getFallbackResult(query, filter),
+            onTimeout: () => _tabResultCache[key] ?? _emptyResult(),
           );
       if (!mounted) return;
-      if (id == _searchRequestId ||
-          _wantedKey == key ||
-          _submittedQuery.toLowerCase() == query.toLowerCase() ||
-          _lastTyped.toLowerCase() == query.toLowerCase()) {
+      if (!results.isEmpty) {
+        if (_tabResultCache.length >= 40) {
+          _tabResultCache.remove(_tabResultCache.keys.first);
+        }
+        _tabResultCache[key] = results;
+      }
+      if (id == _searchRequestId || _wantedKey == key) {
         _rememberTopFor(query, results, filter);
         setState(() {
           _searchResults = results;
@@ -1028,25 +1062,30 @@ class _SearchScreenState extends State<SearchScreen>
         : _textCtrl.text.trim();
     if (_selectedFilter == filter || currentQ.isEmpty) return;
     HapticFeedback.selectionClick();
-    final hasCachedForFilter = switch (filter) {
-      SearchFilter.all => !_searchResults.isEmpty,
-      SearchFilter.songs => _searchResults.songs.length >= 6,
-      SearchFilter.artists => _searchResults.artists.length >= 6,
-      SearchFilter.albums => _searchResults.albums.length >= 6,
-      SearchFilter.featuredPlaylists ||
-      SearchFilter.communityPlaylists => _searchResults.playlists.length >= 6,
-      SearchFilter.videos => _searchResults.videos.length >= 6,
-    };
+    final key = _keyOf(currentQ, filter);
+    final cachedTab = _tabResultCache[key];
+    final hasCachedForFilter = cachedTab != null && !cachedTab.isEmpty;
     final oldIdx = _filterIndex(_selectedFilter);
     final newIdx = _filterIndex(filter);
     final id = ++_searchRequestId;
     setState(() {
       _tabDir = newIdx >= oldIdx ? 1 : -1;
       _selectedFilter = filter;
-      if (!hasCachedForFilter) _isLoading = true;
+      _wantedKey = key;
+      if (hasCachedForFilter) {
+        _searchResults = cachedTab;
+        _resultsKey = key;
+        _isLoading = false;
+      } else {
+        _searchResults = _emptyResult();
+        _resultsKey = '';
+        _isLoading = true;
+      }
     });
     _scrollTop();
-    _executeSearch(currentQ, id, filter: filter);
+    if (!hasCachedForFilter) {
+      _executeSearch(currentQ, id, filter: filter);
+    }
   }
 
   int _filterIndex(SearchFilter f) {
@@ -1072,6 +1111,7 @@ class _SearchScreenState extends State<SearchScreen>
     _textCtrl.clear();
     setState(() {
       _liveSuggestions = [];
+      _liveSuggestedEntities = [];
       _searchResults = _emptyResult();
       _isLoading = false;
       _isLoadingMore = false;
@@ -1216,6 +1256,7 @@ class _SearchScreenState extends State<SearchScreen>
 
   void _handleItemTap(SearchItem item) {
     HapticFeedback.lightImpact();
+    _focusNode.unfocus();
     _rememberItem(item);
     final activeQ = _textCtrl.text.trim().isNotEmpty
         ? _textCtrl.text.trim()
@@ -1244,16 +1285,20 @@ class _SearchScreenState extends State<SearchScreen>
       return;
     }
     if (item is SearchAlbumItem) {
-      Navigator.push(
+      final isSing =
+          item.albumType.toLowerCase() == 'single' ||
+          item.albumType.toLowerCase() == 'ep' ||
+          AlbumResolver.isSingleReleaseTitle(item.title);
+      final cleanArtist = item.artists.isNotEmpty
+          ? ArtistRef.formatList(item.artists)
+          : _cleanSub(item.subtitle);
+      MediaRouter.openRelease(
         context,
-        ZenPageRoute(
-          builder: (_) => AlbumScreen(
-            albumTitle: item.title,
-            artistName: item.subtitle,
-            coverUrl: hiRes,
-            browseId: item.browseId,
-          ),
-        ),
+        albumTitle: item.title,
+        artistName: cleanArtist.isNotEmpty ? cleanArtist : item.subtitle,
+        coverUrl: hiRes,
+        browseId: item.browseId,
+        isSingle: isSing,
       );
       return;
     }
@@ -1370,7 +1415,12 @@ class _SearchScreenState extends State<SearchScreen>
     final category = _activeCategory;
 
     final showSuggestions =
-        typing && _liveSuggestions.isNotEmpty && _searchResults.isEmpty;
+        typing &&
+        !_isLoading &&
+        _searchResults.isEmpty &&
+        (_submittedQuery.isEmpty ||
+            _liveSuggestions.isNotEmpty ||
+            _liveSuggestedEntities.isNotEmpty);
 
     final _SearchViewPhase phase;
     if (_submittedQuery.isNotEmpty && !_searchResults.isEmpty) {
@@ -1748,12 +1798,16 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  Widget _albumsCarousel(List<SearchAlbumItem> albums, {VoidCallback? seeAll}) {
+  Widget _albumsCarousel(
+    List<SearchAlbumItem> albums, {
+    String title = 'Albums',
+    VoidCallback? seeAll,
+  }) {
     final w = MediaQuery.sizeOf(context).width;
     final ext = (w - 20) / 2.18;
     final cw = ext - 14;
     return _carousel(
-      title: 'Albums',
+      title: title,
       height: cw + 78,
       extent: cw,
       count: albums.length,
@@ -2111,12 +2165,17 @@ class _SearchScreenState extends State<SearchScreen>
           builder: (context, recents, _) {
             if (recents.isEmpty) return const SizedBox.shrink();
             final seen = <String>{};
-            final visible = recents.where((q) {
-              final m = _recentMeta[_norm(q)];
-              return seen.add(m == null
-                  ? 'q|${_norm(q)}'
-                  : '${m.kind}|${_norm(m.title)}|${_norm(m.sub)}');
-            }).take(12).toList();
+            final visible = recents
+                .where((q) {
+                  final m = _recentMeta[_norm(q)];
+                  return seen.add(
+                    m == null
+                        ? 'q|${_norm(q)}'
+                        : '${m.kind}|${_norm(m.title)}|${_norm(m.sub)}',
+                  );
+                })
+                .take(12)
+                .toList();
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -2176,7 +2235,8 @@ class _SearchScreenState extends State<SearchScreen>
     final meta = _recentMeta[key];
     final isArtist = meta?.kind == 'artist';
     final isVideo = meta?.kind == 'video' || live is SearchVideoItem;
-    final isPlayable = live is SearchSongItem ||
+    final isPlayable =
+        live is SearchSongItem ||
         live is SearchVideoItem ||
         meta?.kind == 'song' ||
         meta?.kind == 'video';
@@ -2186,20 +2246,20 @@ class _SearchScreenState extends State<SearchScreen>
 
     final Widget leading = (artUrl.isNotEmpty || meta != null || live != null)
         ? (isVideo
-            ? _Artwork(
-                url: artUrl,
-                title: artTitle,
-                size: 44,
-                width: 76,
-                radius: 6,
-              )
-            : _Artwork(
-                url: artUrl,
-                title: artTitle,
-                size: 56,
-                circle: isArtist,
-                radius: 6,
-              ))
+              ? _Artwork(
+                  url: artUrl,
+                  title: artTitle,
+                  size: 44,
+                  width: 76,
+                  radius: 6,
+                )
+              : _Artwork(
+                  url: artUrl,
+                  title: artTitle,
+                  size: 56,
+                  circle: isArtist,
+                  radius: 6,
+                ))
         : Container(
             width: 56,
             height: 56,
@@ -2271,7 +2331,8 @@ class _SearchScreenState extends State<SearchScreen>
                               overflow: TextOverflow.ellipsis,
                             ),
                             if ((meta != null && meta.sub.isNotEmpty) ||
-                                (live != null && _typeSub(live).isNotEmpty)) ...[
+                                (live != null &&
+                                    _typeSub(live).isNotEmpty)) ...[
                               const SizedBox(height: 2),
                               Text(
                                 meta?.sub ??
@@ -2289,7 +2350,8 @@ class _SearchScreenState extends State<SearchScreen>
                           if (live != null) {
                             _showMore(live);
                           } else if (meta != null) {
-                            final rawId = (meta.id != null && meta.id!.isNotEmpty)
+                            final rawId =
+                                (meta.id != null && meta.id!.isNotEmpty)
                                 ? meta.id!
                                 : 'yt-${_norm(meta.title)}';
                             final isVid = meta.kind == 'video';
@@ -2354,10 +2416,30 @@ class _SearchScreenState extends State<SearchScreen>
           .toList();
       list = [typed, ...filtered];
     }
+    final recEntities = typed.isNotEmpty
+        ? _liveSuggestedEntities.take(3).toList()
+        : const <SearchItem>[];
     return Column(
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (recEntities.isNotEmpty) ...[
+          for (int i = 0; i < recEntities.length; i++)
+            SpringIn(
+              delayMs: i * 18,
+              rise: 10,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTapDown: (_) {
+                  if (typed.isNotEmpty) {
+                    _dataService.recordQueryAffinity(typed, recEntities[i]);
+                  }
+                },
+                child: _compactRow(recEntities[i]),
+              ),
+            ),
+          const SizedBox(height: 4),
+        ],
         ...List.generate(list.length, (i) {
           final s = list[i];
           final isDirectTyped =
@@ -2754,10 +2836,31 @@ class _SearchScreenState extends State<SearchScreen>
               const SizedBox(height: 14),
             ],
           );
-    final albumsSec = r.albums.isEmpty
+    final albumsList = r.albums
+        .where(
+          (a) =>
+              a.albumType.toLowerCase() != 'single' &&
+              !AlbumResolver.isSingleReleaseTitle(a.title),
+        )
+        .toList();
+    final singlesList = r.albums
+        .where(
+          (a) =>
+              a.albumType.toLowerCase() == 'single' ||
+              AlbumResolver.isSingleReleaseTitle(a.title),
+        )
+        .toList();
+    final albumsSec = albumsList.isEmpty
         ? null
         : _albumsCarousel(
-            r.albums,
+            albumsList,
+            seeAll: () => _onFilterSelected(SearchFilter.albums),
+          );
+    final singlesSec = singlesList.isEmpty
+        ? null
+        : _albumsCarousel(
+            singlesList,
+            title: 'Singles',
             seeAll: () => _onFilterSelected(SearchFilter.albums),
           );
     final artistsSec = r.artists.isEmpty
@@ -2783,12 +2886,14 @@ class _SearchScreenState extends State<SearchScreen>
       SearchLayoutMode.exactArtist || SearchLayoutMode.artistType => [
         songsSec,
         albumsSec,
+        singlesSec,
         artistsSec,
         playlistsSec,
         videosSec,
       ],
       SearchLayoutMode.albumOrPlaylist => [
         albumsSec,
+        singlesSec,
         playlistsSec,
         songsSec,
         artistsSec,
@@ -2797,6 +2902,7 @@ class _SearchScreenState extends State<SearchScreen>
       SearchLayoutMode.songTitle || SearchLayoutMode.generic => [
         songsSec,
         albumsSec,
+        singlesSec,
         artistsSec,
         playlistsSec,
         videosSec,
@@ -2923,12 +3029,16 @@ class _SearchScreenState extends State<SearchScreen>
 
     final serviceTop = r.topResult?.item;
     final serviceKey = serviceTop == null ? null : keyOf(serviceTop);
+    final isVideoIntent =
+        r.intent.intentType == SearchItemType.video ||
+        _selectedFilter == SearchFilter.videos;
 
     void add(SearchItem item) {
-      // Validate videos and shorts
       if (item is SearchVideoItem) {
-        if (r.intent.intentType != SearchItemType.video && _selectedFilter != SearchFilter.videos) {
-          return; // Never let videos become top result in audio/overview search
+        final k = keyOf(item);
+        // Keep videos out of audio overview UNLESS explicitly a verified Top Card or video query
+        if (!isVideoIntent && k != serviceKey) {
+          return;
         }
         if (!MusicVideoFilter.isLegitMusicVideo(
           title: item.title,
@@ -2940,16 +3050,20 @@ class _SearchScreenState extends State<SearchScreen>
         }
       }
       if (item is SearchSongItem &&
-          item.durationSeconds < 60 &&
+          item.durationSeconds < 25 &&
           item.durationSeconds > 0) {
         return;
       }
 
       final k = keyOf(item);
       if (cands.containsKey(k)) return;
-      var score = _scoreItem(item, queries, mode);
-      if (k == serviceKey && score >= 0.5) {
-        score += 0.04;
+
+      final uiScore = _scoreItem(item, queries, mode);
+      var score = item.finalScore > 0
+          ? (item.finalScore * 0.65) + (uiScore * 0.35)
+          : uiScore;
+      if (k == serviceKey && score >= 0.35) {
+        score += 0.08;
       }
       cands[k] = _TopCand(item, score);
     }
@@ -2968,13 +3082,15 @@ class _SearchScreenState extends State<SearchScreen>
       return const [];
     }
 
-    // Strict layout mode top result priority:
-    // When intent is exactArtist, ensure the top matching artist leads.
+    // Strict layout mode top result priority: only promote matching type if competitive in relevance.
+    final bestOverall = sorted.first.score;
     if (mode == SearchLayoutMode.exactArtist) {
       final bestArtist = sorted
           .where((c) => c.item is SearchArtistItem)
           .firstOrNull;
-      if (bestArtist != null && bestArtist != sorted.first) {
+      if (bestArtist != null &&
+          bestArtist != sorted.first &&
+          bestArtist.score >= bestOverall - 0.15) {
         sorted.remove(bestArtist);
         sorted.insert(0, bestArtist);
       }
@@ -2984,7 +3100,9 @@ class _SearchScreenState extends State<SearchScreen>
             (c) => c.item is SearchAlbumItem || c.item is SearchPlaylistItem,
           )
           .firstOrNull;
-      if (bestAlbumOrPl != null && bestAlbumOrPl != sorted.first) {
+      if (bestAlbumOrPl != null &&
+          bestAlbumOrPl != sorted.first &&
+          bestAlbumOrPl.score >= bestOverall - 0.15) {
         sorted.remove(bestAlbumOrPl);
         sorted.insert(0, bestAlbumOrPl);
       }
@@ -2992,13 +3110,15 @@ class _SearchScreenState extends State<SearchScreen>
       final bestSong = sorted
           .where((c) => c.item is SearchSongItem)
           .firstOrNull;
-      if (bestSong != null && bestSong != sorted.first) {
+      if (bestSong != null &&
+          bestSong != sorted.first &&
+          bestSong.score >= bestOverall - 0.12) {
         sorted.remove(bestSong);
         sorted.insert(0, bestSong);
       }
     }
 
-    if (sorted.first.score < 0.35) {
+    if (sorted.first.score < 0.32) {
       if (serviceTop != null) return [_TopCand(serviceTop, 1.0)];
       if (r.songs.isNotEmpty) return [_TopCand(r.songs.first, 1.0)];
       return const [];
@@ -3007,7 +3127,7 @@ class _SearchScreenState extends State<SearchScreen>
     final out = <_TopCand>[sorted.first];
     for (final c in sorted.skip(1)) {
       if (out.length >= 4) break;
-      if (c.score >= 0.45) out.add(c);
+      if (c.score >= 0.42) out.add(c);
     }
     return out;
   }

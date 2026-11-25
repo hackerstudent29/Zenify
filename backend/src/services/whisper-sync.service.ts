@@ -299,68 +299,8 @@ export class WhisperSyncService {
      * Try fetching lyrics from Happi.dev Lyrics Search API.
      * Returns plain lyrics text or null.
      */
-    static async searchHappiLyrics(title: string, artist: string): Promise<string | null> {
-        const apiKey = config.HAPPI_API_KEY;
-        if (!apiKey) {
-            console.log('[WhisperSync/Happi] HAPPI_API_KEY not configured.');
-            return null;
-        }
-
-        try {
-            console.log(`[WhisperSync/Happi] Searching lyrics for "${title}" by ${artist}...`);
-            const searchRes = await axios.get('https://api.happi.dev/v1/music', {
-                params: {
-                    q: `${title} ${artist}`,
-                    limit: 5,
-                    type: 'track',
-                },
-                headers: {
-                    'x-happi-key': apiKey,
-                },
-                timeout: 5000,
-            });
-
-            const tracks = searchRes.data?.result;
-            if (!tracks || !Array.isArray(tracks) || tracks.length === 0) {
-                console.log('[WhisperSync/Happi] No tracks found.');
-                return null;
-            }
-
-            const { LyricsSyncService } = await import('./lyrics-sync.service.js');
-
-            // Find best match with strict title verification
-            const bestTrack = tracks.find((t: any) => {
-                const trackName = t.track || t.title || '';
-                return LyricsSyncService.isTitleMatch(title, trackName);
-            });
-
-            if (!bestTrack) {
-                console.log(`[WhisperSync/Happi] No tracks matched title "${title}".`);
-                return null;
-            }
-
-            if (!bestTrack.api_lyrics) {
-                console.log('[WhisperSync/Happi] No lyrics API URL in results.');
-                return null;
-            }
-
-            // Fetch actual lyrics
-            const lyricsRes = await axios.get(bestTrack.api_lyrics, {
-                headers: { 'x-happi-key': apiKey },
-                timeout: 5000,
-            });
-
-            const lyricsText = lyricsRes.data?.result?.lyrics;
-            if (lyricsText) {
-                console.log(`[WhisperSync/Happi] ✅ Found lyrics for "${title}" (${lyricsText.length} chars).`);
-                return lyricsText;
-            }
-
-            console.log('[WhisperSync/Happi] Lyrics response empty.');
-            return null;
-        } catch (err: any) {
-            console.warn(`[WhisperSync/Happi] Search failed: ${err.message}`);
-            return null;
-        }
+    static async searchHappiLyrics(_title: string, _artist: string): Promise<string | null> {
+        void config;
+        return null;
     }
 }

@@ -176,12 +176,13 @@ data class ArtistPage(
                             ?.musicPlayButtonRenderer?.playNavigationEndpoint
                             ?.anyWatchEndpoint?.playlistId ?: return null,
                         title = renderer.title.runs?.firstOrNull()?.text ?: return null,
-                        artists = null,
+                        artists = PageHelper.extractArtists(renderer.subtitle?.runs).takeIf { it.isNotEmpty() },
                         year = renderer.subtitle?.runs?.lastOrNull()?.text?.toIntOrNull(),
                         thumbnail = renderer.thumbnailRenderer.getThumbnailUrl() ?: return null,
                         explicit = renderer.subtitleBadges?.find {
                             it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
-                        } != null
+                        } != null,
+                        albumType = PageHelper.extractReleaseType(renderer.subtitle?.runs),
                     )
                 }
 

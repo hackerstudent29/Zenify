@@ -170,11 +170,13 @@ export class AIProfileService {
     genreWeights: Record<string, number>,
     artistWeights: Record<string, number>
   ): Promise<AIInferredProfile> {
-    const apiKey = process.env.AI_GATEWAY_API_KEY || config.VERCEL_AI_KEY || process.env.VERCEL_AI_KEY;
-    const modelName = process.env.AI_GATEWAY_MODEL || config.AI_GATEWAY_MODEL || 'openai/gpt-4o-mini';
+    void languageWeights;
+    void generateObject;
+    void createOpenAI;
+    void config;
+    void AIInferenceSchema;
 
-    // Fallback profile if AI key is unavailable or fails
-    const codeFallbackProfile: AIInferredProfile = {
+    return {
       interests: Object.keys(genreWeights).map(g => `${g} Discovery`),
       moods: ['Upbeat', 'Focus', 'Evening Chill', 'Soundtrack Drive'],
       similarArtists: Object.keys(artistWeights).slice(0, 5),
@@ -183,44 +185,6 @@ export class AIProfileService {
         ...Object.keys(genreWeights).slice(0, 2).map(g => `Top ${g}`)
       ]
     };
-
-    if (!apiKey) {
-      console.warn('[AIProfileService] AI_GATEWAY_API_KEY missing, using code-inferred fallback.');
-      return codeFallbackProfile;
-    }
-
-    const openai = createOpenAI({
-      apiKey,
-      baseURL: process.env.AI_GATEWAY_BASE_URL || undefined
-    });
-
-    const promptSummary = `
-You are an expert music curator and recommendation intelligence engine.
-Analyze this anonymized user listening taste profile (recency-weighted):
-- Language Preferences: ${JSON.stringify(languageWeights)}
-- Genre Preferences: ${JSON.stringify(genreWeights)}
-- Favorite & Top Streamed Artists: ${JSON.stringify(artistWeights)}
-
-Infer the following:
-1. "interests": 3-5 concise phrases capturing the user's specific musical tastes and subcultural affinities (e.g., "Tamil cinematic anthems", "Melodic acoustic indie").
-2. "moods": 3-5 vibe or mood tags that match this music profile.
-3. "similarArtists": 5-8 artist names not explicitly listed in their top artists who have a strong stylistic and cultural overlap.
-4. "searchSeeds": 4-6 specific search queries for discovering new songs matching this vibe.
-`;
-
-    try {
-      const model = openai(modelName as any);
-      const { object } = await generateObject({
-        model,
-        schema: AIInferenceSchema,
-        prompt: promptSummary
-      });
-
-      return object;
-    } catch (err: any) {
-      console.warn('[AIProfileService] AI Gateway call failed, falling back to rule-based profile:', err.message);
-      return codeFallbackProfile;
-    }
   }
 
   /**

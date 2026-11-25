@@ -441,6 +441,24 @@ object YouTube {
                                 ?.lastOrNull()
                                 ?.url ?: response.background?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
                         explicit = false,
+                        albumType = PageHelper.extractReleaseType(
+                            response.contents
+                                ?.twoColumnBrowseResultsRenderer
+                                ?.tabs
+                                ?.firstOrNull()
+                                ?.tabRenderer
+                                ?.content
+                                ?.sectionListRenderer
+                                ?.contents
+                                ?.firstOrNull()
+                                ?.musicResponsiveHeaderRenderer
+                                ?.subtitle
+                                ?.runs
+                                ?: response.header
+                                    ?.musicDetailHeaderRenderer
+                                    ?.subtitle
+                                    ?.runs,
+                        ),
                     )
                 return@runCatching AlbumPage(
                     album = albumItem,
@@ -563,6 +581,24 @@ object YouTube {
                                     ?.url
                                 ?: response.background?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
                         explicit = false,
+                        albumType = PageHelper.extractReleaseType(
+                            response.contents
+                                ?.twoColumnBrowseResultsRenderer
+                                ?.tabs
+                                ?.firstOrNull()
+                                ?.tabRenderer
+                                ?.content
+                                ?.sectionListRenderer
+                                ?.contents
+                                ?.firstOrNull()
+                                ?.musicResponsiveHeaderRenderer
+                                ?.subtitle
+                                ?.runs
+                                ?: response.header
+                                    ?.musicDetailHeaderRenderer
+                                    ?.subtitle
+                                    ?.runs,
+                        ),
                     )
                 val albumSongsList =
                     if (withSongs) {

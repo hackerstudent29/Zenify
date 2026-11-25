@@ -1,0 +1,9 @@
+:root{
+  --zenify-rose-red:#D81B3C;
+  --zenify-rose:#FB5C74;
+  --zenify-blush:#FFE3E8;
+  --zenify-cream:#F3E9EB;
+  --zenify-ink:#1F1416;
+  --zenify-white:#FFFFFF;
+  --zenify-gradient:linear-gradient(45deg,#D81B3C,#FB5C74);
+}

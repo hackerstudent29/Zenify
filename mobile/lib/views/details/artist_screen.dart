@@ -19,6 +19,7 @@ import '../../design_system/zen.dart';
 import '../../features/story_sharing/story_sharing.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
+import '../../services/album_resolver.dart';
 import '../../services/artist_service.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/innertube_service.dart';
@@ -674,15 +675,10 @@ class _VideoCard extends StatelessWidget {
       displayYear = '';
     }
 
-    final artistLabel = (track.artist.isNotEmpty &&
-            track.artist.toLowerCase() != 'unknown artist' &&
-            !MediaNormalizer.isDistributorOrLabel(track.artist))
-        ? track.artist
-        : '';
-    final metaLine = [
-      if (artistLabel.isNotEmpty) artistLabel,
-      if (displayYear.isNotEmpty) displayYear,
-    ].join(' · ');
+    final cleanTitle = MediaNormalizer.cleanVideoTitle(
+      track.title,
+      knownArtists: track.artist,
+    );
 
     return _Press(
       onTap: onTap,
@@ -702,7 +698,7 @@ class _VideoCard extends StatelessWidget {
           ),
           const SizedBox(height: 7),
           Text(
-            MediaNormalizer.cleanCompactTitle(track.title),
+            cleanTitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -713,10 +709,10 @@ class _VideoCard extends StatelessWidget {
               letterSpacing: -0.15,
             ),
           ),
-          if (metaLine.isNotEmpty) ...[
+          if (displayYear.isNotEmpty) ...[
             const SizedBox(height: 2),
             Text(
-              metaLine,
+              displayYear,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -1336,58 +1332,96 @@ class _ArtistScreenState extends State<ArtistScreen>
   String? _resolvedImage;
   String? _resolvedBanner;
   String? _resolvedBio;
+  final Map<String, String> _resolvedVideoTitles = {};
   final Map<String, String> _resolvedVideoYears = {};
   final Map<String, String> _resolvedVideoArtists = {};
   final Set<String> _resolvingVideoIds = {};
+  final Set<String> _attemptedVideoIds = {};
 
   void _resolveVideosMetadata(List<Track> videos) {
     if (videos.isEmpty) return;
+    final candidates = <Track>[];
     for (final vt in videos) {
       final cleanId = vt.id.replaceFirst(RegExp(r'^(yt-|yt:)'), '');
-      if (cleanId.isEmpty || _resolvingVideoIds.contains(cleanId)) {
-        continue;
-      }
+      if (cleanId.isEmpty) continue;
+
       if (vt.year != null && RegExp(r'\b(19\d{2}|20\d{2})\b').hasMatch(vt.year!)) {
         _resolvedVideoYears[cleanId] ??= RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(vt.year!)!.group(0)!;
       }
       if (vt.artist.isNotEmpty &&
           vt.artist.toLowerCase() != 'unknown artist' &&
-          !MediaNormalizer.isDistributorOrLabel(vt.artist)) {
+          !MediaNormalizer.isDistributorOrLabel(vt.artist) &&
+          !MediaNormalizer.isNonArtistCreditSegment(vt.artist)) {
         _resolvedVideoArtists[cleanId] ??= vt.artist;
       }
 
+      // Immediately hydrate from shared InnerTube cache if already resolved elsewhere
+      final cached = InnerTubeService.instance.getCachedVideoDetails(cleanId);
+      if (cached != null) {
+        if (cached.cleanTitle.isNotEmpty) {
+          _resolvedVideoTitles[cleanId] = cached.cleanTitle;
+        }
+        if (cached.year != null && cached.year!.isNotEmpty) {
+          _resolvedVideoYears[cleanId] ??= cached.year!;
+        }
+        if (cached.artists.isNotEmpty) {
+          _resolvedVideoArtists[cleanId] = cached.artists;
+        }
+        _attemptedVideoIds.add(cleanId);
+        continue;
+      }
+
+      if (_resolvingVideoIds.contains(cleanId) || _attemptedVideoIds.contains(cleanId)) {
+        continue;
+      }
       final needsYear = !_resolvedVideoYears.containsKey(cleanId);
-      final needsArtist = !_resolvedVideoArtists.containsKey(cleanId);
-      if (!needsYear && !needsArtist) continue;
+      final needsTitleOrArtist =
+          !_resolvedVideoTitles.containsKey(cleanId) ||
+          InnerTubeService.needsVideoEnrichment(vt, requireYear: needsYear);
+      if (!needsYear && !needsTitleOrArtist) continue;
 
       _resolvingVideoIds.add(cleanId);
-      InnerTubeService.instance.getVideoDetails(cleanId).then((details) {
-        if (!mounted || details == null) return;
-        bool changed = false;
-        if (details.year != null && details.year!.isNotEmpty) {
-          _resolvedVideoYears[cleanId] = details.year!;
-          changed = true;
-        }
-        if (needsArtist) {
-          var realArtist = MediaNormalizer.extractArtistsFromDescription(details.description);
-          if (realArtist.isEmpty) {
-            realArtist = MediaNormalizer.extractArtistsFromVideoTitle(
-              details.title.isNotEmpty ? details.title : vt.title,
-              defaultArtist: _artistProfile?.name ?? widget.artistName,
-            );
-          }
-          if (realArtist.isNotEmpty) {
-            _resolvedVideoArtists[cleanId] = realArtist;
-            changed = true;
-          }
-        }
-        if (changed) {
-          setState(() {});
-        }
-      }).whenComplete(() {
-        _resolvingVideoIds.remove(cleanId);
-      });
+      _attemptedVideoIds.add(cleanId);
+      candidates.add(vt);
     }
+    if (candidates.isEmpty) return;
+
+    final artistFallback = _artistProfile?.name ?? widget.artistName;
+    InnerTubeService.instance
+        .enrichVideoTracks(
+          candidates,
+          knownArtist: artistFallback,
+          requireYear: true,
+          maxConcurrent: 3,
+          onBatchProgress: (updatedBatch) {
+            if (!mounted || updatedBatch.isEmpty) return;
+            var changed = false;
+            for (final u in updatedBatch) {
+              final cid = u.id.replaceFirst(RegExp(r'^(yt-|yt:)'), '');
+              if (cid.isEmpty) continue;
+              if (u.title.isNotEmpty && _resolvedVideoTitles[cid] != u.title) {
+                _resolvedVideoTitles[cid] = u.title;
+                changed = true;
+              }
+              if (u.year != null && u.year!.isNotEmpty && _resolvedVideoYears[cid] != u.year) {
+                _resolvedVideoYears[cid] = u.year!;
+                changed = true;
+              }
+              if (u.artist.isNotEmpty &&
+                  !MediaNormalizer.isDistributorOrLabel(u.artist) &&
+                  _resolvedVideoArtists[cid] != u.artist) {
+                _resolvedVideoArtists[cid] = u.artist;
+                changed = true;
+              }
+            }
+            if (changed) setState(() {});
+          },
+        )
+        .whenComplete(() {
+          for (final c in candidates) {
+            _resolvingVideoIds.remove(c.id.replaceFirst(RegExp(r'^(yt-|yt:)'), ''));
+          }
+        });
   }
 
   // ---- Living cover (same behaviour as the album page) ----
@@ -1416,8 +1450,7 @@ class _ArtistScreenState extends State<ArtistScreen>
   double _imageAspectRatio = 0.75;
   String? _resolvedImageRatioUrl;
 
-  /// Resolves the full, uncropped HD artist hero picture by stripping any forced Google CDN
-  /// cropping parameters (-p, -c, -h\d+) so Google serves the full uncropped original photo.
+  /// Resolves a sharp yet fast-loading artist hero picture without forced cropping.
   static String resolveFullArtistHeroUrl(String? url) {
     if (url == null || url.trim().isEmpty) return '';
     var u = url.trim();
@@ -1429,7 +1462,7 @@ class _ArtistScreenState extends State<ArtistScreen>
         ),
         '',
       );
-      return '$base=w900-l90-rj';
+      return '$base=w720-l85-rj';
     }
     return MediaNormalizer.upgradeBannerUrl(u);
   }
@@ -1495,9 +1528,48 @@ class _ArtistScreenState extends State<ArtistScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.imageUrl != null && widget.imageUrl!.isNotEmpty) {
-      _resolveImageDimensions(resolveFullArtistHeroUrl(widget.imageUrl!));
+    final cachedProfile = ArtistService.instance.getCached(
+      widget.artistName,
+      browseId: widget.browseId,
+    );
+    if (cachedProfile != null &&
+        (cachedProfile.topSongs.isNotEmpty || cachedProfile.albums.isNotEmpty)) {
+      _artistProfile = cachedProfile;
+      _tracks = List.of(cachedProfile.topSongs);
+      if (cachedProfile.imageUrl.isNotEmpty) {
+        _resolvedImage = cachedProfile.imageUrl;
+      }
+      if (cachedProfile.coverUrl.isNotEmpty) {
+        _resolvedBanner = cachedProfile.coverUrl;
+      }
+      if (cachedProfile.bio.isNotEmpty) {
+        _resolvedBio = cachedProfile.bio;
+      }
+      _loading = false;
+    } else {
+      final cachedAvatar = ArtistService.getCachedAvatar(widget.artistName);
+      if (cachedAvatar != null && cachedAvatar.isNotEmpty) {
+        _resolvedImage = cachedAvatar;
+      }
     }
+
+    final seedUrl =
+        _resolvedBanner ?? _resolvedImage ?? widget.imageUrl ?? '';
+    if (seedUrl.isNotEmpty) {
+      _resolveImageDimensions(resolveFullArtistHeroUrl(seedUrl));
+    } else {
+      // Resolve the artist's hero avatar fast (~200-400ms) in parallel without waiting for full discography
+      ArtistService.resolveArtistAvatar(widget.artistName).then((url) {
+        if (mounted &&
+            url.isNotEmpty &&
+            (_resolvedImage == null || _resolvedImage!.isEmpty)) {
+          setState(() {
+            _resolvedImage = url;
+          });
+        }
+      });
+    }
+
     _load();
     LibraryStore.instance.ensureLoaded();
     LibraryStore.instance.addListener(_onLibrary);
@@ -1669,6 +1741,12 @@ class _ArtistScreenState extends State<ArtistScreen>
 
   /// If the image is already an animated GIF / WebP, skip the fake drift.
   Future<void> _detectAnimated(String url) async {
+    final lower = url.toLowerCase();
+    // Google CDN `-rj` URLs always return static JPEGs; skip duplicate file download
+    if (lower.contains('-rj') ||
+        (!lower.contains('.gif') && !lower.contains('.webp'))) {
+      return;
+    }
     var animated = false;
     try {
       final file = await DefaultCacheManager().getSingleFile(url);
@@ -1688,7 +1766,9 @@ class _ArtistScreenState extends State<ArtistScreen>
         browseId: widget.browseId,
       );
       if (info != null &&
-          (info.topSongs.isNotEmpty || info.albums.isNotEmpty)) {
+          (info.topSongs.isNotEmpty ||
+              info.albums.isNotEmpty ||
+              info.singles.isNotEmpty)) {
         if (mounted) {
           setState(() {
             _artistProfile = info;
@@ -1761,17 +1841,26 @@ class _ArtistScreenState extends State<ArtistScreen>
     );
   }
 
-  void _openAlbum(_Release r) => Navigator.push(
-    context,
-    ZenPageRoute(
-      builder: (_) => AlbumScreen(
-        albumTitle: MediaNormalizer.stripIdNoise(r.title),
-        artistName: MediaNormalizer.stripIdNoise(widget.artistName),
-        coverUrl: r.cover,
-        browseId: r.browseId,
+  void _openAlbum(_Release r) {
+    final lowerType = r.type.toLowerCase();
+    final isSingleRelease =
+        lowerType == 'single' ||
+        AlbumResolver.isSingleReleaseTitle(r.title);
+    Navigator.push(
+      context,
+      ZenPageRoute(
+        builder: (_) => AlbumScreen(
+          albumTitle: isSingleRelease
+              ? MediaNormalizer.cleanTitle(r.title)
+              : MediaNormalizer.cleanAlbumTitle(r.title),
+          artistName: MediaNormalizer.stripIdNoise(widget.artistName),
+          coverUrl: r.cover,
+          browseId: AlbumResolver.sanitizeAlbumBrowseId(r.browseId),
+          isSingle: isSingleRelease,
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   void _share(String name) {
     HapticFeedback.selectionClick();
@@ -2116,16 +2205,18 @@ class _ArtistScreenState extends State<ArtistScreen>
                                     letterSpacing: -0.2,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  e.subtitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 13,
+                                if (e.subtitle.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    e.subtitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 13,
+                                    ),
                                   ),
-                                ),
+                                ],
                               ],
                             ),
                           ),
@@ -2330,34 +2421,48 @@ class _ArtistScreenState extends State<ArtistScreen>
           .tracks
           .add(t);
     }
-    final albums = _artistProfile != null && _artistProfile!.albums.isNotEmpty
-        ? _artistProfile!.albums
-              .where((a) => a.type.toLowerCase() == 'album')
-              .map(
-                (a) => _Release(
-                  a.title,
-                  a.coverUrl,
-                  browseId: a.browseId,
-                  year: a.year,
-                  type: 'Album',
-                ),
-              )
-              .toList()
-        : const <_Release>[];
-    final singles = _artistProfile != null && _artistProfile!.singles.isNotEmpty
-        ? _artistProfile!.singles
-              .where((s) => s.type.toLowerCase() != 'album')
-              .map(
-                (s) => _Release(
-                  s.title,
-                  s.coverUrl,
-                  browseId: s.browseId,
-                  year: s.year,
-                  type: s.type,
-                ),
-              )
-              .toList()
-        : const <_Release>[];
+    final rawAlbums = _artistProfile?.albums ?? const <ArtistReleaseItem>[];
+    final rawSingles = _artistProfile?.singles ?? const <ArtistReleaseItem>[];
+    final albums = rawAlbums
+        .where(
+          (a) =>
+              a.type.toLowerCase() == 'album' &&
+              !AlbumResolver.isSingleReleaseTitle(a.title),
+        )
+        .map(
+          (a) => _Release(
+            a.title,
+            a.coverUrl,
+            browseId: a.browseId,
+            year: a.year,
+            type: 'Album',
+          ),
+        )
+        .toList();
+    final seenSingleKeys = <String>{};
+    final singles = <_Release>[];
+    for (final s in [
+      ...rawSingles.where((s) => s.type.toLowerCase() != 'album'),
+      ...rawAlbums.where(
+        (a) =>
+            a.type.toLowerCase() != 'album' ||
+            AlbumResolver.isSingleReleaseTitle(a.title),
+      ),
+    ]) {
+      final key = (s.browseId != null && s.browseId!.isNotEmpty)
+          ? s.browseId!
+          : MediaNormalizer.cleanCompactTitle(s.title).toLowerCase();
+      if (key.isEmpty || !seenSingleKeys.add(key)) continue;
+      singles.add(
+        _Release(
+          s.title,
+          s.coverUrl,
+          browseId: s.browseId,
+          year: s.year,
+          type: s.type.toLowerCase() == 'ep' ? 'EP' : 'Single',
+        ),
+      );
+    }
     final _Release? latest = albums.isNotEmpty
         ? albums.first
         : (singles.isNotEmpty ? singles.first : null);
@@ -2378,15 +2483,22 @@ class _ArtistScreenState extends State<ArtistScreen>
       var art = _resolvedVideoArtists[cleanId] ?? v.artist;
       if (art.isEmpty ||
           art.toLowerCase() == 'unknown artist' ||
-          MediaNormalizer.isDistributorOrLabel(art)) {
+          MediaNormalizer.isDistributorOrLabel(art) ||
+          MediaNormalizer.isNonArtistCreditSegment(art)) {
         art = MediaNormalizer.extractArtistsFromVideoTitle(
           v.title,
           defaultArtist: name,
         );
       }
+      if (art.isEmpty) art = name;
+      final resolvedTitle = _resolvedVideoTitles[cleanId];
+      final cleanTitle = (resolvedTitle != null && resolvedTitle.isNotEmpty)
+          ? resolvedTitle
+          : MediaNormalizer.cleanVideoTitle(v.title, knownArtists: art);
       final resolvedYr = _resolvedVideoYears[cleanId] ?? v.year;
       return v.copyWith(
         isVideo: true,
+        title: cleanTitle,
         artist: art,
         year: resolvedYr,
       );
@@ -2423,8 +2535,14 @@ class _ArtistScreenState extends State<ArtistScreen>
       final inAlbum = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(vt.album);
       if (inAlbum != null) return inAlbum.group(0)!;
 
-      // Asynchronously resolve authentic upload/publish year from YouTube WEB player
-      _resolveVideosMetadata([vt]);
+      // Schedule background resolution once if not already attempted for this videoId
+      if (cleanId.isNotEmpty &&
+          !_attemptedVideoIds.contains(cleanId) &&
+          !_resolvingVideoIds.contains(cleanId)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _resolveVideosMetadata([vt]);
+        });
+      }
       return '';
     }
 
@@ -2736,17 +2854,14 @@ class _ArtistScreenState extends State<ArtistScreen>
                                             )
                                               _ArtistSheetEntry(
                                                 title:
-                                                    MediaNormalizer.cleanCompactTitle(
+                                                    MediaNormalizer.cleanVideoTitle(
                                                       videoTracks[idx].title,
+                                                      knownArtists:
+                                                          videoTracks[idx].artist,
                                                     ),
-                                                subtitle: [
-                                                  if (videoTracks[idx].artist.isNotEmpty &&
-                                                      videoTracks[idx].artist.toLowerCase() != 'unknown artist' &&
-                                                      !MediaNormalizer.isDistributorOrLabel(videoTracks[idx].artist))
-                                                    videoTracks[idx].artist,
-                                                  if (resolveVideoYear(videoTracks[idx]).isNotEmpty)
-                                                    resolveVideoYear(videoTracks[idx]),
-                                                ].join(' · '),
+                                                subtitle: resolveVideoYear(
+                                                  videoTracks[idx],
+                                                ),
                                                 coverUrl:
                                                     videoTracks[idx].coverUrl,
                                                 isVideo: true,
@@ -2892,7 +3007,9 @@ class _ArtistScreenState extends State<ArtistScreen>
                                 ),
                               ],
                             ],
-                            const SizedBox(height: 140),
+                            SizedBox(
+                              height: 180 + MediaQuery.paddingOf(context).bottom,
+                            ),
                           ],
                         ),
                       ),
@@ -2973,31 +3090,75 @@ class _ArtistScreenState extends State<ArtistScreen>
     String banner,
     String avatar,
   ) {
+    final quickPreviewUrl = (widget.imageUrl != null &&
+            widget.imageUrl!.isNotEmpty &&
+            widget.imageUrl != banner)
+        ? widget.imageUrl!
+        : ((avatar.isNotEmpty && avatar != banner) ? avatar : '');
+
+    final Widget imageWidget;
+    if (banner.isEmpty) {
+      imageWidget = quickPreviewUrl.isNotEmpty
+          ? CachedNetworkImage(
+              imageUrl: quickPreviewUrl,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: heroImgH,
+              alignment: Alignment.topCenter,
+              fadeInDuration: Duration.zero,
+              placeholder: (c, u) => const ColoredBox(color: Colors.black),
+              errorWidget: (c, u, e) => const ColoredBox(color: Colors.black),
+            )
+          : const ColoredBox(color: Colors.black);
+    } else {
+      imageWidget = Stack(
+        fit: StackFit.expand,
+        children: [
+          if (quickPreviewUrl.isNotEmpty)
+            CachedNetworkImage(
+              imageUrl: quickPreviewUrl,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: heroImgH,
+              alignment: Alignment.topCenter,
+              fadeInDuration: Duration.zero,
+              placeholder: (c, u) => const ColoredBox(color: Colors.black),
+              errorWidget: (c, u, e) => const ColoredBox(color: Colors.black),
+            ),
+          CachedNetworkImage(
+            imageUrl: banner,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: heroImgH,
+            alignment: Alignment.topCenter,
+            useOldImageOnUrlChange: true,
+            fadeInDuration: const Duration(milliseconds: 180),
+            placeholder: (c, u) => quickPreviewUrl.isNotEmpty
+                ? const SizedBox.shrink()
+                : const ColoredBox(color: Colors.black),
+            errorWidget: (c, u, e) => banner != avatar && avatar.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: avatar,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: heroImgH,
+                    alignment: Alignment.topCenter,
+                    errorWidget: (_, _, _) => const ColoredBox(color: Colors.black),
+                  )
+                : (quickPreviewUrl.isNotEmpty
+                    ? const SizedBox.shrink()
+                    : const ColoredBox(color: Colors.black)),
+          ),
+        ],
+      );
+    }
+
     final media = RepaintBoundary(
       child: Transform.scale(
         scaleX: 1.0, // strictly 1.0: zero horizontal zoom or side-crop
         scaleY: 1.0, // strictly 1.0: zero top/bottom cut
         alignment: Alignment.center,
-        child: CachedNetworkImage(
-          imageUrl: banner,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: heroImgH,
-          alignment: Alignment.topCenter,
-          fadeInDuration: const Duration(milliseconds: 250),
-          placeholder: (c, u) => const ColoredBox(color: Colors.black),
-          errorWidget: (c, u, e) => banner != avatar && avatar.isNotEmpty
-              ? CachedNetworkImage(
-                  imageUrl: avatar,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: heroImgH,
-                  alignment: Alignment.topCenter,
-                  errorWidget: (_, _, _) =>
-                      const ColoredBox(color: Colors.black),
-                )
-              : const ColoredBox(color: Colors.black),
-        ),
+        child: imageWidget,
       ),
     );
 

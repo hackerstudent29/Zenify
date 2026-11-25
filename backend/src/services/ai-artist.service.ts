@@ -8,7 +8,7 @@ export class AIArtistService {
         return profile.bio;
     }
 
-    private static VERCEL_AI_KEY = process.env.VERCEL_OIDC_TOKEN || process.env.VERCEL_API_KEY;
+    private static VERCEL_AI_KEY = '';
 
     /**
      * Generates an enriched artist profile including bio, DOB, and fetches images via Deezer.

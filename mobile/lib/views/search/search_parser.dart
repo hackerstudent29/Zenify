@@ -28,7 +28,7 @@ class SearchParser {
   static final RegExp _yearRegex = RegExp(r'^(19|20)\d{2}$');
   static final RegExp _durationRegex = RegExp(r'^\d{1,2}:\d{2}(:\d{2})?$');
   static final RegExp _countRegex = RegExp(
-    r'(\d+(\.\d+)?[KMBkmb]?\+?\s*(songs|tracks|episodes|subscribers|views|plays|videos|listeners))|(\d{1,3}(,\d{3})*\s*(songs|tracks|episodes|subscribers|views|plays|videos))',
+    r'(\d+(?:\.\d+)?[KMBkmb]?\+?\s*(?:monthly\s+audience|monthly\s+listeners|songs|tracks|episodes|subscribers|views|plays|videos|listeners))|(\d{1,3}(?:,\d{3})*\s*(?:monthly\s+audience|monthly\s+listeners|songs|tracks|episodes|subscribers|views|plays|videos|listeners))',
     caseSensitive: false,
   );
   static final RegExp _typeRegex = RegExp(
@@ -60,24 +60,36 @@ class SearchParser {
         final tabs = tabbed?['tabs'] as List?;
         if (tabs != null && tabs.isNotEmpty && tabs.first is Map) {
           final t0 = tabs.first as Map;
-          sectionList = t0['tabRenderer']?['content']?['sectionListRenderer']?['contents'] as List?;
+          sectionList =
+              t0['tabRenderer']?['content']?['sectionListRenderer']?['contents']
+                  as List?;
         }
-        sectionList ??= contents['twoColumnSearchResultsRenderer']?['primaryContents']?['sectionListRenderer']?['contents'] as List?;
-        sectionList ??= contents['singleColumnSearchResultsRenderer']?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents'] as List?;
-        sectionList ??= contents['singleColumnSearchResultsRenderer']?['contents'] as List?;
+        sectionList ??=
+            contents['twoColumnSearchResultsRenderer']?['primaryContents']?['sectionListRenderer']?['contents']
+                as List?;
+        sectionList ??=
+            contents['singleColumnSearchResultsRenderer']?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents']
+                as List?;
+        sectionList ??=
+            contents['singleColumnSearchResultsRenderer']?['contents'] as List?;
         sectionList ??= contents['sectionListRenderer']?['contents'] as List?;
 
         // Direct shelf containers in filtered searches without sectionList wrapper
         if (sectionList == null && contents['musicShelfRenderer'] is Map) {
-          sectionList = [{'musicShelfRenderer': contents['musicShelfRenderer']}];
+          sectionList = [
+            {'musicShelfRenderer': contents['musicShelfRenderer']},
+          ];
         }
         if (sectionList == null && contents['musicCardShelfRenderer'] is Map) {
-          sectionList = [{'musicCardShelfRenderer': contents['musicCardShelfRenderer']}];
+          sectionList = [
+            {'musicCardShelfRenderer': contents['musicCardShelfRenderer']},
+          ];
         }
       }
 
       // Continuation contents check (from loadMore)
-      final continuationShelf = json['continuationContents']?['musicShelfContinuation'];
+      final continuationShelf =
+          json['continuationContents']?['musicShelfContinuation'];
       if (continuationShelf is Map) {
         final contItems = _parseMusicShelfItems(
           continuationShelf,
@@ -105,15 +117,34 @@ class SearchParser {
 
         // A. Top Result Shelf: musicCardShelfRenderer
         final cardShelf = sMap['musicCardShelfRenderer'];
-        if (cardShelf is Map && topResult == null) {
-          topResult = _parseMusicCardShelf(
-            Map<String, dynamic>.from(cardShelf),
-            rawRank: rawRankCounter++,
-            sourceStream: sourceStream,
-          );
-          if (topResult != null) {
-            // Also add topResult's item to the pool for comprehensive ranking
-            items.add(topResult.item);
+        if (cardShelf is Map) {
+          final cardMap = Map<String, dynamic>.from(cardShelf);
+          if (topResult == null) {
+            topResult = _parseMusicCardShelf(
+              cardMap,
+              rawRank: rawRankCounter++,
+              sourceStream: sourceStream,
+            );
+            if (topResult != null) {
+              // Also add topResult's item to the pool for comprehensive ranking
+              items.add(topResult.item);
+            }
+          }
+          final cardContents = cardMap['contents'] as List?;
+          if (cardContents != null) {
+            for (final subIt in cardContents) {
+              if (subIt is Map &&
+                  subIt['musicResponsiveListItemRenderer'] is Map) {
+                final parsedSub = _parseResponsiveListItem(
+                  Map<String, dynamic>.from(
+                    subIt['musicResponsiveListItemRenderer'],
+                  ),
+                  rawRank: rawRankCounter++,
+                  sourceStream: sourceStream,
+                );
+                if (parsedSub != null) items.add(parsedSub);
+              }
+            }
           }
         }
 
@@ -152,28 +183,56 @@ class SearchParser {
 
               // Check for nested didYouMeanRenderer
               if (didYouMean == null && it['didYouMeanRenderer'] is Map) {
-                didYouMean = _extractTextFromRuns(it['didYouMeanRenderer']?['correctedQuery']?['runs']);
+                didYouMean = _extractTextFromRuns(
+                  it['didYouMeanRenderer']?['correctedQuery']?['runs'],
+                );
               }
-              if (didYouMean == null && it['showingResultsForRenderer'] is Map) {
-                didYouMean = _extractTextFromRuns(it['showingResultsForRenderer']?['correctedQuery']?['runs']);
+              if (didYouMean == null &&
+                  it['showingResultsForRenderer'] is Map) {
+                didYouMean = _extractTextFromRuns(
+                  it['showingResultsForRenderer']?['correctedQuery']?['runs'],
+                );
               }
 
               // Top card shelf inside itemSection
-              if (it['musicCardShelfRenderer'] is Map && topResult == null) {
-                topResult = _parseMusicCardShelf(
-                  Map<String, dynamic>.from(it['musicCardShelfRenderer']),
-                  rawRank: rawRankCounter++,
-                  sourceStream: sourceStream,
+              if (it['musicCardShelfRenderer'] is Map) {
+                final cardMap = Map<String, dynamic>.from(
+                  it['musicCardShelfRenderer'],
                 );
-                if (topResult != null) {
-                  items.add(topResult.item);
+                if (topResult == null) {
+                  topResult = _parseMusicCardShelf(
+                    cardMap,
+                    rawRank: rawRankCounter++,
+                    sourceStream: sourceStream,
+                  );
+                  if (topResult != null) {
+                    items.add(topResult.item);
+                  }
+                }
+                final cardContents = cardMap['contents'] as List?;
+                if (cardContents != null) {
+                  for (final subIt in cardContents) {
+                    if (subIt is Map &&
+                        subIt['musicResponsiveListItemRenderer'] is Map) {
+                      final parsedSub = _parseResponsiveListItem(
+                        Map<String, dynamic>.from(
+                          subIt['musicResponsiveListItemRenderer'],
+                        ),
+                        rawRank: rawRankCounter++,
+                        sourceStream: sourceStream,
+                      );
+                      if (parsedSub != null) items.add(parsedSub);
+                    }
+                  }
                 }
               }
 
               // Responsive list item
               if (it['musicResponsiveListItemRenderer'] is Map) {
                 final parsed = _parseResponsiveListItem(
-                  Map<String, dynamic>.from(it['musicResponsiveListItemRenderer']),
+                  Map<String, dynamic>.from(
+                    it['musicResponsiveListItemRenderer'],
+                  ),
                   rawRank: rawRankCounter++,
                   sourceStream: sourceStream,
                 );
@@ -219,7 +278,8 @@ class SearchParser {
         }
       }
     } catch (e, stack) {
-      if (kDebugMode) debugPrint('[SearchParser] Error parsing payload: $e\n$stack');
+      if (kDebugMode)
+        debugPrint('[SearchParser] Error parsing payload: $e\n$stack');
     }
 
     return ParsedSearchPayload(
@@ -251,13 +311,18 @@ class SearchParser {
         for (final rawItem in rawItems) {
           if (rawItem is! Map) continue;
           final itemMap = Map<String, dynamic>.from(rawItem);
-          final parsedItem = parseNativeItem(itemMap, rawRank: rawRankCounter++);
+          final parsedItem = parseNativeItem(
+            itemMap,
+            rawRank: rawRankCounter++,
+          );
           if (parsedItem == null) continue;
 
           if (isTopSection && topResult == null) {
             topResult = SearchTopResult(
               item: parsedItem,
-              playVideoId: parsedItem.videoId ?? (parsedItem is SearchSongItem ? parsedItem.id : null),
+              playVideoId:
+                  parsedItem.videoId ??
+                  (parsedItem is SearchSongItem ? parsedItem.id : null),
               radioPlaylistId: parsedItem.radioPlaylistId,
             );
           }
@@ -265,36 +330,45 @@ class SearchParser {
         }
       }
     } catch (e, stack) {
-      if (kDebugMode) debugPrint('[SearchParser] Error parsing native summaries: $e\n$stack');
+      if (kDebugMode)
+        debugPrint('[SearchParser] Error parsing native summaries: $e\n$stack');
     }
 
-    return ParsedSearchPayload(
-      topResult: topResult,
-      items: items,
-    );
+    return ParsedSearchPayload(topResult: topResult, items: items);
   }
 
   /// Parses a single item map returned from Android native InnerTube channel.
-  static SearchItem? parseNativeItem(Map<String, dynamic> m, {required int rawRank}) {
+  static SearchItem? parseNativeItem(
+    Map<String, dynamic> m, {
+    required int rawRank,
+  }) {
     final type = (m['type'] as String? ?? '').toLowerCase();
     final id = (m['id'] as String? ?? '').trim();
     final title = MediaNormalizer.cleanTitle(m['title'] as String? ?? '');
     if (title.isEmpty) return null;
 
-    final thumb = MediaNormalizer.upgradeArtworkUrl(m['thumbnail'] as String?, videoId: id);
+    final thumb = MediaNormalizer.upgradeArtworkUrl(
+      m['thumbnail'] as String?,
+      videoId: id,
+    );
     final rawArtists = m['artists'] as List?;
     final artistRefs = InnerTubeService.parseArtistRefs(rawArtists);
     final artistsString = artistRefs.isNotEmpty
         ? ArtistRef.formatList(artistRefs)
-        : MediaNormalizer.formatArtists(rawArtists?.map((a) => a is Map ? a['name'] : a).toList());
+        : MediaNormalizer.formatArtists(
+            rawArtists?.map((a) => a is Map ? a['name'] : a).toList(),
+          );
 
     final isExplicit = m['explicit'] == true;
 
     if (type == 'song') {
       final albumMap = (m['album'] is Map) ? m['album'] as Map : null;
       final albumName = albumMap?['name'] as String?;
-      final album = albumName != null ? MediaNormalizer.cleanTitle(albumName) : null;
-      final albumBrowseId = albumMap?['id'] as String? ?? albumMap?['browseId'] as String?;
+      final album = albumName != null
+          ? MediaNormalizer.cleanTitle(albumName)
+          : null;
+      final albumBrowseId =
+          albumMap?['id'] as String? ?? albumMap?['browseId'] as String?;
       final durSec = (m['duration'] as num?)?.toInt() ?? 210;
       final mins = durSec ~/ 60;
       final secs = (durSec % 60).toString().padLeft(2, '0');
@@ -312,28 +386,47 @@ class SearchParser {
         durationText: '$mins:$secs',
         isExplicit: isExplicit,
         rawRank: rawRank,
+        providerRank: rawRank,
+        sourceStream: 'native',
       );
     } else if (type == 'album') {
       final browseId = m['browseId'] as String? ?? id;
       final playlistId = m['playlistId'] as String?;
       final year = (m['year'] as num?)?.toInt();
+      final rawType = (m['albumType'] as String? ?? '').trim();
+      final isSingleFlag =
+          m['isSingle'] == true ||
+          rawType.toLowerCase() == 'single' ||
+          title.toLowerCase().endsWith('- single');
+      final resolvedType = isSingleFlag
+          ? 'Single'
+          : (rawType.toLowerCase() == 'ep' ? 'EP' : 'Album');
       return SearchAlbumItem(
-        id: id.isNotEmpty ? id : (browseId.isNotEmpty ? browseId : 'album-$title'),
+        id: id.isNotEmpty
+            ? id
+            : (browseId.isNotEmpty ? browseId : 'album-$title'),
         title: title,
-        subtitle: artistsString.isNotEmpty ? (year != null ? '$artistsString • $year' : artistsString) : 'Album',
+        subtitle: artistsString.isNotEmpty
+            ? (year != null ? '$artistsString • $year' : artistsString)
+            : resolvedType,
         thumbnailUrl: thumb,
         thumbnailUrlHiRes: thumb,
         browseId: browseId,
         playlistId: playlistId,
+        albumType: resolvedType,
         year: year,
         artists: artistRefs,
         isExplicit: isExplicit,
         rawRank: rawRank,
+        providerRank: rawRank,
+        sourceStream: 'native',
       );
     } else if (type == 'artist') {
       final channelId = m['channelId'] as String? ?? id;
       return SearchArtistItem(
-        id: id.isNotEmpty ? id : (channelId.isNotEmpty ? channelId : 'artist-$title'),
+        id: id.isNotEmpty
+            ? id
+            : (channelId.isNotEmpty ? channelId : 'artist-$title'),
         title: title,
         subtitle: 'Artist',
         thumbnailUrl: thumb,
@@ -341,9 +434,13 @@ class SearchParser {
         browseId: channelId,
         isVerified: true,
         rawRank: rawRank,
+        providerRank: rawRank,
+        sourceStream: 'native',
       );
     } else if (type == 'playlist') {
-      final author = (m['author'] is Map) ? (m['author']['name'] as String?) : null;
+      final author = (m['author'] is Map)
+          ? (m['author']['name'] as String?)
+          : null;
       return SearchPlaylistItem(
         id: id,
         title: title,
@@ -354,33 +451,48 @@ class SearchParser {
         playlistId: id,
         author: author,
         rawRank: rawRank,
+        providerRank: rawRank,
+        sourceStream: 'native',
       );
     } else if (type == 'video') {
-      final channel = artistsString.isNotEmpty ? artistsString : (m['channel'] as String?);
+      final rawVideoTitle = (m['title'] as String? ?? title).trim();
+      final rawChan = artistsString.isNotEmpty ? artistsString : (m['channel'] as String?);
+      final validArtist = (rawChan != null &&
+              rawChan.trim().isNotEmpty &&
+              !MediaNormalizer.isDistributorOrLabel(rawChan) &&
+              !MediaNormalizer.isNonArtistCreditSegment(rawChan))
+          ? MediaNormalizer.formatArtists(rawChan)
+          : MediaNormalizer.extractArtistsFromVideoTitle(rawVideoTitle);
+      final cleanVidTitle = MediaNormalizer.cleanVideoTitle(
+        rawVideoTitle,
+        knownArtists: validArtist,
+      );
       final durSec = (m['duration'] as num?)?.toInt() ?? 0;
       if (!MusicVideoFilter.isLegitMusicVideo(
-        title: title,
-        subtitle: channel ?? 'Video',
-        channel: channel,
+        title: rawVideoTitle,
+        subtitle: validArtist.isNotEmpty ? validArtist : (rawChan ?? 'Video'),
+        channel: rawChan,
         durationSeconds: durSec,
       )) {
         return null;
       }
       return SearchVideoItem(
         id: id,
-        title: title,
-        subtitle: channel ?? 'Video',
+        title: cleanVidTitle,
+        subtitle: validArtist.isNotEmpty ? validArtist : 'Video',
         thumbnailUrl: thumb,
         thumbnailUrlHiRes: thumb,
         videoId: id,
-        channel: channel,
+        channel: validArtist.isNotEmpty ? validArtist : rawChan,
         rawRank: rawRank,
+        providerRank: rawRank,
+        sourceStream: 'native',
       );
     } else {
       // Fallback: guess by presence of fields
       if (m.containsKey('duration') || id.length == 11) {
         final durSec = (m['duration'] as num?)?.toInt() ?? 210;
-        if (durSec < 60) return null; // Reject shorts
+        if (durSec > 0 && durSec < 25) return null; // Reject shorts
         return SearchSongItem(
           id: id,
           title: title,
@@ -390,6 +502,8 @@ class SearchParser {
           videoId: id,
           artists: artistRefs,
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: 'native',
         );
       }
     }
@@ -406,23 +520,54 @@ class SearchParser {
     try {
       final title = _extractTitleWithFallback(
         primaryRuns: card['title']?['runs'] as List?,
-        accessibility: card['title']?['accessibility']?['accessibilityData']?['label'] as String?,
+        accessibility:
+            card['title']?['accessibility']?['accessibilityData']?['label']
+                as String?,
       );
       if (title.isEmpty) return null;
 
       final subtitleRuns = card['subtitle']?['runs'] as List?;
       final subtitle = _extractTextFromRuns(subtitleRuns);
 
-      final thumbs = card['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails'] as List?;
+      final thumbs =
+          card['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails']
+              as List?;
       final (thumb, thumbHiRes) = _extractThumbnails(thumbs);
 
       // Endpoints & Identifiers
-      final titleEndpoint = card['title']?['runs']?[0]?['navigationEndpoint'];
-      final browseId = titleEndpoint?['browseEndpoint']?['browseId'] as String?;
-      final pageType = titleEndpoint?['browseEndpoint']
-              ?['browseEndpointContextSupportedConfigs']
-              ?['browseEndpointContextMusicConfig']?['pageType']
-          ?.toString();
+      final onTap = card['onTap'];
+      final titleRuns0 = card['title']?['runs'];
+      final firstRunNav =
+          (titleRuns0 is List && titleRuns0.isNotEmpty && titleRuns0[0] is Map)
+          ? titleRuns0[0]['navigationEndpoint']
+          : null;
+      final titleEndpoint = firstRunNav ?? onTap;
+      final titleBrowse =
+          (titleEndpoint is Map ? titleEndpoint['browseEndpoint'] : null)
+              as Map?;
+      final onTapBrowse =
+          (onTap is Map ? onTap['browseEndpoint'] : null) as Map?;
+      final browseId =
+          (titleBrowse?['browseId'] ?? onTapBrowse?['browseId']) as String?;
+
+      final titleMusicCfg =
+          (titleBrowse?['browseEndpointContextSupportedConfigs']
+                  as Map?)?['browseEndpointContextMusicConfig']
+              as Map?;
+      final onTapMusicCfg =
+          (onTapBrowse?['browseEndpointContextSupportedConfigs']
+                  as Map?)?['browseEndpointContextMusicConfig']
+              as Map?;
+      final pageType =
+          (titleMusicCfg?['pageType'] ?? onTapMusicCfg?['pageType'])
+              ?.toString();
+
+      final onTapWatch = (onTap is Map ? onTap['watchEndpoint'] : null) as Map?;
+      final onTapWatchCfg =
+          (onTapWatch?['watchEndpointMusicSupportedConfigs']
+                  as Map?)?['watchEndpointMusicConfig']
+              as Map?;
+      final onTapMvt = onTapWatchCfg?['musicVideoType']?.toString();
 
       // Check buttons for playback, radio, shuffle
       String? playVideoId;
@@ -437,19 +582,23 @@ class SearchParser {
           if (playRenderer is Map) {
             final nav = playRenderer['playNavigationEndpoint'];
             playVideoId ??= nav?['watchEndpoint']?['videoId'] as String?;
-            radioPlaylistId ??= nav?['watchPlaylistEndpoint']?['playlistId'] as String?;
+            radioPlaylistId ??=
+                nav?['watchPlaylistEndpoint']?['playlistId'] as String?;
           }
           final btnRenderer = btn['buttonRenderer'];
           if (btnRenderer is Map) {
             final cmd = btnRenderer['command'];
             final icon = btnRenderer['icon']?['iconType'];
             if (icon == 'MUSIC_SHUFFLE') {
-              shufflePlaylistId ??= cmd?['watchPlaylistEndpoint']?['playlistId'] as String?;
+              shufflePlaylistId ??=
+                  cmd?['watchPlaylistEndpoint']?['playlistId'] as String?;
             } else if (icon == 'MIX') {
-              radioPlaylistId ??= cmd?['watchPlaylistEndpoint']?['playlistId'] as String?;
+              radioPlaylistId ??=
+                  cmd?['watchPlaylistEndpoint']?['playlistId'] as String?;
             }
             playVideoId ??= cmd?['watchEndpoint']?['videoId'] as String?;
-            radioPlaylistId ??= cmd?['watchPlaylistEndpoint']?['playlistId'] as String?;
+            radioPlaylistId ??=
+                cmd?['watchPlaylistEndpoint']?['playlistId'] as String?;
           }
           final navRenderer = btn['menuRenderer']?['items'] as List?;
           if (navRenderer != null) {
@@ -457,9 +606,13 @@ class SearchParser {
               final navItem = mItem['menuNavigationItemRenderer'];
               final icon = navItem?['icon']?['iconType'];
               if (icon == 'MUSIC_SHUFFLE') {
-                shufflePlaylistId ??= navItem?['navigationEndpoint']?['watchPlaylistEndpoint']?['playlistId'] as String?;
+                shufflePlaylistId ??=
+                    navItem?['navigationEndpoint']?['watchPlaylistEndpoint']?['playlistId']
+                        as String?;
               } else if (icon == 'MIX') {
-                radioPlaylistId ??= navItem?['navigationEndpoint']?['watchPlaylistEndpoint']?['playlistId'] as String?;
+                radioPlaylistId ??=
+                    navItem?['navigationEndpoint']?['watchPlaylistEndpoint']?['playlistId']
+                        as String?;
               }
             }
           }
@@ -467,20 +620,33 @@ class SearchParser {
       }
 
       // Fallback videoId from tap endpoint
-      final onTap = card['onTap'];
       if (playVideoId == null && onTap is Map) {
         playVideoId = onTap['watchEndpoint']?['videoId'] as String?;
       }
 
       final subLower = subtitle.toLowerCase();
-      final isArtist = pageType == 'MUSIC_PAGE_TYPE_ARTIST' ||
+      final isArtist =
+          pageType == 'MUSIC_PAGE_TYPE_ARTIST' ||
           pageType == 'MUSIC_PAGE_TYPE_USER_CHANNEL' ||
           subLower.startsWith('artist');
-      final isAlbum = pageType == 'MUSIC_PAGE_TYPE_ALBUM' ||
+      final isAlbum =
+          pageType == 'MUSIC_PAGE_TYPE_ALBUM' ||
           subLower.startsWith('album') ||
           subLower.startsWith('ep') ||
           subLower.startsWith('single');
-      final isPlaylist = pageType == 'MUSIC_PAGE_TYPE_PLAYLIST' || subLower.startsWith('playlist');
+      final isPlaylist =
+          pageType == 'MUSIC_PAGE_TYPE_PLAYLIST' ||
+          subLower.startsWith('playlist');
+      final isVideo =
+          !isArtist &&
+          !isAlbum &&
+          !isPlaylist &&
+          (subLower.startsWith('video') ||
+              onTapMvt == 'MUSIC_VIDEO_TYPE_OMV' ||
+              onTapMvt == 'MUSIC_VIDEO_TYPE_UGC' ||
+              onTapMvt == 'MUSIC_VIDEO_TYPE_OFFICIAL_SOURCE_MUSIC_VIDEO');
+
+      final parsedSub = _classifySubtitleSegments(subtitleRuns);
 
       SearchItem item;
       if (isArtist) {
@@ -509,37 +675,86 @@ class SearchParser {
           thumbnailUrlHiRes: thumbHiRes,
           browseId: browseId,
           playlistId: radioPlaylistId,
-          albumType: subLower.contains('single') ? 'Single' : (subLower.contains('ep') ? 'EP' : 'Album'),
+          albumType: subLower.contains('single')
+              ? 'Single'
+              : (subLower.contains('ep') ? 'EP' : 'Album'),
           year: _extractYear(subtitle),
+          artists: parsedSub.artists,
           rawRank: rawRank,
           providerRank: rawRank,
           sourceStream: sourceStream,
         );
       } else if (isPlaylist) {
+        final pid = browseId?.removePrefix('VL') ?? '';
         item = SearchPlaylistItem(
-          id: browseId ?? 'playlist-$title',
+          id: pid.isNotEmpty ? pid : 'playlist-$title',
           title: title,
           subtitle: subtitle.isNotEmpty ? subtitle : 'Playlist',
           thumbnailUrl: thumb,
           thumbnailUrlHiRes: thumbHiRes,
           browseId: browseId,
-          playlistId: browseId,
+          playlistId: pid.isNotEmpty ? pid : browseId,
           rawRank: rawRank,
           providerRank: rawRank,
           sourceStream: sourceStream,
-          author: subtitle,
+          author: parsedSub.authorOrCurator ?? subtitle,
+          songCountText: parsedSub.countText,
+        );
+      } else if (isVideo) {
+        final rawChan = parsedSub.artists.isNotEmpty
+            ? parsedSub.artists.first.name
+            : parsedSub.authorOrCurator;
+        final validArtist = (rawChan != null &&
+                rawChan.trim().isNotEmpty &&
+                !MediaNormalizer.isDistributorOrLabel(rawChan) &&
+                !MediaNormalizer.isNonArtistCreditSegment(rawChan))
+            ? MediaNormalizer.formatArtists(rawChan)
+            : MediaNormalizer.extractArtistsFromVideoTitle(title);
+        final cleanVidTitle = MediaNormalizer.cleanVideoTitle(
+          title,
+          knownArtists: validArtist,
+        );
+        item = SearchVideoItem(
+          id: playVideoId ?? 'vid-$cleanVidTitle',
+          title: cleanVidTitle,
+          subtitle: validArtist.isNotEmpty
+              ? validArtist
+              : (parsedSub.formattedSubtitle.isNotEmpty
+                    ? parsedSub.formattedSubtitle
+                    : 'Video'),
+          thumbnailUrl: thumb,
+          thumbnailUrlHiRes: thumbHiRes,
+          videoId: playVideoId,
+          browseId: browseId,
+          channel: validArtist.isNotEmpty ? validArtist : rawChan,
+          viewCountText: parsedSub.countText,
+          durationText: parsedSub.durationText ?? '3:30',
+          views: parsedSub.countValue ?? 0,
+          rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
         );
       } else {
         // Song
         item = SearchSongItem(
           id: playVideoId ?? (browseId ?? 'song-$title'),
           title: title,
-          subtitle: subtitle.isNotEmpty ? subtitle : 'Song',
+          subtitle: parsedSub.artists.isNotEmpty
+              ? ArtistRef.formatList(parsedSub.artists)
+              : (subtitle.isNotEmpty ? subtitle : 'Song'),
           thumbnailUrl: thumb,
           thumbnailUrlHiRes: thumbHiRes,
           videoId: playVideoId,
           browseId: browseId,
           radioPlaylistId: radioPlaylistId,
+          artists: parsedSub.artists,
+          albumName: parsedSub.albumName,
+          albumBrowseId: parsedSub.albumBrowseId,
+          durationSeconds: _parseDurationSeconds(parsedSub.durationText),
+          durationText: parsedSub.durationText ?? '3:30',
+          playCount: parsedSub.countValue,
+          playCountText: parsedSub.countText,
+          musicVideoType: onTapMvt ?? 'ATV',
           rawRank: rawRank,
           providerRank: rawRank,
           sourceStream: sourceStream,
@@ -649,14 +864,29 @@ class SearchParser {
       final flexCol0 = col0?['musicResponsiveListItemFlexColumnRenderer'];
       final titleRuns = flexCol0?['text']?['runs'] as List?;
       final simpleTitle = flexCol0?['text']?['simpleText'] as String?;
-      final accessibilityLabel = item['accessibility']?['accessibilityData']?['label'] as String? ??
-          flexCol0?['text']?['accessibility']?['accessibilityData']?['label'] as String?;
+      final accessibilityLabel =
+          item['accessibility']?['accessibilityData']?['label'] as String? ??
+          flexCol0?['text']?['accessibility']?['accessibilityData']?['label']
+              as String?;
 
       // Subtitle runs for fallback
-      final col1 = flexColumns.length > 1 && flexColumns[1] is Map ? flexColumns[1] as Map : null;
+      final col1 = flexColumns.length > 1 && flexColumns[1] is Map
+          ? flexColumns[1] as Map
+          : null;
       final flexCol1 = col1?['musicResponsiveListItemFlexColumnRenderer'];
       final subtitleRuns = flexCol1?['text']?['runs'] as List?;
       final simpleSubtitle = flexCol1?['text']?['simpleText'] as String?;
+
+      // Optional Column 2: Plays / Views text (e.g. "4.1B plays")
+      final col2 = flexColumns.length > 2 && flexColumns[2] is Map
+          ? flexColumns[2] as Map
+          : null;
+      final flexCol2 = col2?['musicResponsiveListItemFlexColumnRenderer'];
+      final col2Runs = flexCol2?['text']?['runs'] as List?;
+      final col2Text = col2Runs != null
+          ? _extractTextFromRuns(col2Runs)
+          : (flexCol2?['text']?['simpleText'] as String? ?? '');
+      final col2CountVal = _extractCountValue(col2Text);
 
       final title = _extractTitleWithFallback(
         primaryRuns: titleRuns,
@@ -667,71 +897,136 @@ class SearchParser {
 
       // Rule: Never produce an item with an empty title
       if (title.isEmpty) {
-        if (kDebugMode) debugPrint('[SearchParser] Dropping item: empty title after full fallback chain');
+        if (kDebugMode)
+          debugPrint(
+            '[SearchParser] Dropping item: empty title after full fallback chain',
+          );
         return null;
       }
 
       // 2. Thumbnails
-      final thumbs = item['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails'] as List?;
+      final thumbs =
+          item['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails']
+              as List?;
       final (thumb, thumbHiRes) = _extractThumbnails(thumbs);
 
       // 3. Navigation Endpoints & Identifiers
       final navEndpoint = item['navigationEndpoint'];
-      final browseId = navEndpoint?['browseEndpoint']?['browseId'] as String?;
-      final pageType = navEndpoint?['browseEndpoint']
-              ?['browseEndpointContextSupportedConfigs']
-              ?['browseEndpointContextMusicConfig']?['pageType']
-          ?.toString();
+      final navBrowse =
+          (navEndpoint is Map ? navEndpoint['browseEndpoint'] : null) as Map?;
+      final browseId = navBrowse?['browseId'] as String?;
+      final navMusicCfg =
+          (navBrowse?['browseEndpointContextSupportedConfigs']
+                  as Map?)?['browseEndpointContextMusicConfig']
+              as Map?;
+      final pageType = navMusicCfg?['pageType']?.toString();
 
-      final overlayNav = item['overlay']?['musicItemThumbnailOverlayRenderer']
-          ?['content']?['musicPlayButtonRenderer']?['playNavigationEndpoint'];
-      String? videoId = overlayNav?['watchEndpoint']?['videoId'] as String? ??
-          navEndpoint?['watchEndpoint']?['videoId'] as String? ??
-          item['playlistItemData']?['videoId'] as String?;
-
-      if (videoId == null && titleRuns != null && titleRuns.isNotEmpty && titleRuns[0] is Map) {
-        videoId = titleRuns[0]['navigationEndpoint']?['watchEndpoint']?['videoId'] as String?;
+      final overlayRenderer =
+          item['overlay']?['musicItemThumbnailOverlayRenderer'];
+      final playBtnRenderer = (overlayRenderer is Map
+          ? overlayRenderer['content']
+          : null)?['musicPlayButtonRenderer'];
+      final overlayNav = playBtnRenderer is Map
+          ? playBtnRenderer['playNavigationEndpoint']
+          : null;
+      Map? titleWatch;
+      if (titleRuns != null && titleRuns.isNotEmpty && titleRuns[0] is Map) {
+        final tNav = (titleRuns[0] as Map)['navigationEndpoint'];
+        if (tNav is Map) {
+          titleWatch = tNav['watchEndpoint'] as Map?;
+        }
       }
+      final effectiveWatch =
+          (overlayNav?['watchEndpoint'] ??
+                  navEndpoint?['watchEndpoint'] ??
+                  titleWatch)
+              as Map?;
+      String? videoId =
+          effectiveWatch?['videoId'] as String? ??
+          item['playlistItemData']?['videoId'] as String?;
+      final watchMusicCfg =
+          (effectiveWatch?['watchEndpointMusicSupportedConfigs']
+                  as Map?)?['watchEndpointMusicConfig']
+              as Map?;
+      final musicVideoType =
+          watchMusicCfg?['musicVideoType']?.toString() ??
+          item['musicVideoType']?.toString();
 
       // Check badges for explicit flag
       final badges = item['badges'] as List?;
-      final isExplicit = badges?.any((b) =>
-              b is Map &&
-              b['musicInlineBadgeRenderer']?['icon']?['iconType'] == 'MUSIC_EXPLICIT_BADGE') ??
+      final isExplicit =
+          badges?.any(
+            (b) =>
+                b is Map &&
+                b['musicInlineBadgeRenderer']?['icon']?['iconType'] ==
+                    'MUSIC_EXPLICIT_BADGE',
+          ) ??
           false;
 
       // 4. Subtitle runs classification
-      final segments = _classifySubtitleSegments(subtitleRuns, simpleText: simpleSubtitle);
+      final segments = _classifySubtitleSegments(
+        subtitleRuns,
+        simpleText: simpleSubtitle,
+      );
+      final isAudienceArtistHint =
+          (segments.countText?.toLowerCase().contains('audience') == true ||
+              segments.countText?.toLowerCase().contains('subscriber') ==
+                  true) &&
+          videoId == null;
 
-      // Determine Item Type
-      final isArtist = shelfCategory.contains('artist') ||
-          pageType == 'MUSIC_PAGE_TYPE_ARTIST' ||
-          pageType == 'MUSIC_PAGE_TYPE_USER_CHANNEL' ||
-          segments.typeKeyword == 'artist' ||
-          segments.typeKeyword == 'profile';
-
-      final isAlbum = shelfCategory.contains('album') ||
-          pageType == 'MUSIC_PAGE_TYPE_ALBUM' ||
-          segments.typeKeyword == 'album' ||
-          segments.typeKeyword == 'single' ||
-          segments.typeKeyword == 'ep';
-
-      final isPlaylist = shelfCategory.contains('playlist') ||
-          pageType == 'MUSIC_PAGE_TYPE_PLAYLIST' ||
-          segments.typeKeyword == 'playlist';
-
-      final isPodcast = shelfCategory.contains('podcast') ||
+      // Reject podcast episodes from music searches unless explicitly in podcast context
+      final isPodcast =
+          shelfCategory.contains('podcast') ||
           pageType == 'MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE' ||
           segments.typeKeyword == 'podcast';
 
-      final isEpisode = segments.typeKeyword == 'episode' ||
-          pageType == 'MUSIC_PAGE_TYPE_PODCAST_EPISODE_DETAIL_PAGE';
+      final isEpisode =
+          segments.typeKeyword == 'episode' ||
+          pageType == 'MUSIC_PAGE_TYPE_PODCAST_EPISODE_DETAIL_PAGE' ||
+          musicVideoType == 'MUSIC_VIDEO_TYPE_PODCAST_EPISODE';
+
+      // Determine Item Type
+      final isArtist =
+          !isPodcast &&
+          !isEpisode &&
+          (sourceStream == 'artists' ||
+              shelfCategory.contains('artist') ||
+              pageType == 'MUSIC_PAGE_TYPE_ARTIST' ||
+              pageType == 'MUSIC_PAGE_TYPE_USER_CHANNEL' ||
+              segments.typeKeyword == 'artist' ||
+              segments.typeKeyword == 'profile' ||
+              isAudienceArtistHint);
+
+      final isAlbum =
+          !isArtist &&
+          !isPodcast &&
+          !isEpisode &&
+          (sourceStream == 'albums' ||
+              shelfCategory.contains('album') ||
+              pageType == 'MUSIC_PAGE_TYPE_ALBUM' ||
+              segments.typeKeyword == 'album' ||
+              segments.typeKeyword == 'single' ||
+              segments.typeKeyword == 'ep');
+
+      final isPlaylist =
+          !isArtist &&
+          !isAlbum &&
+          !isPodcast &&
+          !isEpisode &&
+          (sourceStream == 'playlists' ||
+              sourceStream == 'featuredPlaylists' ||
+              sourceStream == 'communityPlaylists' ||
+              shelfCategory.contains('playlist') ||
+              pageType == 'MUSIC_PAGE_TYPE_PLAYLIST' ||
+              segments.typeKeyword == 'playlist');
 
       if (isArtist) {
         return SearchArtistItem(
           id: browseId ?? 'artist-$title',
           title: title,
-          subtitle: segments.formattedSubtitle.isNotEmpty ? segments.formattedSubtitle : 'Artist',
+          subtitle: segments.formattedSubtitle.isNotEmpty
+              ? segments.formattedSubtitle
+              : 'Artist',
           thumbnailUrl: thumb,
           thumbnailUrlHiRes: thumbHiRes,
           browseId: browseId,
@@ -743,16 +1038,23 @@ class SearchParser {
           sourceStream: sourceStream,
         );
       } else if (isAlbum) {
-        final albumPlaylistId = overlayNav?['watchPlaylistEndpoint']?['playlistId'] as String?;
+        final albumPlaylistId =
+            overlayNav?['watchPlaylistEndpoint']?['playlistId'] as String?;
         return SearchAlbumItem(
           id: browseId ?? 'album-$title',
           title: title,
-          subtitle: segments.formattedSubtitle.isNotEmpty ? segments.formattedSubtitle : (segments.artists.isNotEmpty ? segments.artists.first.name : 'Album'),
+          subtitle: segments.formattedSubtitle.isNotEmpty
+              ? segments.formattedSubtitle
+              : (segments.artists.isNotEmpty
+                    ? segments.artists.first.name
+                    : 'Album'),
           thumbnailUrl: thumb,
           thumbnailUrlHiRes: thumbHiRes,
           browseId: browseId,
           playlistId: albumPlaylistId,
-          albumType: segments.typeKeyword == 'single' ? 'Single' : (segments.typeKeyword == 'ep' ? 'EP' : 'Album'),
+          albumType: segments.typeKeyword == 'single'
+              ? 'Single'
+              : (segments.typeKeyword == 'ep' ? 'EP' : 'Album'),
           year: segments.year,
           artists: segments.artists,
           isExplicit: isExplicit,
@@ -765,14 +1067,22 @@ class SearchParser {
         return SearchPlaylistItem(
           id: playlistId.isNotEmpty ? playlistId : 'playlist-$title',
           title: title,
-          subtitle: segments.formattedSubtitle.isNotEmpty ? segments.formattedSubtitle : 'Playlist',
+          subtitle: segments.formattedSubtitle.isNotEmpty
+              ? segments.formattedSubtitle
+              : 'Playlist',
           thumbnailUrl: thumb,
           thumbnailUrlHiRes: thumbHiRes,
           browseId: browseId,
           playlistId: playlistId,
-          author: segments.authorOrCurator ?? (segments.artists.isNotEmpty ? segments.artists.first.name : null),
+          author:
+              segments.authorOrCurator ??
+              (segments.artists.isNotEmpty
+                  ? segments.artists.first.name
+                  : null),
           songCountText: segments.countText,
-          isOfficial: shelfCategory.contains('featured') || (segments.authorOrCurator?.toLowerCase() == 'youtube music'),
+          isOfficial:
+              shelfCategory.contains('featured') ||
+              (segments.authorOrCurator?.toLowerCase() == 'youtube music'),
           isCommunity: shelfCategory.contains('community'),
           rawRank: rawRank,
           providerRank: rawRank,
@@ -782,7 +1092,9 @@ class SearchParser {
         return SearchPodcastItem(
           id: videoId ?? (browseId ?? 'podcast-$title'),
           title: title,
-          subtitle: segments.formattedSubtitle.isNotEmpty ? segments.formattedSubtitle : 'Podcast',
+          subtitle: segments.formattedSubtitle.isNotEmpty
+              ? segments.formattedSubtitle
+              : 'Podcast',
           thumbnailUrl: thumb,
           thumbnailUrlHiRes: thumbHiRes,
           browseId: browseId,
@@ -796,31 +1108,57 @@ class SearchParser {
         );
       } else {
         // Song / Video Default
-        final isVideo = shelfCategory.contains('video') || segments.typeKeyword == 'video';
+        final isVideo =
+            sourceStream == 'videos' ||
+            shelfCategory.contains('video') ||
+            segments.typeKeyword == 'video' ||
+            segments.typeKeyword == 'music video' ||
+            musicVideoType == 'MUSIC_VIDEO_TYPE_OMV' ||
+            musicVideoType == 'MUSIC_VIDEO_TYPE_UGC' ||
+            musicVideoType == 'MUSIC_VIDEO_TYPE_OFFICIAL_SOURCE_MUSIC_VIDEO';
         if (isVideo) {
-          final channelName = segments.artists.isNotEmpty ? segments.artists.first.name : null;
+          final rawChan = segments.artists.isNotEmpty
+              ? ArtistRef.formatList(segments.artists)
+              : segments.authorOrCurator;
+          final validArtist = (rawChan != null &&
+                  rawChan.trim().isNotEmpty &&
+                  !MediaNormalizer.isDistributorOrLabel(rawChan) &&
+                  !MediaNormalizer.isNonArtistCreditSegment(rawChan))
+              ? MediaNormalizer.formatArtists(rawChan)
+              : MediaNormalizer.extractArtistsFromVideoTitle(title);
+          final cleanVidTitle = MediaNormalizer.cleanVideoTitle(
+            title,
+            knownArtists: validArtist,
+          );
           final durationSecs = _parseDurationSeconds(segments.durationText);
           if (!MusicVideoFilter.isLegitMusicVideo(
             title: title,
-            subtitle: segments.formattedSubtitle,
-            channel: channelName,
+            subtitle: validArtist.isNotEmpty
+                ? validArtist
+                : segments.formattedSubtitle,
+            channel: rawChan,
             durationSeconds: durationSecs,
             durationText: segments.durationText,
           )) {
             return null;
           }
           return SearchVideoItem(
-            id: videoId ?? 'vid-$title',
-            title: title,
-            subtitle: segments.formattedSubtitle.isNotEmpty ? segments.formattedSubtitle : 'Video',
+            id: videoId ?? 'vid-$cleanVidTitle',
+            title: cleanVidTitle,
+            subtitle: validArtist.isNotEmpty
+                ? validArtist
+                : (segments.formattedSubtitle.isNotEmpty
+                      ? segments.formattedSubtitle
+                      : 'Video'),
             thumbnailUrl: thumb,
             thumbnailUrlHiRes: thumbHiRes,
             videoId: videoId,
             browseId: browseId,
-            channel: channelName,
-            viewCountText: segments.countText,
+            channel: validArtist.isNotEmpty ? validArtist : rawChan,
+            viewCountText:
+                segments.countText ?? (col2Text.isNotEmpty ? col2Text : null),
             durationText: segments.durationText ?? '3:30',
-            views: segments.countValue ?? 0,
+            views: segments.countValue ?? col2CountVal ?? 0,
             rawRank: rawRank,
             providerRank: rawRank,
             sourceStream: sourceStream,
@@ -828,10 +1166,23 @@ class SearchParser {
         }
 
         final durationSecs = _parseDurationSeconds(segments.durationText);
+        final effectivePlaysText = col2Text.isNotEmpty
+            ? col2Text
+            : segments.countText;
+        final effectivePlaysVal = col2CountVal ?? segments.countValue;
+        final cleanArtistsSub = segments.artists.isNotEmpty
+            ? ArtistRef.formatList(segments.artists)
+            : (segments.authorOrCurator ?? 'Song');
+        final songDisplaySub =
+            (segments.albumName != null &&
+                segments.albumName!.isNotEmpty &&
+                segments.albumName != 'Single')
+            ? '$cleanArtistsSub • ${segments.albumName}'
+            : cleanArtistsSub;
         return SearchSongItem(
           id: videoId ?? 'yt-$title',
           title: title,
-          subtitle: segments.formattedSubtitle.isNotEmpty ? segments.formattedSubtitle : (segments.artists.isNotEmpty ? ArtistRef.formatList(segments.artists) : 'Song'),
+          subtitle: songDisplaySub.isNotEmpty ? songDisplaySub : 'Song',
           thumbnailUrl: thumb,
           thumbnailUrlHiRes: thumbHiRes,
           videoId: videoId,
@@ -842,14 +1193,19 @@ class SearchParser {
           durationSeconds: durationSecs,
           durationText: segments.durationText ?? '3:30',
           isExplicit: isExplicit,
-          musicVideoType: item['musicVideoType']?.toString() ?? 'ATV',
+          musicVideoType: musicVideoType ?? 'ATV',
+          playCount: effectivePlaysVal,
+          playCountText: effectivePlaysText,
           rawRank: rawRank,
           providerRank: rawRank,
           sourceStream: sourceStream,
         );
       }
     } catch (e, stack) {
-      if (kDebugMode) debugPrint('[SearchParser] Error parsing responsive list item: $e\n$stack');
+      if (kDebugMode)
+        debugPrint(
+          '[SearchParser] Error parsing responsive list item: $e\n$stack',
+        );
       return null;
     }
   }
@@ -865,7 +1221,9 @@ class SearchParser {
     try {
       final titleRuns = item['title']?['runs'] as List?;
       final simpleTitle = item['title']?['simpleText'] as String?;
-      final accessibilityLabel = item['title']?['accessibility']?['accessibilityData']?['label'] as String?;
+      final accessibilityLabel =
+          item['title']?['accessibility']?['accessibilityData']?['label']
+              as String?;
 
       final subtitleRuns = item['subtitle']?['runs'] as List?;
       final simpleSubtitle = item['subtitle']?['simpleText'] as String?;
@@ -879,30 +1237,37 @@ class SearchParser {
 
       if (title.isEmpty) return null;
 
-      final thumbs = item['thumbnailRenderer']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails'] as List?;
+      final thumbs =
+          item['thumbnailRenderer']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails']
+              as List?;
       final (thumb, thumbHiRes) = _extractThumbnails(thumbs);
 
       final navEndpoint = item['navigationEndpoint'];
       final browseId = navEndpoint?['browseEndpoint']?['browseId'] as String?;
-      final pageType = navEndpoint?['browseEndpoint']
-              ?['browseEndpointContextSupportedConfigs']
-              ?['browseEndpointContextMusicConfig']?['pageType']
-          ?.toString();
+      final pageType =
+          navEndpoint?['browseEndpoint']?['browseEndpointContextSupportedConfigs']?['browseEndpointContextMusicConfig']?['pageType']
+              ?.toString();
 
-      final segments = _classifySubtitleSegments(subtitleRuns, simpleText: simpleSubtitle);
+      final segments = _classifySubtitleSegments(
+        subtitleRuns,
+        simpleText: simpleSubtitle,
+      );
 
-      final isArtist = shelfCategory.contains('artist') ||
+      final isArtist =
+          shelfCategory.contains('artist') ||
           pageType == 'MUSIC_PAGE_TYPE_ARTIST' ||
           pageType == 'MUSIC_PAGE_TYPE_USER_CHANNEL' ||
           segments.typeKeyword == 'artist';
 
-      final isAlbum = shelfCategory.contains('album') ||
+      final isAlbum =
+          shelfCategory.contains('album') ||
           pageType == 'MUSIC_PAGE_TYPE_ALBUM' ||
           segments.typeKeyword == 'album' ||
           segments.typeKeyword == 'single' ||
           segments.typeKeyword == 'ep';
 
-      final isPlaylist = shelfCategory.contains('playlist') ||
+      final isPlaylist =
+          shelfCategory.contains('playlist') ||
           pageType == 'MUSIC_PAGE_TYPE_PLAYLIST' ||
           segments.typeKeyword == 'playlist';
 
@@ -910,7 +1275,9 @@ class SearchParser {
         return SearchArtistItem(
           id: browseId ?? 'artist-$title',
           title: title,
-          subtitle: segments.formattedSubtitle.isNotEmpty ? segments.formattedSubtitle : 'Artist',
+          subtitle: segments.formattedSubtitle.isNotEmpty
+              ? segments.formattedSubtitle
+              : 'Artist',
           thumbnailUrl: thumb,
           thumbnailUrlHiRes: thumbHiRes,
           browseId: browseId,
@@ -924,7 +1291,9 @@ class SearchParser {
         return SearchAlbumItem(
           id: browseId ?? 'album-$title',
           title: title,
-          subtitle: segments.formattedSubtitle.isNotEmpty ? segments.formattedSubtitle : 'Album',
+          subtitle: segments.formattedSubtitle.isNotEmpty
+              ? segments.formattedSubtitle
+              : 'Album',
           thumbnailUrl: thumb,
           thumbnailUrlHiRes: thumbHiRes,
           browseId: browseId,
@@ -939,7 +1308,9 @@ class SearchParser {
         return SearchPlaylistItem(
           id: browseId ?? 'playlist-$title',
           title: title,
-          subtitle: segments.formattedSubtitle.isNotEmpty ? segments.formattedSubtitle : 'Playlist',
+          subtitle: segments.formattedSubtitle.isNotEmpty
+              ? segments.formattedSubtitle
+              : 'Playlist',
           thumbnailUrl: thumb,
           thumbnailUrlHiRes: thumbHiRes,
           browseId: browseId,
@@ -956,7 +1327,9 @@ class SearchParser {
         return SearchSongItem(
           id: videoId ?? (browseId ?? 'song-$title'),
           title: title,
-          subtitle: segments.formattedSubtitle.isNotEmpty ? segments.formattedSubtitle : 'Song',
+          subtitle: segments.formattedSubtitle.isNotEmpty
+              ? segments.formattedSubtitle
+              : 'Song',
           thumbnailUrl: thumb,
           thumbnailUrlHiRes: thumbHiRes,
           videoId: videoId,
@@ -970,7 +1343,8 @@ class SearchParser {
         );
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('[SearchParser] Error parsing two-row item: $e');
+      if (kDebugMode)
+        debugPrint('[SearchParser] Error parsing two-row item: $e');
       return null;
     }
   }
@@ -1077,12 +1451,18 @@ class SearchParser {
     }
 
     final std = MediaNormalizer.upgradeArtworkUrl(highestUrl, targetSize: 600);
-    final hiRes = MediaNormalizer.upgradeArtworkUrl(highestUrl, targetSize: 1200);
+    final hiRes = MediaNormalizer.upgradeArtworkUrl(
+      highestUrl,
+      targetSize: 1200,
+    );
     return (std, hiRes);
   }
 
   /// Classifies subtitle runs into structured semantic components.
-  static _SubtitleMetadata _classifySubtitleSegments(List? runs, {String? simpleText}) {
+  static _SubtitleMetadata _classifySubtitleSegments(
+    List? runs, {
+    String? simpleText,
+  }) {
     final artists = <ArtistRef>[];
     String? typeKeyword;
     int? year;
@@ -1143,14 +1523,16 @@ class SearchParser {
         }
 
         // Check Album Run
-        final hasAlbumNav = segRuns.any((r) =>
-            r['navigationEndpoint']?['browseEndpoint']
-                ?['browseEndpointContextSupportedConfigs']
-                ?['browseEndpointContextMusicConfig']?['pageType'] ==
-            'MUSIC_PAGE_TYPE_ALBUM');
+        final hasAlbumNav = segRuns.any(
+          (r) =>
+              r['navigationEndpoint']?['browseEndpoint']?['browseEndpointContextSupportedConfigs']?['browseEndpointContextMusicConfig']?['pageType'] ==
+              'MUSIC_PAGE_TYPE_ALBUM',
+        );
         if (hasAlbumNav && albumName == null) {
           albumName = segText;
-          albumBrowseId = segRuns.first['navigationEndpoint']?['browseEndpoint']?['browseId'] as String?;
+          albumBrowseId =
+              segRuns.first['navigationEndpoint']?['browseEndpoint']?['browseId']
+                  as String?;
           continue;
         }
 
@@ -1158,7 +1540,9 @@ class SearchParser {
         final parsedRefs = InnerTubeService.parseArtistRefs(segRuns);
         if (parsedRefs.isNotEmpty) {
           for (final a in parsedRefs) {
-            if (!artists.any((x) => x.name.toLowerCase() == a.name.toLowerCase())) {
+            if (!artists.any(
+              (x) => x.name.toLowerCase() == a.name.toLowerCase(),
+            )) {
               artists.add(a);
             }
           }
@@ -1167,7 +1551,8 @@ class SearchParser {
         }
 
         // Fallback: artist / creator candidate
-        if (!MediaNormalizer.isMetadataNoise(segText) && !_yearRegex.hasMatch(segText)) {
+        if (!MediaNormalizer.isMetadataNoise(segText) &&
+            !_yearRegex.hasMatch(segText)) {
           authorOrCurator ??= segText;
           if (artists.isEmpty) {
             final split = MediaNormalizer.splitArtistNames(segText);
@@ -1178,7 +1563,11 @@ class SearchParser {
         }
       }
     } else if (simpleText != null && simpleText.isNotEmpty) {
-      final parts = simpleText.split('•').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      final parts = simpleText
+          .split('•')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
       for (final p in parts) {
         if (_typeRegex.hasMatch(p)) {
           typeKeyword = p.toLowerCase();
@@ -1275,9 +1664,12 @@ class SearchParser {
       List? sectionList;
       if (tabs != null && tabs.isNotEmpty && tabs.first is Map) {
         final t0 = tabs.first as Map;
-        sectionList = t0['tabRenderer']?['content']?['sectionListRenderer']?['contents'] as List?;
+        sectionList =
+            t0['tabRenderer']?['content']?['sectionListRenderer']?['contents']
+                as List?;
       }
-      sectionList ??= json['contents']?['sectionListRenderer']?['contents'] as List?;
+      sectionList ??=
+          json['contents']?['sectionListRenderer']?['contents'] as List?;
 
       if (sectionList is List) {
         for (final sec in sectionList) {
@@ -1286,7 +1678,8 @@ class SearchParser {
           if (dym is List) {
             for (final it in dym) {
               if (it is! Map) continue;
-              final dymObj = it['didYouMeanRenderer'] ?? it['showingResultsForRenderer'];
+              final dymObj =
+                  it['didYouMeanRenderer'] ?? it['showingResultsForRenderer'];
               if (dymObj is Map) {
                 final runs = dymObj['correctedQuery']?['runs'] as List?;
                 final q = _extractTextFromRuns(runs);
@@ -1311,6 +1704,49 @@ class SearchParser {
       }
     } catch (_) {}
     return null;
+  }
+
+  /// Parses `music/get_search_suggestions` response into query autocomplete strings
+  /// and rich entity recommendations (`contents[1]`).
+  static ({List<String> queries, List<SearchItem> recommendedItems})
+  parseSuggestionBundle(Map<String, dynamic> json) {
+    final queries = <String>[];
+    final recommended = <SearchItem>[];
+    try {
+      final contents = json['contents'] as List?;
+      if (contents == null)
+        return (queries: queries, recommendedItems: recommended);
+
+      int rank = 0;
+      for (final c in contents) {
+        if (c is! Map) continue;
+        final rows = c['searchSuggestionsSectionRenderer']?['contents'];
+        if (rows is! List) continue;
+        for (final row in rows) {
+          if (row is! Map) continue;
+          final sugRuns =
+              row['searchSuggestionRenderer']?['suggestion']?['runs'] as List?;
+          if (sugRuns != null && sugRuns.isNotEmpty) {
+            final text = sugRuns.map((r) => r['text'] ?? '').join().trim();
+            if (text.isNotEmpty) queries.add(text);
+          }
+          if (row['musicResponsiveListItemRenderer'] is Map) {
+            final parsed = _parseResponsiveListItem(
+              Map<String, dynamic>.from(row['musicResponsiveListItemRenderer']),
+              rawRank: rank++,
+              sourceStream: 'suggestion',
+            );
+            if (parsed != null && parsed is! SearchPodcastItem) {
+              recommended.add(parsed);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode)
+        debugPrint('[SearchParser] parseSuggestionBundle error: $e');
+    }
+    return (queries: queries, recommendedItems: recommended);
   }
 }
 

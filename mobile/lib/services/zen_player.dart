@@ -47,6 +47,9 @@ class AudioPlayer implements FxEngine {
   final _videoTextureIdC = StreamController<int>.broadcast();
   final _xfDueC = StreamController<void>.broadcast();
   final _xfC = StreamController<({String phase, int ms})>.broadcast();
+  final _sysVolC = StreamController<double>.broadcast();
+  final _audioFocusC =
+      StreamController<({String state, int positionMs})>.broadcast();
 
   Stream<PlayerState> get onPlayerStateChanged => _stateC.stream;
   Stream<bool> get onBufferingChanged => _bufferingC.stream;
@@ -61,6 +64,9 @@ class AudioPlayer implements FxEngine {
   Stream<int> get onVideoTextureId => _videoTextureIdC.stream;
   Stream<void> get onCrossfadeDue => _xfDueC.stream;
   Stream<({String phase, int ms})> get onCrossfade => _xfC.stream;
+  Stream<double> get onSystemVolumeChanged => _sysVolC.stream;
+  Stream<({String state, int positionMs})> get onAudioFocusChanged =>
+      _audioFocusC.stream;
   PlayerState get state => _state;
 
   void _onEvent(dynamic e) {
@@ -117,6 +123,15 @@ class AudioPlayer implements FxEngine {
         final tid = (e['id'] as num?)?.toInt();
         if (tid != null) {
           _videoTextureIdC.add(tid);
+        }
+      case 'systemVolume':
+        final v = (e['value'] as num?)?.toDouble();
+        if (v != null) _sysVolC.add(v.clamp(0.0, 1.0));
+      case 'audioFocus':
+        final s = e['state']?.toString() ?? '';
+        final posMs = (e['positionMs'] as num?)?.toInt() ?? -1;
+        if (s.isNotEmpty) {
+          _audioFocusC.add((state: s, positionMs: posMs));
         }
     }
   }
@@ -268,10 +283,35 @@ class AudioPlayer implements FxEngine {
   Future<void> stop() => _call('stop');
   Future<void> seek(Duration p) => _call('seek', {'ms': p.inMilliseconds});
   Future<void> setVolume(double v) => _call('setVolume', {'v': v});
+  Future<double> getSystemVolume() async {
+    try {
+      final res = await _method.invokeMethod<num>('getSystemVolume');
+      return res?.toDouble().clamp(0.0, 1.0) ?? 0.6;
+    } catch (_) {
+      return 0.6;
+    }
+  }
+
+  Future<void> setSystemVolume(double v) =>
+      _call('setSystemVolume', {'v': v.clamp(0.0, 1.0)});
   Future<void> setPlaybackRate(double rate) => _call('setFx', {'speed': rate});
   Future<void> setBalance(double balance) async {}
   Future<void> setLifecycle(bool isForeground) =>
       _call('setLifecycle', {'isForeground': isForeground});
+
+  Future<({int positionMs, int durationMs, bool isPlaying})?> getPosition() async {
+    try {
+      final res = await _method.invokeMapMethod<String, dynamic>('getPosition');
+      if (res == null) return null;
+      return (
+        positionMs: (res['positionMs'] as num?)?.toInt() ?? 0,
+        durationMs: (res['durationMs'] as num?)?.toInt() ?? -1,
+        isPlaying: res['isPlaying'] == true,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> setVideoViewport({
     required String state,
@@ -300,6 +340,8 @@ class AudioPlayer implements FxEngine {
       _videoUnavailableC,
       _xfDueC,
       _xfC,
+      _sysVolC,
+      _audioFocusC,
     ]) {
       await c.close();
     }

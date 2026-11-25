@@ -72,6 +72,12 @@ class PlayerState extends ChangeNotifier
   /// User volume 0..1.
   final ValueNotifier<double> volumeNotifier = ValueNotifier<double>(1.0);
 
+  /// Device hardware media volume 0..1 (`AudioManager.STREAM_MUSIC`).
+  final ValueNotifier<double> systemVolumeNotifier = ValueNotifier<double>(0.6);
+  DateTime? _lastSysVolDragAt;
+  Timer? _sysVolThrottle;
+  double? _pendingSysVol;
+
   /// Now Playing sheet expansion 0 (mini player) .. 1 (full). Written by the UI
   /// so the tab bar, mini player and background can react to the drag.
   final ValueNotifier<double> expansionNotifier = ValueNotifier<double>(0.0);
@@ -130,6 +136,8 @@ class PlayerState extends ChangeNotifier
   double _appliedVolume = 1.0;
   String? _lastPrefetchedNextKey;
   bool _isRecoveringError = false;
+  bool _interruptedByAudioFocus = false;
+  bool get isInterruptedByAudioFocus => _interruptedByAudioFocus;
   int _consecutiveErrorCount = 0;
   String? _lastRecoveryAttemptKey;
 
@@ -157,6 +165,8 @@ class PlayerState extends ChangeNotifier
   // Early-skip data saver timers
   Timer? _prefetchDebounceTimer;
   Timer? _lyricsFetchTimer;
+  int? _lyricsFetchingToken;
+  int? _lyricsCompletedToken;
   Timer? _radioDebounceTimer;
   bool _hasPrefetchedNext = false;
 
@@ -173,9 +183,33 @@ class PlayerState extends ChangeNotifier
   void requestLyricsNow() {
     _lyricsFetchTimer?.cancel();
     _lyricsFetchTimer = null;
-    if (_currentTrack != null && !_isLoadingLyrics && _lyricsLines.isEmpty) {
-      unawaited(_loadLyricsForTrack(_currentTrack!, _playToken));
+    final track = _currentTrack;
+    if (track == null || _lyricsLines.isNotEmpty) return;
+    final isVid =
+        track.isVideo ||
+        Track.detectIsVideo(track.title, track.album, coverUrl: track.coverUrl);
+    if (isVid) {
+      if (_isLoadingLyrics) {
+        Future.microtask(() {
+          if (_currentTrack?.id == track.id && _isLoadingLyrics) {
+            _isLoadingLyrics = false;
+            notifyListeners();
+          }
+        });
+      }
+      return;
     }
+    final token = _playToken;
+    if (_lyricsFetchingToken == token || _lyricsCompletedToken == token) return;
+    Future.microtask(() {
+      if (_currentTrack?.id == track.id &&
+          token == _playToken &&
+          _lyricsLines.isEmpty &&
+          _lyricsFetchingToken != token &&
+          _lyricsCompletedToken != token) {
+        unawaited(_loadLyricsForTrack(track, token));
+      }
+    });
   }
 
   // Studio FX Engine Connection
@@ -337,6 +371,27 @@ class PlayerState extends ChangeNotifier
       _audioPlayer.onDurationChanged.listen((d) {
         if (d > Duration.zero && d != _duration) {
           _duration = d;
+          final cur = _currentTrack;
+          final realSec = d.inSeconds;
+          if (cur != null &&
+              realSec > 0 &&
+              (cur.durationSeconds <= 0 ||
+                  cur.durationSeconds == 210 ||
+                  cur.durationSeconds == 240) &&
+              cur.durationSeconds != realSec) {
+            final updated = cur.copyWith(durationSeconds: realSec);
+            _currentTrack = updated;
+            if (_currentIndex >= 0 &&
+                _currentIndex < _queue.length &&
+                _queue[_currentIndex].id == updated.id) {
+              _queue[_currentIndex] = updated;
+            }
+            if (_lyricsLines.isEmpty &&
+                _lyricsCompletedToken == _playToken &&
+                _lyricsFetchingToken != _playToken) {
+              unawaited(_loadLyricsForTrack(updated, _playToken, forceRetry: true));
+            }
+          }
           notifyListeners();
         }
       }),
@@ -394,6 +449,75 @@ class PlayerState extends ChangeNotifier
       }),
     );
     _subs.add(_audioPlayer.onError.listen(_onEngineError));
+    unawaited(
+      _audioPlayer.getSystemVolume().then((v) {
+        if (_lastSysVolDragAt == null) {
+          systemVolumeNotifier.value = v;
+        }
+      }),
+    );
+    _subs.add(
+      _audioPlayer.onSystemVolumeChanged.listen((v) {
+        final dragAt = _lastSysVolDragAt;
+        if (dragAt != null &&
+            DateTime.now().difference(dragAt) <
+                const Duration(milliseconds: 350)) {
+          return;
+        }
+        systemVolumeNotifier.value = v;
+      }),
+    );
+    _subs.add(_audioPlayer.onAudioFocusChanged.listen(_onAudioFocus));
+  }
+
+  void _onAudioFocus(({String state, int positionMs}) event) {
+    if (event.state == 'interrupted') {
+      _interruptedByAudioFocus = true;
+      _isTransitioning = false;
+      _pausing = false;
+      _isBuffering = false;
+      _rampToken++;
+      _prefetchDebounceTimer?.cancel();
+      _prefetchDebounceTimer = null;
+      _radioDebounceTimer?.cancel();
+      _radioDebounceTimer = null;
+      if (event.positionMs >= 0 && !_isScrubbing) {
+        final frozen = _clampPosition(Duration(milliseconds: event.positionMs));
+        positionNotifier.value = frozen;
+        _lastReportedPosition = frozen;
+        _updateLyricIndex(frozen);
+      }
+      if (_isPlaying) {
+        _isPlaying = false;
+        CrossfadeController.instance.setPlaying(false);
+        ListeningTrackerService.instance.onPlaybackStateChanged(false);
+      }
+      notifyListeners();
+    } else if (event.state == 'resumed') {
+      _interruptedByAudioFocus = false;
+      _isTransitioning = false;
+      _pausing = false;
+      _isBuffering = false;
+      if (event.positionMs >= 0 && !_isScrubbing) {
+        final pos = _clampPosition(Duration(milliseconds: event.positionMs));
+        positionNotifier.value = pos;
+        _lastReportedPosition = pos;
+        _updateLyricIndex(pos);
+      }
+      if (!_isPlaying) {
+        _isPlaying = true;
+        CrossfadeController.instance.setPlaying(true);
+        ListeningTrackerService.instance.onPlaybackStateChanged(true);
+      }
+      if (_appliedVolume < volumeNotifier.value * 0.9) {
+        unawaited(_applyVolume(volumeNotifier.value));
+      }
+      if (_currentTrack?.isVideo == true &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        unawaited(_restoreVideoSurfaceAndViewport());
+      }
+      notifyListeners();
+    }
   }
 
   void _onEngineError(String message) {
@@ -489,17 +613,33 @@ class PlayerState extends ChangeNotifier
     if (!playing) {
       _isTransitioning = false;
       _pausing = false;
+      _isBuffering = false;
+      _prefetchDebounceTimer?.cancel();
+      _prefetchDebounceTimer = null;
+      _radioDebounceTimer?.cancel();
+      _radioDebounceTimer = null;
     } else if (_isTransitioning || _pausing) {
       return;
+    } else {
+      _interruptedByAudioFocus = false;
     }
     if (_isPlaying != playing) {
       _isPlaying = playing;
+      CrossfadeController.instance.setPlaying(playing);
+      ListeningTrackerService.instance.onPlaybackStateChanged(playing);
       notifyListeners();
     }
   }
 
   void _onEnginePosition(Duration pos) {
-    if (_isScrubbing || _isTransitioning) return;
+    if (_isScrubbing) return;
+    if (_isTransitioning) {
+      if (pos > Duration.zero && !_pausing) {
+        _isTransitioning = false;
+      } else {
+        return;
+      }
+    }
 
     // Drop stale events that arrive right after a seek.
     final target = _seekTarget;
@@ -517,6 +657,27 @@ class PlayerState extends ChangeNotifier
     if (_isBuffering && pos > Duration.zero) {
       _isBuffering = false;
       notifyListeners();
+    }
+  }
+
+  /// Re-synchronizes elapsed position & duration directly from the native player.
+  Future<void> syncPositionNow() async {
+    if (_isScrubbing || _currentTrack == null) return;
+    final snap = await _audioPlayer.getPosition();
+    if (snap == null) return;
+    if (snap.durationMs > 0) {
+      final d = Duration(milliseconds: snap.durationMs);
+      if (d != _duration) {
+        _duration = d;
+        notifyListeners();
+      }
+    }
+    if (!_isScrubbing && snap.positionMs >= 0) {
+      final pos = Duration(milliseconds: snap.positionMs);
+      if ((pos - positionNotifier.value).abs() >
+          const Duration(milliseconds: 120)) {
+        _setPosition(pos);
+      }
     }
   }
 
@@ -540,7 +701,11 @@ class PlayerState extends ChangeNotifier
     _updateLyricIndex(pos);
 
     // If track has been playing for >= 12s, ensure next track is prefetched for gapless transition
-    if (!_hasPrefetchedNext && pos.inSeconds >= 12 && _currentTrack != null) {
+    if (!_hasPrefetchedNext &&
+        _isPlaying &&
+        !_interruptedByAudioFocus &&
+        pos.inSeconds >= 12 &&
+        _currentTrack != null) {
       _hasPrefetchedNext = true;
       _prefetchNext();
     }
@@ -732,7 +897,8 @@ class PlayerState extends ChangeNotifier
   /// Play one track. If it is in the queue the queue is kept, otherwise it is
   /// inserted right after the current song.
   Future<void> playTrack(Track track, {bool syncQueue = true}) async {
-    final isOffline = DownloadService.instance.isDownloaded(track.id) ||
+    final isOffline =
+        DownloadService.instance.isDownloaded(track.id) ||
         DownloadService.instance.getLocalAudioPath(track.id) != null;
     if (syncQueue) {
       _queueState?.syncCurrent(track);
@@ -768,10 +934,7 @@ class PlayerState extends ChangeNotifier
       IslandNotification(
         id: 'play_next_${track.id}_${DateTime.now().millisecondsSinceEpoch}',
         title: 'Playing Next',
-        body: IslandNotification.artistOrTitle(
-          artist: track.artist,
-          title: track.title,
-        ),
+        body: IslandNotification.itemTitle(track.title, fallback: track.artist),
         leading: IslandNotification.trackThumb(
           track.coverUrl,
           fallbackIcon: CupertinoIcons.arrow_turn_right_up,
@@ -816,10 +979,7 @@ class PlayerState extends ChangeNotifier
       IslandNotification(
         id: 'play_next_${track.id}_${DateTime.now().millisecondsSinceEpoch}',
         title: queueTitle,
-        body: IslandNotification.artistOrTitle(
-          artist: track.artist,
-          title: track.title,
-        ),
+        body: IslandNotification.itemTitle(track.title, fallback: track.artist),
         leading: IslandNotification.trackThumb(
           track.coverUrl,
           fallbackIcon: CupertinoIcons.arrow_turn_right_up,
@@ -844,10 +1004,7 @@ class PlayerState extends ChangeNotifier
       IslandNotification(
         id: 'add_queue_${track.id}_${DateTime.now().millisecondsSinceEpoch}',
         title: 'Queued',
-        body: IslandNotification.artistOrTitle(
-          artist: track.artist,
-          title: track.title,
-        ),
+        body: IslandNotification.itemTitle(track.title, fallback: track.artist),
         leading: IslandNotification.trackThumb(
           track.coverUrl,
           fallbackIcon: CupertinoIcons.text_badge_plus,
@@ -856,6 +1013,95 @@ class PlayerState extends ChangeNotifier
       ),
     );
     notifyListeners();
+  }
+
+  /// Bulk "Add to Queue": appends all [tracks] and shows a single artwork-free
+  /// count notification instead of firing per-song notifications one by one.
+  int playLastBatch(
+    List<Track> tracks, {
+    bool silent = false,
+    bool forceBulkNotification = false,
+  }) {
+    if (tracks.isEmpty) return 0;
+    if (tracks.length == 1 && !forceBulkNotification) {
+      if (!silent) {
+        playLast(tracks.first);
+      } else {
+        _queueState?.addToQueue(tracks.first);
+        if (_queue.isEmpty) {
+          unawaited(setQueue(tracks));
+        } else {
+          _queue.add(tracks.first);
+          _originalQueue.add(tracks.first);
+          notifyListeners();
+        }
+      }
+      return 1;
+    }
+
+    if (_queue.isEmpty) {
+      unawaited(setQueue(tracks));
+    } else {
+      _queueState?.addAll(tracks);
+      _queue.addAll(tracks);
+      _originalQueue.addAll(tracks);
+      notifyListeners();
+    }
+
+    if (!silent) {
+      HapticFeedback.lightImpact();
+      final count = tracks.length;
+      IslandNotifier.instance.show(
+        IslandNotification(
+          id: 'add_queue_batch_${DateTime.now().millisecondsSinceEpoch}',
+          title: '$count ${count == 1 ? "song" : "songs"} added to queue',
+        ),
+      );
+    }
+    return tracks.length;
+  }
+
+  /// Starts a mix from [seed] without restarting playback from 0:00 if [seed]
+  /// is already the active track, and queues related tracks as one bulk batch.
+  Future<void> startMix(Track seed) async {
+    final seedNorm = seed.id.replaceFirst('yt-', '').trim();
+    final curNorm = _currentTrack?.id.replaceFirst('yt-', '').trim() ?? '';
+    final isAlreadyCurrent =
+        _currentTrack != null && seedNorm.isNotEmpty && seedNorm == curNorm;
+
+    if (isAlreadyCurrent) {
+      if (!_isPlaying) {
+        await resume();
+      }
+    } else {
+      await playMedia(seed);
+    }
+
+    if (seedNorm.isEmpty || seedNorm.startsWith('trk_')) return;
+
+    try {
+      final nextTracks = await InnerTubeService.instance.getNextQueue(seed.id);
+      if (nextTracks.isEmpty) return;
+
+      final seenIds = <String>{
+        seedNorm,
+        if (curNorm.isNotEmpty) curNorm,
+        ..._queue
+            .skip(math.max(0, _currentIndex))
+            .map((t) => t.id.replaceFirst('yt-', '').trim()),
+      };
+
+      final fresh = <Track>[];
+      for (final next in nextTracks) {
+        final nextNorm = next.id.replaceFirst('yt-', '').trim();
+        if (nextNorm.isEmpty || !seenIds.add(nextNorm)) continue;
+        fresh.add(next);
+      }
+
+      if (fresh.isNotEmpty) {
+        playLastBatch(fresh, forceBulkNotification: true);
+      }
+    } catch (_) {}
   }
 
   /// Tap a row in "Playing Next": advance directly to this queue entry.
@@ -991,7 +1237,8 @@ class PlayerState extends ChangeNotifier
       startMs != null ? Duration(milliseconds: startMs) : Duration.zero,
     );
     _pushHistory(track);
-    final isOffline = DownloadService.instance.isDownloaded(track.id) ||
+    final isOffline =
+        DownloadService.instance.isDownloaded(track.id) ||
         DownloadService.instance.getLocalAudioPath(track.id) != null;
     if (isOffline) {
       final downloaded = DownloadService.instance.getDownloaded(track.id);
@@ -1042,16 +1289,25 @@ class PlayerState extends ChangeNotifier
     _lyricsLines = [];
     _lyricTimes = [];
     _lyricsSynced = false;
-    _isLoadingLyrics = true;
+    _lyricsFetchingToken = null;
+    _lyricsCompletedToken = null;
     lyricIndexNotifier.value = -1;
-
-    notifyListeners();
 
     _cancelEarlyTimers();
     _hasPrefetchedNext = false;
 
-    // Check offline downloaded lyrics first (instant, 100% offline, 0 bytes)
-    final offlineLyrics = DownloadService.instance.getLocalLyrics(track.id);
+    final isVid =
+        track.isVideo ||
+        Track.detectIsVideo(track.title, track.album, coverUrl: track.coverUrl);
+    if (isVid && !track.isVideo) {
+      track = track.copyWith(isVideo: true);
+      _queue[_currentIndex] = track;
+      _currentTrack = track;
+    }
+
+    // Check offline downloaded lyrics first (never for video songs)
+    final offlineLyrics =
+        isVid ? null : DownloadService.instance.getLocalLyrics(track.id);
     if (offlineLyrics != null && offlineLyrics.isNotEmpty) {
       _lyricsLines = offlineLyrics.lines;
       _lyricTimes = offlineLyrics.lines
@@ -1060,33 +1316,23 @@ class PlayerState extends ChangeNotifier
       _lyricsSynced = offlineLyrics.synced;
       _isLoadingLyrics = false;
       notifyListeners();
-    } else if (isOffline) {
-      // Offline track with no stored lyrics: NEVER fetch over internet!
+    } else if (isOffline || isVid) {
+      // Offline track without local lyrics, or video song: never fetch lyrics over network
       _lyricsLines = [];
       _lyricTimes = [];
       _lyricsSynced = false;
       _isLoadingLyrics = false;
       notifyListeners();
     } else {
-      // Defer lyrics network fetch: only load if user listens for >= 8s or opens lyrics sheet
-      _lyricsFetchTimer = Timer(const Duration(seconds: 8), () {
-        if (token == _playToken && _isPlaying) {
-          unawaited(_loadLyricsForTrack(track, token));
-        }
-      });
+      _isLoadingLyrics = true;
+      notifyListeners();
+      unawaited(_loadLyricsForTrack(track, token));
     }
 
     unawaited(_resolveAccent(track, token));
 
     try {
-      final isVid =
-          track.isVideo || Track.detectIsVideo(track.title, track.album);
       if (isVid) {
-        if (!track.isVideo) {
-          track = track.copyWith(isVideo: true);
-          _queue[_currentIndex] = track;
-          _currentTrack = track;
-        }
         await _ensureVideoTexturePrepared(token);
         if (token != _playToken) return;
       } else if (videoTextureIdNotifier.value != null) {
@@ -1099,7 +1345,7 @@ class PlayerState extends ChangeNotifier
       final crossfadeStyle = isCrossfading ? _armedCrossfadeStyle : null;
 
       if (!isCrossfading) {
-        await _applyVolume(0);
+        unawaited(_applyVolume(0));
       }
       await _playWithFallback(
         track,
@@ -1117,7 +1363,7 @@ class PlayerState extends ChangeNotifier
 
       if (!isCrossfading) {
         // Apple Music always eases audio in instead of cutting it.
-        const rampDuration = Duration(milliseconds: 260);
+        const rampDuration = Duration(milliseconds: 220);
         unawaited(_rampVolume(volumeNotifier.value, rampDuration));
       }
       _crossfadingToNext = false;
@@ -1127,7 +1373,7 @@ class PlayerState extends ChangeNotifier
       _playedSessionTrackIds.add(track.id.replaceFirst('yt-', ''));
 
       // If next track is already cached offline, prepare it immediately (0 network bytes).
-      // Otherwise schedule prefetch after 12s so rapid skips don't download unneeded audio/metadata.
+      // Otherwise schedule metadata prefetch after 4s so the next track plays in 0ms.
       Track? peekNext;
       if (_queueState != null && _queueState!.hasNext) {
         peekNext = _queueState!.upNext.first.track;
@@ -1144,7 +1390,7 @@ class PlayerState extends ChangeNotifier
         _hasPrefetchedNext = true;
         _prefetchNext();
       } else {
-        _prefetchDebounceTimer = Timer(const Duration(seconds: 12), () {
+        _prefetchDebounceTimer = Timer(const Duration(seconds: 4), () {
           if (token == _playToken && _isPlaying && !_hasPrefetchedNext) {
             _hasPrefetchedNext = true;
             _prefetchNext();
@@ -1222,7 +1468,8 @@ class PlayerState extends ChangeNotifier
     final isOfflineVideo =
         (track.isVideo || localVideo != null) && localVideo != null;
     final localCover = DownloadService.instance.getLocalCoverPath(track.id);
-    final effectiveArtwork = (localCover != null && File(localCover).existsSync())
+    final effectiveArtwork =
+        (localCover != null && File(localCover).existsSync())
         ? 'file://$localCover'
         : track.coverUrl;
 
@@ -1304,20 +1551,12 @@ class PlayerState extends ChangeNotifier
       }
     }
 
-    // 2. Fast Direct On-Device Stream Resolution (completes in ~300ms - 1.5s)
-    if (await _playViaResolver(
-      track,
-      token,
-      startMs: startMs,
-      loudnessDb: loudnessDb,
-      crossfadeMs: crossfadeMs,
-      crossfadeStyle: crossfadeStyle,
-    )) {
-      return;
-    }
+    final isAndroid =
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
-    // 3. Native ExoPlayer Pipeline with InnerTubeX + PO Token on device
-    if (hasValidVideoId) {
+    // 2. Native ExoPlayer + YtEngine Pipeline FIRST on Android for instant playback
+    //    (checks 256MB SimpleCache, 500-entry StreamUrlCache, prewarmed cipher/OkHttp pool, and 512KB chunked streaming)
+    if (isAndroid && hasValidVideoId) {
       try {
         if (token != _playToken) return;
         if (track.isVideo) {
@@ -1338,6 +1577,42 @@ class PlayerState extends ChangeNotifier
       } catch (e) {
         error = e;
         if (kDebugMode) debugPrint('[PlayerState] native playMedia error: $e');
+      }
+    }
+
+    // 3. Direct On-Device Stream Resolution fallback (non-Android, search-resolved IDs, or fallback)
+    if (await _playViaResolver(
+      track,
+      token,
+      startMs: startMs,
+      loudnessDb: loudnessDb,
+      crossfadeMs: crossfadeMs,
+      crossfadeStyle: crossfadeStyle,
+    )) {
+      return;
+    }
+
+    // 4. Native ExoPlayer retry fallback if resolver failed
+    if (!isAndroid && hasValidVideoId) {
+      try {
+        if (token != _playToken) return;
+        if (track.isVideo) {
+          unawaited(_ensureVideoTexturePrepared(token));
+        }
+        await _audioPlayer.playMedia(
+          mediaId: videoId,
+          title: track.title,
+          artist: track.artist,
+          artworkUrl: track.coverUrl,
+          startMs: startMs,
+          loudnessDb: loudnessDb,
+          isVideo: track.isVideo,
+          crossfadeMs: crossfadeMs,
+          crossfadeStyle: crossfadeStyle,
+        );
+        return;
+      } catch (e) {
+        error = e;
       }
     }
 
@@ -1478,9 +1753,15 @@ class PlayerState extends ChangeNotifier
   }
 
   void _prefetchNext() {
-    final curIsOffline = _currentTrack != null &&
+    if (!_isPlaying || _interruptedByAudioFocus) {
+      // Never spend internet bandwidth prefetching while paused or interrupted.
+      return;
+    }
+    final curIsOffline =
+        _currentTrack != null &&
         (DownloadService.instance.isDownloaded(_currentTrack!.id) ||
-            DownloadService.instance.getLocalAudioPath(_currentTrack!.id) != null);
+            DownloadService.instance.getLocalAudioPath(_currentTrack!.id) !=
+                null);
 
     Track? nextTrack;
 
@@ -1493,7 +1774,8 @@ class PlayerState extends ChangeNotifier
       }
     }
 
-    final nextIsOffline = nextTrack != null &&
+    final nextIsOffline =
+        nextTrack != null &&
         (DownloadService.instance.isDownloaded(nextTrack.id) ||
             DownloadService.instance.getLocalAudioPath(nextTrack.id) != null);
 
@@ -1510,20 +1792,26 @@ class PlayerState extends ChangeNotifier
 
     if (nextTrack != null) {
       _hasPrefetchedNext = true;
-      if (nextTrack.isVideo) {
-        if (videoTextureIdNotifier.value == null) {
-          unawaited(_ensureVideoTexturePrepared());
-        }
-        if (!nextIsOffline) {
+      final isAndroid =
+          !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+      final nextVidId = nextTrack.id.replaceFirst('yt-', '').trim();
+      final hasNextValidVid =
+          nextVidId.length == 11 &&
+          !nextVidId.contains(' ') &&
+          !nextVidId.startsWith('http');
+
+      if (nextTrack.isVideo && videoTextureIdNotifier.value == null) {
+        unawaited(_ensureVideoTexturePrepared());
+      }
+      if (!nextIsOffline && !(isAndroid && hasNextValidVid)) {
+        if (nextTrack.isVideo) {
           unawaited(
             StreamResolverService.instance.resolveVideoStreams(
               nextTrack.id,
               quality: SettingsState.instance.videoQuality,
             ),
           );
-        }
-      } else {
-        if (!nextIsOffline) {
+        } else {
           unawaited(
             StreamResolverService.instance.resolveTrack(
               nextTrack,
@@ -1532,15 +1820,26 @@ class PlayerState extends ChangeNotifier
           );
         }
       }
+      if (!nextIsOffline &&
+          !nextTrack.isVideo &&
+          !Track.detectIsVideo(
+            nextTrack.title,
+            nextTrack.album,
+            coverUrl: nextTrack.coverUrl,
+          )) {
+        unawaited(LyricsService.instance.fetchLyrics(nextTrack));
+      }
       // Gapless next track setup & native engine prefetch with metadata (respects Settings)
       final isGapless = SettingsState.instance.gaplessPlayback;
       final xfadeSec = SettingsState.instance.crossfadeSeconds;
       final nextLocal = DownloadService.instance.getLocalAudioPath(
         nextTrack.id,
       );
-      final nextLocalCover =
-          DownloadService.instance.getLocalCoverPath(nextTrack.id);
-      final nextArtwork = (nextLocalCover != null && File(nextLocalCover).existsSync())
+      final nextLocalCover = DownloadService.instance.getLocalCoverPath(
+        nextTrack.id,
+      );
+      final nextArtwork =
+          (nextLocalCover != null && File(nextLocalCover).existsSync())
           ? 'file://$nextLocalCover'
           : nextTrack.coverUrl;
       if (isGapless && xfadeSec == 0) {
@@ -1555,6 +1854,12 @@ class PlayerState extends ChangeNotifier
         );
       } else {
         unawaited(_audioPlayer.setNext(null));
+        if (!nextIsOffline &&
+            isAndroid &&
+            hasNextValidVid &&
+            !nextTrack.isVideo) {
+          unawaited(_audioPlayer.prefetch([nextVidId]));
+        }
       }
     } else {
       // Clear next item in native player at queue boundary so it doesn't auto-transition
@@ -1587,7 +1892,17 @@ class PlayerState extends ChangeNotifier
   Future<void> pause({
     Duration fade = const Duration(milliseconds: 180),
   }) async {
-    if (!_isPlaying) return;
+    _interruptedByAudioFocus = false;
+    _prefetchDebounceTimer?.cancel();
+    _prefetchDebounceTimer = null;
+    _radioDebounceTimer?.cancel();
+    _radioDebounceTimer = null;
+    if (!_isPlaying) {
+      try {
+        await _audioPlayer.pause();
+      } catch (_) {}
+      return;
+    }
     ListeningTrackerService.instance.onPlaybackStateChanged(false);
     _isPlaying = false;
     CrossfadeController.instance.setPlaying(false);
@@ -1604,6 +1919,7 @@ class PlayerState extends ChangeNotifier
 
   Future<void> resume() async {
     if (_queue.isEmpty) return;
+    _interruptedByAudioFocus = false;
     _pausing = false;
 
     final st = _audioPlayer.state;
@@ -1777,11 +2093,21 @@ class PlayerState extends ChangeNotifier
           _lyricsLines = [];
           _lyricTimes = [];
           _lyricsSynced = false;
-          _isLoadingLyrics = true;
+          _lyricsFetchingToken = null;
+          _lyricsCompletedToken = null;
           lyricIndexNotifier.value = -1;
 
-          final isOffline = DownloadService.instance.isDownloaded(track.id) ||
+          final isOffline =
+              DownloadService.instance.isDownloaded(track.id) ||
               DownloadService.instance.getLocalAudioPath(track.id) != null;
+          final isVid =
+              track.isVideo ||
+              Track.detectIsVideo(
+                track.title,
+                track.album,
+                coverUrl: track.coverUrl,
+              );
+          _isLoadingLyrics = !isOffline && !isVid;
           final isLoopOne = q.repeatMode == RepeatMode.one;
           final ctx = q.context;
           final contextTypeStr = ctx?.type.name;
@@ -1808,14 +2134,17 @@ class PlayerState extends ChangeNotifier
             );
           }
           notifyListeners();
-          if (isOffline) {
-            final offlineLyrics =
-                DownloadService.instance.getLocalLyrics(track.id);
-            if (offlineLyrics != null && offlineLyrics.isNotEmpty) {
+          if (isOffline || isVid) {
+            final offlineLyrics = DownloadService.instance.getLocalLyrics(
+              track.id,
+            );
+            if (!isVid && offlineLyrics != null && offlineLyrics.isNotEmpty) {
               _lyricsLines = offlineLyrics.lines;
               _lyricTimes = offlineLyrics.lines
-                  .map((l) =>
-                      ((l['timeMs'] ?? l['startMs']) as num?)?.toInt() ?? 0)
+                  .map(
+                    (l) =>
+                        ((l['timeMs'] ?? l['startMs']) as num?)?.toInt() ?? 0,
+                  )
                   .toList();
               _lyricsSynced = offlineLyrics.synced;
             }
@@ -2016,6 +2345,19 @@ class PlayerState extends ChangeNotifier
   }
 
   // ---- Volume ---------------------------------------------------------------------
+  void setSystemVolume(double v) {
+    final value = v.clamp(0.0, 1.0);
+    _lastSysVolDragAt = DateTime.now();
+    systemVolumeNotifier.value = value;
+    _pendingSysVol = value;
+    _sysVolThrottle ??= Timer(const Duration(milliseconds: 16), () {
+      _sysVolThrottle = null;
+      final p = _pendingSysVol;
+      _pendingSysVol = null;
+      if (p != null) unawaited(_audioPlayer.setSystemVolume(p));
+    });
+  }
+
   @override
   Future<void> setVolume(double v) async {
     final value = v.clamp(0.0, 1.0);
@@ -2134,33 +2476,18 @@ class PlayerState extends ChangeNotifier
   }
 
   // ---- Lyrics ---------------------------------------------------------------------
-  Future<void> _loadLyricsForTrack(Track track, int token) async {
-    _isLoadingLyrics = true;
-    _lyricsLines = [];
-    _lyricTimes = [];
-    _lyricsSynced = false;
-    lyricIndexNotifier.value = -1;
-    notifyListeners();
-
-    // Check offline downloaded lyrics first (instant, 100% offline)
-    final isOffline = DownloadService.instance.isDownloaded(track.id) ||
-        DownloadService.instance.getLocalAudioPath(track.id) != null;
-    final offlineLyrics = DownloadService.instance.getLocalLyrics(track.id);
-    if (offlineLyrics != null && offlineLyrics.isNotEmpty) {
-      if (token != _playToken) return;
-      _lyricsLines = offlineLyrics.lines;
-      _lyricTimes = offlineLyrics.lines
-          .map((l) => ((l['timeMs'] ?? l['startMs']) as num?)?.toInt() ?? 0)
-          .toList();
-      _lyricsSynced = offlineLyrics.synced;
-      _isLoadingLyrics = false;
-      notifyListeners();
-      return;
-    }
-
-    if (isOffline) {
-      // Offline track with no stored lyrics: NEVER fetch over internet!
-      if (token != _playToken) return;
+  Future<void> _loadLyricsForTrack(
+    Track track,
+    int token, {
+    bool forceRetry = false,
+  }) async {
+    if (token != _playToken) return;
+    if (track.isVideo ||
+        Track.detectIsVideo(
+          track.title,
+          track.album,
+          coverUrl: track.coverUrl,
+        )) {
       _lyricsLines = [];
       _lyricTimes = [];
       _lyricsSynced = false;
@@ -2169,40 +2496,95 @@ class PlayerState extends ChangeNotifier
       return;
     }
 
-    var lines = <Map<String, dynamic>>[];
-    LyricsResult? lyricsRes;
-    try {
-      lyricsRes = await LyricsService.instance.fetchLyrics(track);
-      if (token != _playToken) return; // a newer track took over
-      if (lyricsRes != null && lyricsRes.lines.isNotEmpty) {
-        lines = lyricsRes.lines;
-      }
-    } catch (_) {
-      if (token != _playToken) return;
-    }
+    if (_lyricsFetchingToken == token && !forceRetry) return;
+    _lyricsFetchingToken = token;
 
-    final synced =
-        lyricsRes?.synced ??
-        (lines.isNotEmpty &&
-            lines.any((l) => (l['timeMs'] ?? l['startMs']) is num));
-    if (synced) {
-      lines.sort(
-        (a, b) => (((a['timeMs'] ?? a['startMs']) ?? 0) as num).compareTo(
-          ((b['timeMs'] ?? b['startMs']) ?? 0) as num,
-        ),
-      );
-    }
-
-    _lyricsLines = lines;
-    _lyricsSynced = synced;
-    _lyricTimes = synced
-        ? lines
-              .map((l) => (((l['timeMs'] ?? l['startMs']) ?? 0) as num).toInt())
-              .toList()
-        : <int>[];
-    _isLoadingLyrics = false;
-    _updateLyricIndex(positionNotifier.value);
+    _isLoadingLyrics = true;
+    _lyricsLines = [];
+    _lyricTimes = [];
+    _lyricsSynced = false;
+    lyricIndexNotifier.value = -1;
     notifyListeners();
+
+    try {
+      // Check offline downloaded lyrics first (instant, 100% offline)
+      final isOffline =
+          DownloadService.instance.isDownloaded(track.id) ||
+          DownloadService.instance.getLocalAudioPath(track.id) != null;
+      final offlineLyrics = DownloadService.instance.getLocalLyrics(track.id);
+      if (offlineLyrics != null && offlineLyrics.isNotEmpty) {
+        if (token != _playToken) return;
+        _lyricsLines = offlineLyrics.lines;
+        _lyricTimes = offlineLyrics.lines
+            .map((l) => ((l['timeMs'] ?? l['startMs']) as num?)?.toInt() ?? 0)
+            .toList();
+        _lyricsSynced = offlineLyrics.synced;
+        _isLoadingLyrics = false;
+        notifyListeners();
+        return;
+      }
+
+      if (isOffline) {
+        if (token != _playToken) return;
+        _lyricsLines = [];
+        _lyricTimes = [];
+        _lyricsSynced = false;
+        _isLoadingLyrics = false;
+        notifyListeners();
+        return;
+      }
+
+      var lines = <Map<String, dynamic>>[];
+      LyricsResult? lyricsRes;
+      try {
+        lyricsRes = await LyricsService.instance
+            .fetchLyrics(track, force: forceRetry)
+            .timeout(const Duration(seconds: 10), onTimeout: () => null);
+        if (token != _playToken) return;
+        if (lyricsRes != null && lyricsRes.lines.isNotEmpty) {
+          lines = lyricsRes.lines;
+        }
+      } catch (_) {
+        if (token != _playToken) return;
+      }
+
+      final synced =
+          lyricsRes?.synced ??
+          (lines.isNotEmpty &&
+              lines.any((l) => (l['timeMs'] ?? l['startMs']) is num));
+      if (synced) {
+        lines.sort(
+          (a, b) => (((a['timeMs'] ?? a['startMs']) ?? 0) as num).compareTo(
+            ((b['timeMs'] ?? b['startMs']) ?? 0) as num,
+          ),
+        );
+      }
+
+      _lyricsLines = lines;
+      _lyricsSynced = synced;
+      _lyricTimes = synced
+          ? lines
+                .map(
+                  (l) => (((l['timeMs'] ?? l['startMs']) ?? 0) as num).toInt(),
+                )
+                .toList()
+          : <int>[];
+      _isLoadingLyrics = false;
+      _lyricsCompletedToken = token;
+      _updateLyricIndex(positionNotifier.value);
+      notifyListeners();
+    } finally {
+      if (_lyricsFetchingToken == token) {
+        _lyricsFetchingToken = null;
+      }
+      if (token == _playToken) {
+        _lyricsCompletedToken = token;
+        if (_isLoadingLyrics) {
+          _isLoadingLyrics = false;
+          notifyListeners();
+        }
+      }
+    }
   }
 
   void _updateLyricIndex(Duration pos) {
@@ -2250,11 +2632,16 @@ class PlayerState extends ChangeNotifier
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final isForeground = state == AppLifecycleState.resumed;
+    final isForeground =
+        state == AppLifecycleState.resumed ||
+        state == AppLifecycleState.inactive;
     unawaited(_audioPlayer.setLifecycle(isForeground));
     if (!isForeground) {
       unawaited(setVideoViewport(state: 'hidden'));
     } else {
+      if (_isPlaying) {
+        unawaited(syncPositionNow());
+      }
       if (_currentTrack?.isVideo == true ||
           videoTextureIdNotifier.value != null) {
         unawaited(_restoreVideoSurfaceAndViewport());
@@ -2301,12 +2688,14 @@ class PlayerState extends ChangeNotifier
     _cancelEarlyTimers();
     _previewTimer?.cancel();
     _sleepTimer?.cancel();
+    _sysVolThrottle?.cancel();
     _audioPlayer.dispose();
     previewNotifier.dispose();
     positionNotifier.dispose();
     lyricIndexNotifier.dispose();
     scrubbingNotifier.dispose();
     volumeNotifier.dispose();
+    systemVolumeNotifier.dispose();
     expansionNotifier.dispose();
     accentColorNotifier.dispose();
     videoTextureIdNotifier.dispose();

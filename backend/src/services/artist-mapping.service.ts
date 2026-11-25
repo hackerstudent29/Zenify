@@ -60,7 +60,7 @@ function normalizeKey(str: string): string {
 export class ArtistMappingService {
     private static cache = new Map<string, ArtistMatchResult>();
     private static resolveLocks = new Map<string, Promise<ResolvedArtist>>();
-    private static NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
+    private static NVIDIA_API_KEY = '';
 
     /**
      * Resolves an artist name using Section D 5-step canonicalization pipeline:

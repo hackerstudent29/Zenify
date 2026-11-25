@@ -32,6 +32,7 @@ object NewReleaseAlbumPage {
                 renderer.subtitleBadges?.find {
                     it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
                 } != null,
+            albumType = PageHelper.extractReleaseType(renderer.subtitle?.runs),
         )
     }
 }

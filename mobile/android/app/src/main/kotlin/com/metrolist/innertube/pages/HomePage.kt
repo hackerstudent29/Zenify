@@ -235,11 +235,12 @@ data class HomePage(
                                     ?.firstOrNull()
                                     ?.text ?: return null,
                             artists = PageHelper.extractArtists(renderer.subtitle?.runs),
-                            year = null,
+                            year = renderer.subtitle?.runs?.lastOrNull()?.text?.toIntOrNull(),
                             thumbnail = renderer.thumbnailRenderer.getThumbnailUrl() ?: return null,
                             explicit = renderer.subtitleBadges?.find {
                                 it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
-                            } != null
+                            } != null,
+                            albumType = PageHelper.extractReleaseType(renderer.subtitle?.runs),
                         )
                     }
 

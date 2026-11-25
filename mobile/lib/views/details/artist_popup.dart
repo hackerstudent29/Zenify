@@ -12,6 +12,7 @@ import '../../models/artist_ref.dart';
 import '../../services/artist_service.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/library_store.dart';
+import '../shell_screen.dart' show ShellNavigationScope;
 import 'artist_screen.dart';
 
 /// Shows an Apple Music-style context popover or bottom sheet for single or multiple artists.
@@ -53,14 +54,17 @@ Future<void> showArtistPopup(
         artists: effectiveList,
         onOpenArtist: (artist) {
           Navigator.of(ctx).pop();
-          callerNav.push(
-            ZenPageRoute(
-              builder: (_) => ArtistScreen(
-                artistName: artist.name,
-                imageUrl: artist.imageUrl,
-              ),
-            ),
+          final page = ArtistScreen(
+            artistName: artist.name,
+            browseId: artist.id.isNotEmpty && !artist.id.contains('_')
+                ? artist.id
+                : null,
+            imageUrl: artist.imageUrl,
           );
+          if (!ShellNavigationScope.openPage(context, page) &&
+              callerNav.mounted) {
+            callerNav.push(ZenPageRoute(builder: (_) => page));
+          }
         },
       ),
     ),

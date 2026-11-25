@@ -13,6 +13,7 @@ class ScrubberSlider extends StatefulWidget {
     required this.onSeek,
     this.activeColor,
     this.trackColor,
+    this.timeColor,
     this.middleWidget,
   });
 
@@ -21,6 +22,7 @@ class ScrubberSlider extends StatefulWidget {
   final ValueChanged<Duration> onSeek;
   final Color? activeColor;
   final Color? trackColor;
+  final Color? timeColor;
   final Widget? middleWidget;
 
   @override
@@ -47,17 +49,22 @@ class _ScrubberSliderState extends State<ScrubberSlider> {
 
   @override
   Widget build(BuildContext context) {
-    final totalMs = widget.duration.inMilliseconds.toDouble().clamp(1.0, double.infinity);
+    final hasDuration = widget.duration > Duration.zero;
+    final totalMs = hasDuration
+        ? widget.duration.inMilliseconds.toDouble().clamp(1.0, double.infinity)
+        : 1.0;
     final active = widget.activeColor ?? Colors.white.withValues(alpha: 0.6);
     final track = widget.trackColor ?? Colors.white.withValues(alpha: 0.2);
 
     return ValueListenableBuilder<Duration>(
       valueListenable: widget.positionNotifier,
       builder: (context, position, _) {
-        final currentMs = _isDragging
-            ? _dragPositionMs
-            : position.inMilliseconds.toDouble().clamp(0.0, totalMs);
-        final progress = (currentMs / totalMs).clamp(0.0, 1.0);
+        final currentMs = !hasDuration
+            ? 0.0
+            : (_isDragging
+                  ? _dragPositionMs
+                  : position.inMilliseconds.toDouble().clamp(0.0, totalMs));
+        final progress = hasDuration ? (currentMs / totalMs).clamp(0.0, 1.0) : 0.0;
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -112,13 +119,20 @@ class _ScrubberSliderState extends State<ScrubberSlider> {
                       alignment: Alignment.centerLeft,
                       clipBehavior: Clip.none,
                       children: [
-                        // Smooth rounded progress bar with rounded start and head
-                        CustomPaint(
-                          size: Size(trackWidth, trackHeight),
-                          painter: _ScrubberTrackPainter(
-                            progress: progress,
-                            trackColor: track,
-                            activeColor: active,
+                        // Smooth rounded progress bar with animated touch expansion
+                        TweenAnimationBuilder<double>(
+                          tween: Tween<double>(end: trackHeight),
+                          duration: const Duration(milliseconds: 160),
+                          curve: Curves.easeOutCubic,
+                          builder: (_, animHeight, _) => CustomPaint(
+                            size: Size(trackWidth, animHeight),
+                            painter: _ScrubberTrackPainter(
+                              progress: progress,
+                              trackColor: track,
+                              activeColor: _isDragging
+                                  ? active.withValues(alpha: 0.95)
+                                  : active,
+                            ),
                           ),
                         ),
 
@@ -157,7 +171,9 @@ class _ScrubberSliderState extends State<ScrubberSlider> {
                 children: [
                   Text(
                     _formatTime(_isDragging ? Duration(milliseconds: _dragPositionMs.toInt()) : position),
-                    style: AppTypography.timer.copyWith(color: active.withValues(alpha: 0.8)),
+                    style: AppTypography.timer.copyWith(
+                      color: widget.timeColor ?? Colors.white.withValues(alpha: 0.55),
+                    ),
                   ),
                   if (widget.middleWidget != null) widget.middleWidget!,
                   Text(
@@ -165,7 +181,9 @@ class _ScrubberSliderState extends State<ScrubberSlider> {
                       _isDragging ? Duration(milliseconds: _dragPositionMs.toInt()) : position,
                       widget.duration,
                     ),
-                    style: AppTypography.timer.copyWith(color: active.withValues(alpha: 0.8)),
+                    style: AppTypography.timer.copyWith(
+                      color: widget.timeColor ?? Colors.white.withValues(alpha: 0.55),
+                    ),
                   ),
                 ],
               ),

@@ -68,4 +68,28 @@ void main() {
     expect(find.text('Anirudh Ravichander'), findsOneWidget);
     expect(find.text('Go to Album'), findsNothing);
   });
+
+  testWidgets('MediaNavigationSheet hides Go to Album when isVideo is true even if albumTitle is set', (tester) async {
+    const artists = [
+      ArtistRef(id: 'sai_1', name: 'Sai Abhyankkar', imageUrl: 'https://example.com/sai.jpg'),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MediaNavigationSheet(
+            artists: artists,
+            albumTitle: 'Katchi Sera - Album',
+            isVideo: true,
+            onOpenArtist: (_) {},
+            onOpenAlbum: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Go to Artist'), findsOneWidget);
+    expect(find.text('Sai Abhyankkar'), findsOneWidget);
+    expect(find.text('Go to Album'), findsNothing);
+  });
 }

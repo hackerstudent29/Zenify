@@ -45,6 +45,80 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private val lyricsEp = lru<com.metrolist.innertube.models.BrowseEndpoint>(64)
     private val lyricsText = lru<String>(64) // "" = confirmed none
     private val lyricsInflight = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Deferred<String?>>()
+    private val videoDetailsCache = lru<Map<String, Any?>>(150)
+
+    private fun extractRunsOrSimpleText(obj: org.json.JSONObject?): String {
+        if (obj == null) return ""
+        val simple = obj.optString("simpleText", "").trim()
+        if (simple.isNotEmpty()) return simple
+        val runs = obj.optJSONArray("runs") ?: return ""
+        val sb = StringBuilder()
+        for (i in 0 until runs.length()) {
+            val t = runs.optJSONObject(i)?.optString("text", "") ?: ""
+            if (t.isNotEmpty()) sb.append(t)
+        }
+        return sb.toString().trim()
+    }
+
+    private fun scanMusicInfoRows(node: Any?, out: MutableMap<String, String>) {
+        when (node) {
+            is org.json.JSONObject -> {
+                val infoRow = node.optJSONObject("infoRowRenderer")
+                if (infoRow != null) {
+                    val label = extractRunsOrSimpleText(infoRow.optJSONObject("title")).lowercase()
+                    val value = extractRunsOrSimpleText(infoRow.optJSONObject("defaultMetadata"))
+                        .ifBlank { extractRunsOrSimpleText(infoRow.optJSONObject("expandedMetadata")) }
+                    if (value.isNotBlank()) {
+                        when {
+                            label == "song" && !out.containsKey("song") -> out["song"] = value
+                            (label == "artist" || label == "artists") && !out.containsKey("artist") -> out["artist"] = value
+                            label == "album" && !out.containsKey("album") -> out["album"] = value
+                        }
+                    }
+                }
+                val keys = node.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    if (k == "infoRowRenderer") continue
+                    scanMusicInfoRows(node.opt(k), out)
+                    if (out.containsKey("song") && out.containsKey("artist")) break
+                }
+            }
+            is org.json.JSONArray -> {
+                for (i in 0 until node.length()) {
+                    scanMusicInfoRows(node.opt(i), out)
+                    if (out.containsKey("song") && out.containsKey("artist")) break
+                }
+            }
+        }
+    }
+
+    private fun fetchMusicPanelFromNext(videoId: String): Map<String, String> {
+        val out = mutableMapOf<String, String>()
+        try {
+            val jsonBody = """{"context":{"client":{"clientName":"WEB","clientVersion":"2.20240101.01.00","hl":"en","gl":"IN"}},"videoId":"$videoId"}"""
+            val request = okhttp3.Request.Builder()
+                .url("https://www.youtube.com/youtubei/v1/next?prettyPrint=false")
+                .post(jsonBody.toRequestBody("application/json".toMediaTypeOrNull()))
+                .header("Content-Type", "application/json")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("Origin", "https://www.youtube.com")
+                .header("Referer", "https://www.youtube.com/")
+                .build()
+            val body = com.zenify.mobile.yt.Net.api.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return out
+                response.body.string()
+            }
+            val root = org.json.JSONObject(body)
+            val panels = root.optJSONArray("engagementPanels") ?: return out
+            for (i in 0 until panels.length()) {
+                val p = panels.optJSONObject(i) ?: continue
+                scanMusicInfoRows(p, out)
+                if (out.containsKey("song") && out.containsKey("artist")) break
+            }
+        } catch (_: Exception) {}
+        return out
+    }
 
     private suspend fun fetchLyrics(videoId: String): String? = try {
         val ep = lyricsEp[videoId]
@@ -76,10 +150,23 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             return@launch
                         }
                         val quality = call.argument<String>("quality") ?: com.zenify.mobile.yt.YtEngine.currentQuality
+                        val wantVideo = call.argument<Boolean>("wantVideo") ?: false
+                        val maxVideoHeight = call.argument<Number>("maxVideoHeight")?.toInt()
+                        val allowHls = call.argument<Boolean>("allowHls") ?: true
                         try {
-                            val resolved = com.zenify.mobile.yt.YtEngine.resolve(videoId, wantVideo = false, quality = quality)
+                            val resolved = com.zenify.mobile.yt.YtEngine.resolve(
+                                videoId,
+                                wantVideo = wantVideo,
+                                quality = quality,
+                                maxVideoHeight = maxVideoHeight,
+                                allowHls = allowHls,
+                            )
                             val map = mapOf(
                                 "url" to resolved.url,
+                                "videoUrl" to resolved.videoUrl,
+                                "videoWidth" to resolved.videoWidth,
+                                "videoHeight" to resolved.videoHeight,
+                                "isHls" to resolved.isHls,
                                 "headers" to resolved.headers,
                                 "client" to resolved.client,
                                 "itag" to resolved.itag,
@@ -337,56 +424,73 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
                                 val sectionsList = ArrayList<Map<String, Any?>>()
                                 for (section in page.sections) {
+                                    val secLower = section.title.lowercase()
+                                    val secIsSingle = secLower.contains("single") || secLower.contains("ep")
                                     sectionsList.add(
                                         mapOf(
                                             "title" to section.title,
-                                            "items" to section.items.mapNotNull { ytItemToMap(it) }
+                                            "items" to section.items.mapNotNull { item ->
+                                                val mapped = ytItemToMap(item)
+                                                if (mapped != null && item is AlbumItem && item.albumType == null && secIsSingle) {
+                                                    mapped + ("albumType" to "Single") + ("isSingle" to true)
+                                                } else {
+                                                    mapped
+                                                }
+                                            }
                                         )
                                     )
                                 }
 
-                                // Check if top songs are present in sections
-                                val hasSongs = sectionsList.any { sec ->
+                                // If artist channel has no songs or albums shelf, fetch missing shelves in parallel
+                                val needsSongs = sectionsList.none { sec ->
                                     val title = (sec["title"] as? String).orEmpty().lowercase()
                                     val items = sec["items"] as? List<*> ?: emptyList<Any>()
                                     (title.contains("song") || title.contains("popular") || title.contains("track") || title.contains("top")) && items.isNotEmpty()
                                 }
-
-                                // If artist channel has no songs shelf (common for playback singers like Tippu), supplement songs
-                                if (!hasSongs && artistName.isNotBlank()) {
-                                    try {
-                                        val songsOutcome = YouTube.search(artistName, YouTube.SearchFilter.FILTER_SONG)
-                                        val songs = songsOutcome.getOrNull()?.items?.filterIsInstance<SongItem>() ?: emptyList()
-                                        if (songs.isNotEmpty()) {
-                                            sectionsList.add(0, mapOf(
-                                                "title" to "Songs",
-                                                "items" to songs.take(25).map { songItemToMap(it) + ("type" to "song") }
-                                            ))
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.w("ZenInnerTube", "Failed to fetch supplemental songs for $artistName: ${e.message}")
-                                    }
-                                }
-
-                                // Check if albums are present
-                                val hasAlbums = sectionsList.any { sec ->
+                                val needsAlbums = sectionsList.none { sec ->
                                     val title = (sec["title"] as? String).orEmpty().lowercase()
                                     val items = sec["items"] as? List<*> ?: emptyList<Any>()
                                     (title.contains("album") || title.contains("release") || title.contains("single")) && items.isNotEmpty()
                                 }
 
-                                if (!hasAlbums && artistName.isNotBlank()) {
-                                    try {
-                                        val albumsOutcome = YouTube.search(artistName, YouTube.SearchFilter.FILTER_ALBUM)
-                                        val albums = albumsOutcome.getOrNull()?.items?.filterIsInstance<AlbumItem>() ?: emptyList()
-                                        if (albums.isNotEmpty()) {
-                                            sectionsList.add(mapOf(
-                                                "title" to "Albums",
-                                                "items" to albums.take(20).map { albumItemToMap(it) + ("type" to "album") }
-                                            ))
+                                if ((needsSongs || needsAlbums) && artistName.isNotBlank()) {
+                                    val songsDef: kotlinx.coroutines.Deferred<List<SongItem>>? = if (needsSongs) {
+                                        scope.async {
+                                            try {
+                                                YouTube.search(artistName, YouTube.SearchFilter.FILTER_SONG).getOrNull()?.items?.filterIsInstance<SongItem>() ?: emptyList()
+                                            } catch (e: Exception) {
+                                                Log.w("ZenInnerTube", "Failed supplemental songs for $artistName: ${e.message}")
+                                                emptyList()
+                                            }
                                         }
-                                    } catch (e: Exception) {
-                                        Log.w("ZenInnerTube", "Failed to fetch supplemental albums for $artistName: ${e.message}")
+                                    } else {
+                                        null
+                                    }
+                                    val albumsDef: kotlinx.coroutines.Deferred<List<AlbumItem>>? = if (needsAlbums) {
+                                        scope.async {
+                                            try {
+                                                YouTube.search(artistName, YouTube.SearchFilter.FILTER_ALBUM).getOrNull()?.items?.filterIsInstance<AlbumItem>() ?: emptyList()
+                                            } catch (e: Exception) {
+                                                Log.w("ZenInnerTube", "Failed supplemental albums for $artistName: ${e.message}")
+                                                emptyList()
+                                            }
+                                        }
+                                    } else {
+                                        null
+                                    }
+                                    val supSongs = songsDef?.await() ?: emptyList()
+                                    val supAlbums = albumsDef?.await() ?: emptyList()
+                                    if (supSongs.isNotEmpty()) {
+                                        sectionsList.add(0, mapOf(
+                                            "title" to "Songs",
+                                            "items" to supSongs.take(25).map { songItemToMap(it) + ("type" to "song") }
+                                        ))
+                                    }
+                                    if (supAlbums.isNotEmpty()) {
+                                        sectionsList.add(mapOf(
+                                            "title" to "Albums",
+                                            "items" to supAlbums.take(20).map { albumItemToMap(it) + ("type" to "album") }
+                                        ))
                                     }
                                 }
 
@@ -464,32 +568,49 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             ?: call.argument<String>("artistName")
                             ?: ""
                         val songTitle = call.argument<String>("songTitle") ?: ""
-                        Log.d("ZenInnerTube", "getAlbum browseId=$browseId videoId=$videoId title=$albumTitle artist=$artistName songTitle=$songTitle")
+                        val isSingle = call.argument<Boolean>("isSingle") ?: false
+                        val isVideo = call.argument<Boolean>("isVideo") ?: false
+                        val sourceContext = "$songTitle $albumTitle".trim()
+                        Log.d(
+                            "ZenInnerTube",
+                            "getAlbum browseId=$browseId videoId=$videoId title=$albumTitle artist=$artistName songTitle=$songTitle isSingle=$isSingle isVideo=$isVideo"
+                        )
 
-                        // 1. If browseId is missing, resolve it from videoId via watch next
+                        if (isVideo) {
+                            replyError(result, "VIDEO_NO_ALBUM", "Video songs remain on their video single page", null)
+                            return@launch
+                        }
+
+                        // 1. If browseId is missing, resolve strictly from the matching videoId item via watch next
                         if (browseId.isBlank() && videoId.isNotBlank()) {
                             try {
                                 val nextOutcome = YouTube.next(WatchEndpoint(videoId = videoId))
                                 val resolvedItem = nextOutcome.getOrNull()?.items?.firstOrNull { it.id == videoId }
-                                    ?: nextOutcome.getOrNull()?.items?.firstOrNull()
-                                val resolvedAlbumId = resolvedItem?.album?.id
-                                if (!resolvedAlbumId.isNullOrBlank()) {
-                                    browseId = resolvedAlbumId
-                                    Log.i("ZenInnerTube", "Resolved album browseId from WatchEndpoint(videoId): $browseId")
+                                val resolvedAlbum = resolvedItem?.album
+                                if (resolvedAlbum != null &&
+                                    resolvedAlbum.id.isNotBlank() &&
+                                    !isVariantConflict(sourceContext, resolvedAlbum.name)
+                                ) {
+                                    browseId = resolvedAlbum.id
+                                    Log.i("ZenInnerTube", "Resolved album browseId strictly from WatchEndpoint(videoId): $browseId (${resolvedAlbum.name})")
                                 } else {
                                     val radioOutcome = YouTube.next(WatchEndpoint(videoId = videoId, playlistId = "RDAMVM$videoId"))
                                     val radioItem = radioOutcome.getOrNull()?.items?.firstOrNull { it.id == videoId }
-                                        ?: radioOutcome.getOrNull()?.items?.firstOrNull()
-                                    val radioAlbumId = radioItem?.album?.id
-                                    if (!radioAlbumId.isNullOrBlank()) {
-                                        browseId = radioAlbumId
-                                        Log.i("ZenInnerTube", "Resolved album browseId from Radio next: $browseId")
-                                    }
-                                }
-                                if (browseId.isBlank()) {
-                                    val resolvedAlbumName = resolvedItem?.album?.name
-                                    if (!resolvedAlbumName.isNullOrBlank() && !resolvedAlbumName.equals("Single", ignoreCase = true)) {
-                                        albumTitle = resolvedAlbumName
+                                    val radioAlbum = radioItem?.album
+                                    if (radioAlbum != null &&
+                                        radioAlbum.id.isNotBlank() &&
+                                        !isVariantConflict(sourceContext, radioAlbum.name)
+                                    ) {
+                                        browseId = radioAlbum.id
+                                        Log.i("ZenInnerTube", "Resolved album browseId strictly from Radio next: $browseId (${radioAlbum.name})")
+                                    } else {
+                                        val candidateName = resolvedAlbum?.name ?: radioAlbum?.name
+                                        if (!candidateName.isNullOrBlank() &&
+                                            !candidateName.equals("Single", ignoreCase = true) &&
+                                            !isVariantConflict(sourceContext, candidateName)
+                                        ) {
+                                            albumTitle = candidateName
+                                        }
                                     }
                                 }
                             } catch (e: Exception) {
@@ -497,26 +618,41 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             }
                         }
 
-                        // 2. If browseId is still missing, search for album using title & artist
+                        // 2. If browseId is still missing, search albums and strictly validate candidates (reject Unplugged / Remix / wrong artist)
                         if (browseId.isBlank()) {
+                            val cleanAlb = if (albumTitle.equals("Single", ignoreCase = true)) "" else albumTitle.trim()
+                            val cleanSong = songTitle.trim()
                             val candidateQuery = when {
-                                albumTitle.isNotBlank() && !albumTitle.equals("Single", ignoreCase = true) -> {
-                                    if (artistName.isNotBlank() && !albumTitle.contains(artistName, ignoreCase = true)) "$albumTitle $artistName" else albumTitle
+                                cleanAlb.isNotBlank() -> {
+                                    if (artistName.isNotBlank() && !cleanAlb.contains(artistName, ignoreCase = true)) "$cleanAlb $artistName" else cleanAlb
                                 }
-                                songTitle.isNotBlank() -> {
-                                    if (artistName.isNotBlank() && !songTitle.contains(artistName, ignoreCase = true)) "$songTitle $artistName" else songTitle
+                                cleanSong.isNotBlank() -> {
+                                    if (artistName.isNotBlank() && !cleanSong.contains(artistName, ignoreCase = true)) "$cleanSong $artistName" else cleanSong
                                 }
-                                artistName.isNotBlank() -> artistName
                                 else -> ""
                             }
                             if (candidateQuery.isNotBlank()) {
                                 val albumSearch = YouTube.search(candidateQuery, YouTube.SearchFilter.FILTER_ALBUM)
-                                val albumItem = albumSearch.getOrNull()?.items
+                                val candidates = albumSearch.getOrNull()?.items
                                     ?.filterIsInstance<AlbumItem>()
-                                    ?.firstOrNull()
-                                if (albumItem != null) {
-                                    browseId = albumItem.browseId.ifBlank { albumItem.id }
-                                    Log.i("ZenInnerTube", "Resolved album browseId from album search query=$candidateQuery: $browseId")
+                                    ?.map { it to scoreAlbumCandidate(it, cleanAlb, cleanSong, artistName, preferSingle = isSingle) }
+                                    ?.filter { it.second > 0 }
+                                    ?.sortedByDescending { it.second }
+                                    ?.take(4)
+                                    ?: emptyList()
+
+                                for ((cand, score) in candidates) {
+                                    val candId = cand.browseId.ifBlank { cand.id }
+                                    if (candId.isBlank()) continue
+                                    val checkPage = YouTube.album(candId).getOrNull()
+                                    if (checkPage != null &&
+                                        !isVariantConflict(sourceContext, checkPage.album.title) &&
+                                        (cleanSong.isBlank() || songContainedInAlbum(checkPage.songs, cleanSong, artistName))
+                                    ) {
+                                        browseId = candId
+                                        Log.i("ZenInnerTube", "Validated album browseId=$browseId title='${checkPage.album.title}' score=$score")
+                                        break
+                                    }
                                 }
                             }
                         }
@@ -542,7 +678,9 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                                             "artists" to listOf(mapOf("id" to null, "name" to (p.author?.name ?: artistName))),
                                             "thumbnail" to (p.thumbnail ?: ""),
                                             "year" to 2026,
-                                            "explicit" to false
+                                            "explicit" to false,
+                                            "albumType" to (if (isSingle || page.songs.size <= 1) "Single" else "Album"),
+                                            "isSingle" to (isSingle || page.songs.size <= 1)
                                         ),
                                         "songs" to page.songs.map { songItemToMap(it) },
                                         "otherVersions" to emptyList<Map<String, Any?>>()
@@ -557,25 +695,38 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             if (outcome.isSuccess) {
                                 val page = outcome.getOrThrow()
 
-                                // If loaded album only has 1 song (e.g. single release), attempt to find the full parent album/soundtrack
-                                if (page.songs.size <= 1) {
-                                    val other = page.otherVersions.firstOrNull { it.id != cleanBrowseId }
-                                    if (other != null && other.id.isNotBlank()) {
+                                // If opening from an Albums / Song context (NOT a Singles tap) and this release only has 1 song,
+                                // look ONLY for a strictly validated multi-song parent album (never Unplugged / Lofi / Remix / wrong album).
+                                if (!isSingle && page.songs.size <= 1) {
+                                    val verifiedSongTarget = if (songTitle.isNotBlank()) songTitle else (page.songs.firstOrNull()?.title ?: "")
+                                    val otherCandidates = page.otherVersions
+                                        .filter { other ->
+                                            other.id != cleanBrowseId &&
+                                                !isVariantConflict(sourceContext.ifBlank { verifiedSongTarget }, other.title) &&
+                                                !other.albumType.equals("Single", ignoreCase = true) &&
+                                                artistMatches(artistName, other.artists?.map { it.name }.orEmpty())
+                                        }
+                                    for (other in otherCandidates.take(3)) {
+                                        if (other.id.isBlank()) continue
                                         val otherOutcome = YouTube.album(other.id)
-                                        if (otherOutcome.isSuccess && otherOutcome.getOrThrow().songs.size > 1) {
-                                            val otherPage = otherOutcome.getOrThrow()
+                                        val otherPage = otherOutcome.getOrNull()
+                                        if (otherPage != null &&
+                                            otherPage.songs.size > 1 &&
+                                            !isVariantConflict(sourceContext.ifBlank { verifiedSongTarget }, otherPage.album.title) &&
+                                            songContainedInAlbum(otherPage.songs, verifiedSongTarget, artistName)
+                                        ) {
                                             val otherMap = mapOf(
                                                 "album" to albumItemToMap(otherPage.album),
                                                 "songs" to otherPage.songs.map { songItemToMap(it) },
                                                 "otherVersions" to otherPage.otherVersions.map { albumItemToMap(it) }
                                             )
-                                            Log.i("ZenInnerTube", "getAlbum upgraded single to multi-song version ${other.id}: ${otherPage.songs.size} songs")
+                                            Log.i("ZenInnerTube", "getAlbum upgraded single to validated multi-song album ${other.id}: ${otherPage.songs.size} songs")
                                             replySuccess(result, otherMap)
                                             return@launch
                                         }
                                     }
 
-                                    // Check if songTitle or albumTitle has movie/soundtrack tag: From "..."
+                                    // Check if songTitle or albumTitle has explicit movie/soundtrack tag: From "..."
                                     val fullTitle = if (songTitle.isNotBlank()) songTitle else albumTitle
                                     val fromRegex = Regex("""(?i)\(From\s+["']?([^"')]+)["']?\)""")
                                     val movieMatch = fromRegex.find(fullTitle)
@@ -583,24 +734,34 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                                     if (!soundtrackName.isNullOrBlank()) {
                                         try {
                                             val albumSearch = YouTube.search("$soundtrackName $artistName", YouTube.SearchFilter.FILTER_ALBUM)
-                                            val albumItem = albumSearch.getOrNull()?.items?.filterIsInstance<AlbumItem>()?.firstOrNull()
-                                            val fullAlbumId = albumItem?.browseId?.ifBlank { albumItem.id } ?: ""
-                                            if (fullAlbumId.isNotBlank() && fullAlbumId != cleanBrowseId) {
-                                                val fullOutcome = YouTube.album(fullAlbumId)
-                                                if (fullOutcome.isSuccess && fullOutcome.getOrThrow().songs.size > 1) {
-                                                    val fullPage = fullOutcome.getOrThrow()
+                                            val candidates = albumSearch.getOrNull()?.items
+                                                ?.filterIsInstance<AlbumItem>()
+                                                ?.map { it to scoreAlbumCandidate(it, soundtrackName, verifiedSongTarget, artistName, preferSingle = false) }
+                                                ?.filter { it.second > 0 }
+                                                ?.sortedByDescending { it.second }
+                                                ?.take(3)
+                                                ?: emptyList()
+                                            for ((cand, _) in candidates) {
+                                                val fullAlbumId = cand.browseId.ifBlank { cand.id }
+                                                if (fullAlbumId.isBlank() || fullAlbumId == cleanBrowseId) continue
+                                                val fullPage = YouTube.album(fullAlbumId).getOrNull()
+                                                if (fullPage != null &&
+                                                    fullPage.songs.size > 1 &&
+                                                    !isVariantConflict(sourceContext.ifBlank { verifiedSongTarget }, fullPage.album.title) &&
+                                                    songContainedInAlbum(fullPage.songs, verifiedSongTarget, artistName)
+                                                ) {
                                                     val fullMap = mapOf(
                                                         "album" to albumItemToMap(fullPage.album),
                                                         "songs" to fullPage.songs.map { songItemToMap(it) },
                                                         "otherVersions" to fullPage.otherVersions.map { albumItemToMap(it) }
                                                     )
-                                                    Log.i("ZenInnerTube", "getAlbum resolved full soundtrack album $fullAlbumId from movie name '$soundtrackName': ${fullPage.songs.size} songs")
+                                                    Log.i("ZenInnerTube", "getAlbum resolved validated soundtrack album $fullAlbumId for '$soundtrackName': ${fullPage.songs.size} songs")
                                                     replySuccess(result, fullMap)
                                                     return@launch
                                                 }
                                             }
                                         } catch (e: Exception) {
-                                            Log.w("ZenInnerTube", "Failed to resolve full soundtrack album from movie tag: ${e.message}")
+                                            Log.w("ZenInnerTube", "Failed to resolve soundtrack album: ${e.message}")
                                         }
                                     }
                                 }
@@ -610,7 +771,7 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                                     "songs" to page.songs.map { songItemToMap(it) },
                                     "otherVersions" to page.otherVersions.map { albumItemToMap(it) }
                                 )
-                                Log.i("ZenInnerTube", "getAlbum SUCCESS for $cleanBrowseId: ${page.songs.size} songs")
+                                Log.i("ZenInnerTube", "getAlbum SUCCESS for $cleanBrowseId (isSingle=$isSingle): ${page.songs.size} songs")
                                 replySuccess(result, albumMap)
                                 return@launch
                             } else {
@@ -630,7 +791,9 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                                                 "artists" to listOf(mapOf("id" to null, "name" to (p.author?.name ?: artistName))),
                                                 "thumbnail" to (p.thumbnail ?: ""),
                                                 "year" to 2026,
-                                                "explicit" to false
+                                                "explicit" to false,
+                                                "albumType" to (if (isSingle || page.songs.size <= 1) "Single" else "Album"),
+                                                "isSingle" to (isSingle || page.songs.size <= 1)
                                             ),
                                             "songs" to page.songs.map { songItemToMap(it) },
                                             "otherVersions" to emptyList<Map<String, Any?>>()
@@ -643,56 +806,44 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             }
                         }
 
-                        // 4. Fallback: Search songs for this album or song title to extract the album
+                        // 4. Strictly validated song-based album lookup fallback (never dumps unrelated search songs as fake album)
+                        val cleanFallbackAlb = if (albumTitle.equals("Single", ignoreCase = true)) "" else albumTitle.trim()
                         val fallbackSearchQuery = when {
-                            albumTitle.isNotBlank() && !albumTitle.equals("Single", ignoreCase = true) -> "$albumTitle $artistName"
-                            songTitle.isNotBlank() -> "$songTitle $artistName"
-                            else -> artistName
+                            cleanFallbackAlb.isNotBlank() -> "$cleanFallbackAlb $artistName".trim()
+                            songTitle.isNotBlank() -> "$songTitle $artistName".trim()
+                            else -> ""
                         }
                         if (fallbackSearchQuery.isNotBlank()) {
                             val searchSongs = YouTube.search(fallbackSearchQuery, YouTube.SearchFilter.FILTER_SONG)
                             val songs = searchSongs.getOrNull()?.items?.filterIsInstance<SongItem>() ?: emptyList()
-                            val foundAlbum = songs.firstOrNull { it.album != null && it.album.id.isNotBlank() }?.album
-                            if (foundAlbum != null && foundAlbum.id != cleanBrowseId) {
-                                val secondAlbumOutcome = YouTube.album(foundAlbum.id)
-                                if (secondAlbumOutcome.isSuccess) {
-                                    val page = secondAlbumOutcome.getOrThrow()
+                            val matchingSongs = songs.filter { s ->
+                                val candText = "${s.title} ${s.album?.name.orEmpty()}"
+                                !isVariantConflict(sourceContext, candText) &&
+                                    artistMatches(artistName, s.artists.map { it.name }) &&
+                                    (songTitle.isBlank() || normalizedTitleMatch(songTitle, s.title))
+                            }
+                            for (s in matchingSongs.take(4)) {
+                                val foundAlbum = s.album ?: continue
+                                if (foundAlbum.id.isBlank() || foundAlbum.id == cleanBrowseId) continue
+                                if (isVariantConflict(sourceContext, foundAlbum.name)) continue
+                                val secondPage = YouTube.album(foundAlbum.id).getOrNull()
+                                if (secondPage != null &&
+                                    !isVariantConflict(sourceContext, secondPage.album.title) &&
+                                    (songTitle.isBlank() || songContainedInAlbum(secondPage.songs, songTitle, artistName))
+                                ) {
                                     val albumMap = mapOf(
-                                        "album" to albumItemToMap(page.album),
-                                        "songs" to page.songs.map { songItemToMap(it) },
-                                        "otherVersions" to page.otherVersions.map { albumItemToMap(it) }
+                                        "album" to albumItemToMap(secondPage.album),
+                                        "songs" to secondPage.songs.map { songItemToMap(it) },
+                                        "otherVersions" to secondPage.otherVersions.map { albumItemToMap(it) }
                                     )
-                                    Log.i("ZenInnerTube", "getAlbum found via song album id ${foundAlbum.id}: ${page.songs.size} songs")
+                                    Log.i("ZenInnerTube", "getAlbum validated via song album id ${foundAlbum.id}: ${secondPage.songs.size} songs")
                                     replySuccess(result, albumMap)
                                     return@launch
                                 }
                             }
-
-                            if (songs.isNotEmpty()) {
-                                val thumb = songs.firstOrNull()?.thumbnail ?: ""
-                                val fallbackAlbum = mapOf(
-                                    "id" to cleanBrowseId,
-                                    "browseId" to cleanBrowseId,
-                                    "playlistId" to null,
-                                    "title" to (if (albumTitle.isNotBlank()) albumTitle else (songs.firstOrNull()?.album?.name ?: "Album")),
-                                    "artists" to listOf(mapOf("id" to null, "name" to (if (artistName.isNotBlank()) artistName else "Various Artists"))),
-                                    "year" to 2026,
-                                    "thumbnail" to thumb,
-                                    "explicit" to false,
-                                    "shareLink" to null
-                                )
-                                val fallbackMap = mapOf(
-                                    "album" to fallbackAlbum,
-                                    "songs" to songs.map { songItemToMap(it) },
-                                    "otherVersions" to emptyList<Map<String, Any?>>()
-                                )
-                                Log.i("ZenInnerTube", "getAlbum songs fallback SUCCESS for $fallbackSearchQuery: ${songs.size} songs")
-                                replySuccess(result, fallbackMap)
-                                return@launch
-                            }
                         }
 
-                        replyError(result, "ALBUM_NOT_FOUND", "Could not load album for $browseId", null)
+                        replyError(result, "ALBUM_NOT_FOUND", "Could not load validated album for $browseId", null)
                     }
 
                     "getSong" -> {
@@ -737,6 +888,10 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             replyError(result, "BAD_ARGS", "videoId cannot be blank", null)
                             return@launch
                         }
+                        videoDetailsCache[videoId]?.let { cached ->
+                            replySuccess(result, cached)
+                            return@launch
+                        }
                         try {
                             val jsonBody = """{"context":{"client":{"clientName":"WEB","clientVersion":"2.20240101.01.00","hl":"en","gl":"IN"}},"videoId":"$videoId"}"""
                             val request = okhttp3.Request.Builder()
@@ -763,15 +918,23 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             val author = vd?.optString("author") ?: ""
                             val title = vd?.optString("title") ?: ""
                             val desc = vd?.optString("shortDescription") ?: ""
-                            val map = mapOf(
+
+                            val descHasCredits = desc.contains(Regex("""(?im)^\s*(singers?|vocals?|sung\s*by|artists?|music(\s*director|\s*by)?|composed\s*by|provided\s*to\s*youtube\s*by)\b"""))
+                            val panel = if (!descHasCredits) fetchMusicPanelFromNext(videoId) else emptyMap()
+
+                            val map = mutableMapOf<String, Any?>(
                                 "videoId" to videoId,
                                 "title" to title,
                                 "author" to author,
                                 "publishDate" to (publishDate ?: ""),
                                 "uploadDate" to (uploadDate ?: ""),
                                 "year" to year,
-                                "description" to desc
+                                "description" to desc,
+                                "musicPanelSong" to (panel["song"] ?: ""),
+                                "musicPanelArtist" to (panel["artist"] ?: ""),
+                                "musicPanelAlbum" to (panel["album"] ?: "")
                             )
+                            videoDetailsCache[videoId] = map
                             replySuccess(result, map)
                             return@launch
                         } catch (e: Exception) {
@@ -1037,7 +1200,119 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         )
     }
 
+    private val variantRegex = Regex(
+        """\b(unplugged|lofi|lo-fi|slowed|reverb|sped\s*up|speed\s*up|acoustic|remix|cover|karaoke|instrumental|8d|mashup|tribute|live|concert|session|ringtone|bgm)\b""",
+        RegexOption.IGNORE_CASE
+    )
+
+    private fun isVariantConflict(sourceText: String, candidateText: String): Boolean {
+        val srcMarkers = variantRegex.findAll(sourceText).map { it.value.lowercase().replace("\\s+".toRegex(), " ") }.toSet()
+        val candMarkers = variantRegex.findAll(candidateText).map { it.value.lowercase().replace("\\s+".toRegex(), " ") }.toSet()
+        return candMarkers.any { it !in srcMarkers }
+    }
+
+    private fun normalizeTextForMatch(raw: String): String {
+        var s = raw.lowercase()
+            .replace(Regex("""\([^)]*from\s+[^)]*\)""", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("""\[[^\]]*\]"""), " ")
+            .replace(Regex("""\([^)]*(feat|ft|official|lyric|audio|video|hd|4k)[^)]*\)""", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("""-\s*single\b""", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("""[^\p{L}\p{N}\s]"""), " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+        return s
+    }
+
+    private fun artistMatches(expectedArtist: String, candidateArtists: List<String>): Boolean {
+        val cleanedExpected = expectedArtist.split(Regex("""[,&]|(?i)\b(feat\.?|ft\.?|x)\b"""))
+            .map { it.trim().lowercase() }
+            .filter {
+                it.isNotEmpty() &&
+                    it != "unknown artist" &&
+                    it != "various artists" &&
+                    it != "artist" &&
+                    !it.contains("sony music") &&
+                    !it.contains("t-series") &&
+                    !it.contains("think music") &&
+                    !it.contains("zee music") &&
+                    !it.contains("saregama") &&
+                    !it.contains("aditya music")
+            }
+        if (cleanedExpected.isEmpty()) return true
+        val candLower = candidateArtists.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        if (candLower.isEmpty()) return false
+        for (exp in cleanedExpected) {
+            for (cand in candLower) {
+                if (cand == exp || (exp.length >= 3 && cand.contains(exp)) || (cand.length >= 3 && exp.contains(cand))) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun normalizedTitleMatch(expectedTitle: String, candidateTitle: String): Boolean {
+        val a = normalizeTextForMatch(expectedTitle)
+        val b = normalizeTextForMatch(candidateTitle)
+        if (a.isEmpty() || b.isEmpty()) return false
+        if (a == b) return true
+        if (a.length >= 4 && b.contains(a)) return true
+        if (b.length >= 4 && a.contains(b)) return true
+        return false
+    }
+
+    private fun songContainedInAlbum(
+        songs: List<SongItem>,
+        expectedSongTitle: String,
+        expectedArtist: String
+    ): Boolean {
+        if (expectedSongTitle.isBlank()) return true
+        return songs.any { s ->
+            !isVariantConflict(expectedSongTitle, s.title) &&
+                normalizedTitleMatch(expectedSongTitle, s.title) &&
+                (expectedArtist.isBlank() ||
+                    s.artists.isEmpty() ||
+                    artistMatches(expectedArtist, s.artists.map { it.name }))
+        }
+    }
+
+    private fun scoreAlbumCandidate(
+        candidate: AlbumItem,
+        expectedAlbumTitle: String,
+        expectedSongTitle: String,
+        expectedArtist: String,
+        preferSingle: Boolean
+    ): Int {
+        val sourceContext = "$expectedSongTitle $expectedAlbumTitle".trim()
+        if (isVariantConflict(sourceContext, candidate.title)) return -1
+
+        val candArtists = candidate.artists?.map { it.name }.orEmpty()
+        val hasArtistMatch = artistMatches(expectedArtist, candArtists)
+        val targetTitle = if (expectedAlbumTitle.isNotBlank()) expectedAlbumTitle else expectedSongTitle
+        val titleMatches = targetTitle.isNotBlank() && normalizedTitleMatch(targetTitle, candidate.title)
+
+        // Reject candidates that match neither artist nor target title
+        if (!hasArtistMatch && !titleMatches) return -1
+
+        var score = 0
+        if (normalizeTextForMatch(candidate.title) == normalizeTextForMatch(targetTitle) && targetTitle.isNotBlank()) {
+            score += 100
+        } else if (titleMatches) {
+            score += 50
+        }
+        if (hasArtistMatch) score += 45 else score -= 25
+
+        val candIsSingle = candidate.albumType.equals("Single", ignoreCase = true) ||
+            candidate.title.lowercase().endsWith("- single")
+        if (preferSingle && candIsSingle) score += 25
+        if (!preferSingle && !candIsSingle) score += 20
+
+        return score
+    }
+
     private fun albumItemToMap(a: AlbumItem): Map<String, Any?> {
+        val inferredType = a.albumType
+            ?: if (a.title.lowercase().trimEnd().endsWith("- single")) "Single" else null
         return mapOf(
             "id" to a.id,
             "browseId" to a.browseId,
@@ -1047,6 +1322,8 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             "year" to a.year,
             "thumbnail" to a.thumbnail,
             "explicit" to a.explicit,
+            "albumType" to (inferredType ?: "Album"),
+            "isSingle" to inferredType.equals("Single", ignoreCase = true),
             "shareLink" to a.shareLink
         )
     }

@@ -181,13 +181,15 @@ object SearchPage {
                             ?.find { it.menuNavigationItemRenderer?.icon?.iconType == "MUSIC_SHUFFLE" }
                             ?.menuNavigationItemRenderer
                             ?.navigationEndpoint
-                            ?.watchPlaylistEndpoint ?: return null,
+                            ?.watchPlaylistEndpoint,
                     radioEndpoint =
-                        renderer.menu.menuRenderer.items
-                            .find { it.menuNavigationItemRenderer?.icon?.iconType == "MIX" }
+                        renderer.menu
+                            ?.menuRenderer
+                            ?.items
+                            ?.find { it.menuNavigationItemRenderer?.icon?.iconType == "MIX" }
                             ?.menuNavigationItemRenderer
                             ?.navigationEndpoint
-                            ?.watchPlaylistEndpoint ?: return null,
+                            ?.watchPlaylistEndpoint,
                 )
             }
             renderer.isUserChannel -> {
@@ -231,7 +233,7 @@ object SearchPage {
                             ?.playNavigationEndpoint
                             ?.anyWatchEndpoint
                             ?.playlistId
-                            ?: return null,
+                            ?: "",
                     title =
                         renderer.flexColumns
                             .firstOrNull()
@@ -252,6 +254,7 @@ object SearchPage {
                         renderer.badges?.find {
                             it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
                         } != null,
+                    albumType = PageHelper.extractReleaseType(secondaryLine.firstOrNull()),
                 )
             }
             renderer.isPlaylist -> {
@@ -287,7 +290,7 @@ object SearchPage {
                             ?.text
                             ?.runs
                             ?.lastOrNull()
-                            ?.text ?: return null,
+                            ?.text,
                     thumbnail = renderer.thumbnail?.getThumbnailUrl() ?: return null,
                     playEndpoint =
                         renderer.overlay
@@ -295,7 +298,7 @@ object SearchPage {
                             ?.content
                             ?.musicPlayButtonRenderer
                             ?.playNavigationEndpoint
-                            ?.watchPlaylistEndpoint ?: return null,
+                            ?.watchPlaylistEndpoint,
                     shuffleEndpoint =
                         renderer.menu
                             ?.menuRenderer
@@ -303,13 +306,15 @@ object SearchPage {
                             ?.find { it.menuNavigationItemRenderer?.icon?.iconType == "MUSIC_SHUFFLE" }
                             ?.menuNavigationItemRenderer
                             ?.navigationEndpoint
-                            ?.watchPlaylistEndpoint ?: return null,
+                            ?.watchPlaylistEndpoint,
                     radioEndpoint =
-                        renderer.menu.menuRenderer.items
-                            .find { it.menuNavigationItemRenderer?.icon?.iconType == "MIX" }
+                        renderer.menu
+                            ?.menuRenderer
+                            ?.items
+                            ?.find { it.menuNavigationItemRenderer?.icon?.iconType == "MIX" }
                             ?.menuNavigationItemRenderer
                             ?.navigationEndpoint
-                            ?.watchPlaylistEndpoint ?: return null,
+                            ?.watchPlaylistEndpoint,
                 )
             }
             renderer.isPodcast -> {

@@ -16,13 +16,7 @@ interface ReplicatePrediction {
 }
 
 async function replicateHeaders(): Promise<Record<string, string>> {
-    const token = config.REPLICATE_API_TOKEN;
-    if (!token) throw new Error('[Replicate] REPLICATE_API_TOKEN is not set');
-    return {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'wait',
-    };
+    throw new Error('[Replicate] Replicate AI API is disabled');
 }
 
 /**
@@ -232,7 +226,8 @@ function parseSRTTime(timeStr: string): number {
  * Check if Replicate API is configured and available.
  */
 export function isReplicateAvailable(): boolean {
-    return !!config.REPLICATE_API_TOKEN;
+    void config;
+    return false;
 }
 
 // ─── WhisperX Types ───────────────────────────────────────────────────────────

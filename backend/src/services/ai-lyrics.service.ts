@@ -5,80 +5,15 @@ export interface DetectedSongLanguage {
     romanizedLang: string;
 }
 
-import { generateText, createGateway } from 'ai';
 import { config } from '../config/env';
 import { prisma } from '../utils/prisma';
 
 export class AILyricsService {
-    private static VERCEL_AI_KEY = config.VERCEL_AI_KEY;
+    private static VERCEL_AI_KEY = '';
 
-    public static async queryLLM(prompt: string, options?: { isJson?: boolean }): Promise<string | null> {
-        try {
-            const { askAI, FAST_MODEL } = await import('../utils/ai.js');
-            const res = await askAI(prompt, FAST_MODEL);
-            if (res && res.trim().length > 0) {
-                return res;
-            }
-        } catch (vErr: any) {
-            console.warn("[AILyrics] askAI failed, attempting fallback:", vErr.message);
-        }
-
-        if (this.VERCEL_AI_KEY) {
-            try {
-                const gateway = createGateway({
-                    apiKey: this.VERCEL_AI_KEY,
-                });
-                const model = gateway('openai/gpt-4o-mini');
-                const { text } = await generateText({
-                    model,
-                    prompt,
-                });
-                if (text && text.trim().length > 0) {
-                    return text;
-                }
-            } catch (vErr: any) {
-                console.warn("[AILyrics] Vercel Gateway query failed, attempting NVIDIA fallback:", vErr.message);
-            }
-        }
-
-        const nvidiaKey = config.NVIDIA_API_KEY;
-        if (nvidiaKey) {
-            console.log("[AILyrics] Querying NVIDIA API directly...");
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 60000);
-                const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${nvidiaKey}`,
-                    },
-                    body: JSON.stringify({
-                        model: 'nvidia/nemotron-3.5-bolt-e4b',
-                        messages: [{
-                            role: 'user',
-                            content: prompt
-                        }],
-                        temperature: 0.1,
-                    }),
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-
-                if (!res.ok) {
-                    console.error(`[AILyrics] NVIDIA API error: ${res.status}`, await res.text());
-                } else {
-                    const data = await res.json() as any;
-                    const content = data.choices?.[0]?.message?.content;
-                    if (content) {
-                        return content;
-                    }
-                }
-            } catch (err: any) {
-                console.error("[AILyrics] NVIDIA direct query failed or timed out:", err.message);
-            }
-        }
-
+    public static async queryLLM(_prompt: string, _options?: { isJson?: boolean }): Promise<string | null> {
+        void this.VERCEL_AI_KEY;
+        void config;
         return null;
     }
 

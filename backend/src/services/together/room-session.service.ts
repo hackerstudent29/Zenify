@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { prisma } from '../../utils/prisma';
-import { uploadToR2 } from '../../utils/s3';
+import cloudinary from '../../utils/cloudinary';
 import { RoomAnalyticsService } from './room-analytics.service';
 import { roomEventService } from './room-event.service';
 import { RoomPermissionService } from './room-permission.service';
@@ -778,8 +778,25 @@ export class RoomSessionService {
       throw new RoomHttpError(400, 'INVALID_IMAGE', 'Only JPEG, PNG, and WEBP images are supported.');
     }
 
-    const key = `together/covers/${code}-${Date.now()}.${ext}`;
-    const coverUrl = await uploadToR2(key, fileBuffer, contentType);
+    void ext;
+    void contentType;
+    const coverUrl = await new Promise<string>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: 'image',
+          folder: 'zenify/together/covers',
+          public_id: `${code}-${Date.now()}`,
+        },
+        (error, result) => {
+          if (error || !result?.secure_url) {
+            reject(error || new Error('Cloudinary upload returned no URL'));
+          } else {
+            resolve(result.secure_url);
+          }
+        },
+      );
+      uploadStream.end(fileBuffer);
+    });
 
     await prisma.togetherRoom.update({
       where: { code },

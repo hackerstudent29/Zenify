@@ -11,13 +11,12 @@ import '../../design_system/widgets/equalizer_bars.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/tokens/app_colors.dart';
-import '../../design_system/motion/zen_page_route.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
+import '../../services/media_router.dart';
 import '../../services/player_state.dart';
 import '../../services/queue_state.dart';
 import '../../utils/media_normalizer.dart';
-import '../details/album_screen.dart';
 import 'player_kit.dart';
 
 /// Apple-Music style queue.
@@ -531,30 +530,11 @@ class _QueuePanelState extends State<QueuePanel> {
               widget.onGoToArtist!(names.isNotEmpty ? names.first : e.artist);
             }
           : null,
-      onGoToAlbum: () {
-        final isVid = e.track.isVideo ||
-            Track.detectIsVideo(e.track.title, e.track.album) ||
-            e.track.album.toLowerCase() == 'music video';
-        Navigator.push(
-          context,
-          ZenPageRoute(
-            builder: (_) => AlbumScreen(
-              albumTitle: isVid
-                  ? MediaNormalizer.cleanTitle(e.track.title)
-                  : MediaNormalizer.cleanAlbumTitle(
-                      e.track.album.isNotEmpty ? e.track.album : e.title,
-                    ),
-              artistName: MediaNormalizer.formatArtists(e.artist),
-              coverUrl: e.track.coverUrl,
-              browseId: isVid ? null : e.track.albumBrowseId,
-              initialTracks: [
-                e.track.copyWith(isVideo: isVid ? true : e.track.isVideo),
-              ],
-              isVideo: isVid,
-            ),
-          ),
-        );
-      },
+      onGoToAlbum: () => MediaRouter.openForTrack(
+        context,
+        e.track,
+        useShellTab: true,
+      ),
       extraItems: [
         ZenDropdownItem(
           title: 'Remove from Queue',

@@ -74,31 +74,10 @@ server.register(rateLimit, {
 });
 
 function isOriginAllowed(origin: string | undefined): boolean {
+    // Native Android app requests have no browser Origin header.
     if (!origin) return true;
-    // Allow all local development origins (Flutter Chrome :8085, Preview :8080, Vite :5173, etc.)
-    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-        return true;
-    }
-    const allowedOrigins = [
-        ...config.FRONTEND_URL.split(','),
-        'https://listenzenify.vercel.app',
-        'https://listenzenify.com',
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://localhost:3001',
-        'http://127.0.0.1:3001',
-        'http://localhost:5173',
-        'http://127.0.0.1:5173'
-    ].map(o => o.trim()).filter(Boolean);
-
-    const isVercel = (
-        origin === 'https://listenzenify.vercel.app' || 
-        origin === 'https://listenzenify.com' ||
-        /^https:\/\/listenzenify[a-z0-9-]*\.vercel\.app$/.test(origin) ||
-        /^https:\/\/zenify[a-z0-9-]*\.vercel\.app$/.test(origin)
-    );
-
-    return allowedOrigins.includes(origin) || isVercel;
+    // Allow local development origins only; website origins are disconnected.
+    return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 
 server.register(cors, {
@@ -112,7 +91,7 @@ server.register(cors, {
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     credentials: true,
     allowedHeaders: [
-        'Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 
+        'Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization',
         'Range', 'baggage', 'sentry-trace', 'x-user-language', 'x-user-languages', 'x-user-country', 'x-user-recent-artists', 'x-admin-key',
         'Idempotency-Key', 'X-Timezone', 'X-Together-Ticket', 'X-Guest-Id', 'X-Guest-Name'
     ],
@@ -235,16 +214,11 @@ import { trackRoutes } from './routes/track.routes';
 import { searchRoutes } from './routes/search.routes';
 import { playlistRoutes } from './routes/playlist.routes';
 import { albumRoutes } from './routes/album.routes';
-import { billingRoutes } from './routes/billing.routes';
-import { analyticsRoutes } from './routes/analytics.routes';
 import { metadataRoutes } from './routes/metadata.routes';
-import { homepageRoutes } from './routes/homepage.routes';
 import { utilsRoutes } from './routes/utils.routes';
-import { webhookRoutes } from './routes/webhook.routes';
 import { artistRoutes } from './routes/artist.routes';
 import { notificationRoutes } from './routes/notification.routes';
 import { authMiddleware } from './middleware/auth';
-import { settingsRoutes } from './routes/settings.routes';
 import { preferencesRoutes } from './routes/preferences.routes';
 import { activityRoutes } from './routes/activity.routes';
 import { queueRoutes } from './routes/queue.routes';
@@ -252,9 +226,12 @@ import { togetherRoutes } from './routes/together.routes';
 import { togetherPublicRoutes, togetherV1Routes } from './routes/together-v1.routes';
 import { RoomLifecycleScheduler } from './services/together/room-lifecycle.scheduler';
 import { registerTogetherWebSocket } from './websocket/together-ws';
-import { HomepageService } from './services/homepage.service';
 import { ScheduledPublishService } from './services/scheduled-publish.service';
-import { AnalysisSchedulerService } from './services/analysis-scheduler.service';
+import { followRoutes } from './routes/follow.routes';
+import { replayRoutes } from './routes/replay.routes';
+import { meRoutes } from './routes/me.routes';
+import { libraryRoutes } from './routes/library.routes';
+import { lyricsPipelineRoutes } from './routes/lyrics-pipeline.routes';
 
 server.register(authMiddleware);
 
@@ -263,13 +240,8 @@ server.register(trackRoutes, { prefix: '/api/tracks' });
 server.register(searchRoutes, { prefix: '/api/search' });
 server.register(playlistRoutes, { prefix: '/api/playlists' });
 server.register(albumRoutes, { prefix: '/api/albums' });
-server.register(billingRoutes, { prefix: '/api/billing' });
-server.register(analyticsRoutes, { prefix: '/api/analytics' });
 server.register(metadataRoutes, { prefix: '/api/metadata' });
-server.register(homepageRoutes, { prefix: '/api/homepage' });
-server.register(settingsRoutes, { prefix: '/api/settings' });
 server.register(utilsRoutes, { prefix: '/api/utils' });
-server.register(webhookRoutes, { prefix: '/webhooks' });
 server.register(artistRoutes, { prefix: '/api/artists' });
 server.register(notificationRoutes, { prefix: '/api/notifications' });
 server.register(preferencesRoutes, { prefix: '/api/preferences' });
@@ -279,25 +251,10 @@ server.register(togetherRoutes, { prefix: '/api/together' });
 server.register(togetherV1Routes, { prefix: '/api/v1/together' });
 server.register(togetherPublicRoutes);
 server.register(registerTogetherWebSocket);
-import { shareRoutes } from './routes/share.routes';
-server.register(shareRoutes);
-import { followRoutes } from './routes/follow.routes';
 server.register(followRoutes, { prefix: '/api/me' });
-import { replayRoutes } from './routes/replay.routes';
 server.register(replayRoutes, { prefix: '/api/replay' });
-import { dayMixRoutes } from './routes/day-mix.routes';
-server.register(dayMixRoutes, { prefix: '/api/me' });
-import { blendRoutes } from './routes/blend.routes';
-server.register(blendRoutes, { prefix: '/api/me' });
-import { meRoutes } from './routes/me.routes';
 server.register(meRoutes, { prefix: '/api/me' });
-import { libraryRoutes } from './routes/library.routes';
 server.register(libraryRoutes, { prefix: '/api/me/library' });
-import { discoveryRoutes } from './routes/discovery.routes';
-server.register(discoveryRoutes, { prefix: '/api/discover' });
-import { databaseAdminRoutes } from './routes/database-admin.routes';
-server.register(databaseAdminRoutes, { prefix: '/api/admin/database' });
-import { lyricsPipelineRoutes } from './routes/lyrics-pipeline.routes';
 server.register(lyricsPipelineRoutes, { prefix: '/api' });
 
 server.get('/health', async () => {
@@ -352,52 +309,50 @@ const defaultRemoteConfig = {
         homeFeed: false,
     },
     minAppVersion: '1.0.9',
-    latestAppVersion: '1.1.21',
+    latestAppVersion: '1.1.22',
     isForceUpdate: false,
-    releaseDate: 'November 24, 2026',
-    releaseTime: '11:50 PM IST',
-    updateUrl: 'https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk',
+    releaseDate: 'November 25, 2026',
+    releaseTime: '06:15 PM IST',
+    updateUrl: 'https://github.com/hackerstudent29/Zenify/releases/download/v1.1.22/zenify-v1.1.22.apk',
     features: [
-        '100% Offline Data Isolation: Zero internet consumption when listening to downloaded songs (offline disk cache for lyrics, blocked speculative prefetching, disabled background radio queries, and local artwork resolution)',
-        'Strict YouTube Music Search Parity: Unrestricted access to official songs, video songs, albums, verified artists, and playlists',
-        '16:9 Landscape Video Thumbnails: Native widescreen video previews in search history, recent shelf, and player queue',
-        'Instant Search History Playback: Direct 1-tap playback of video and audio tracks directly from history without re-search delays',
-        'Ultra-Fast Parallel Lyrics Engine: Multi-provider parallel fetching (LRCLIB, lrc.red) with sub-300ms response and automatic video skip',
+        'Transparent Liquid Glass UI: Clean transparent liquid-glass backdrop across Top Picks & hero cards',
+        'Smart Singles, Albums & Video Routing: Singles stay on Single view with artist/album redirection sheet, verified album resolution, and dedicated Video Single page with clean titles & accurate artists',
+        'Song Credits & Static View Lyrics: Full credits breakdown (cast, composers, lyricists, distributor) and stationary plain-text View Lyrics screen',
+        'Rigid 90° Rotation Morph & Landscape Video Controls: Fluid portrait-to-landscape morph with landscape ±10s skip buttons, double-tap seek accumulation, and fit/fill toggle',
     ],
     fixes: [
-        'Completely blocked network leakage on background services when listening to offline downloaded tracks',
-        'Fixed search catalog filters to prevent unintentional omission of video songs, playlists, or albums',
-        'Eliminated video song lyrics latency by immediately skipping unnecessary lyrical requests for video media',
-        'Optimized search history tap navigation to launch media immediately instead of triggering duplicate searches',
+        'Persistent Bottom Dock & MiniPlayer across View Credits, View Lyrics, Artist, and Album screens opened from Player, Queue, or modal sheets',
+        'Generous 180px + safe-area bottom scroll clearance across Artist, Album, Library, Credits, Lyrics, and Sound Atlas screens',
+        'Fixed View Lyrics scroll stability so header, selection, and bottom dock remain completely stationary while scrolling',
+        'Fixed wrong album redirects, unplugged track hijacks, and video song title/artist noise',
     ],
     improvements: [
-        'Ultra-compressed 16.0 MB APK footprint with R8 minification, ProGuard dead-code removal, and ABI-split optimization',
-        'Ultra-fast lyrics retrieval with multi-provider race and LRCLIB cache v12',
-        'Landscape 16:9 aspect ratio rendering across all video song queues and search rows',
-        'Enhanced battery longevity and offline audio stability',
+        'Clean Title + Year metadata on Artist Video Songs and Title + Artist Name on Home shelves',
+        'Standalone Android-focused backend with website CORS/routes, AI gateways, and Cloudflare R2 disabled',
+        'Widget test coverage across FullLyricsScreen, ShellNavigationScope tab routing, SongCreditsScreen, and PlayerShell rotation',
     ],
-    releaseNotes: '• 100% Offline Data Isolation: Zero data consumption on downloaded songs\n• Strict YouTube Music search parity (unrestricted songs, videos, albums, playlists)\n• 16:9 landscape video previews in search history & queue\n• Ultra-fast parallel lyrics resolver with video skip\n• Ultra-compressed 16.0 MB APK footprint',
-    message: 'Update to v1.1.21 for 100% offline playback isolation (zero data usage on downloaded songs), YouTube Music search parity, and ultra-fast lyrics fetching',
+    releaseNotes: '• Persistent Dock & MiniPlayer on Credits, View Lyrics & Artist pages with 180px bottom clearance\n• Rigid 90° portrait/landscape rotation morph & landscape video ±10s + fit/fill controls\n• Smart Single/Album/Video routing with verified album matching & clean video metadata\n• Transparent liquid-glass Top Picks UI & stationary plain View Lyrics page\n• Website disconnection & leaner Android-first backend',
+    message: 'Update to v1.1.22 for persistent Dock & MiniPlayer on Credits/Lyrics/Artist pages, smooth 90° rotation morph & landscape video controls, smart Single/Video routing, and liquid-glass polish',
 };
 
 server.get('/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.1.21.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.1.22.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }
-    return reply.redirect('https://listenzenify.vercel.app/downloads/zenify.apk');
+    return reply.redirect(defaultRemoteConfig.updateUrl);
 });
 
 server.get('/api/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.1.21.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.1.22.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }
-    return reply.redirect('https://listenzenify.vercel.app/downloads/zenify.apk');
+    return reply.redirect(defaultRemoteConfig.updateUrl);
 });
 
 server.get('/remote_config.json', async () => {
@@ -421,26 +376,13 @@ const start = async () => {
         server.log.info(`Server listening on port ${config.PORT}`);
         logBuffer.add({ level: 'INFO', category: 'SYSTEM', message: `Zenify API listening on port ${config.PORT} (${config.NODE_ENV})` });
 
-        // Run engagement score update on startup + every 3 hours
-        HomepageService.updateEngagementScores();
-        setInterval(() => HomepageService.updateEngagementScores(), 3 * 60 * 60 * 1000);
-
         // Start scheduled publishing service
         ScheduledPublishService.start();
         server.log.info('Scheduled publishing service started');
 
-        // Start Cron jobs
+        // Start Cron jobs (AI & Deepgram background pipelines are disabled)
         CronService.init();
         server.log.info('CronService initialized');
-
-        // Start deterministic AI Analysis Scheduler (12:30 AM Asia/Kolkata, 10 req/min cap)
-        AnalysisSchedulerService.init();
-        server.log.info('AnalysisSchedulerService initialized');
-
-        // Start 24/7 Elastic Auto-Scaling Lyrics Enrichment & Deepgram Onset Engine
-        const { ElasticLyricWorker } = await import('./queues/lyric-enrichment.worker.js');
-        ElasticLyricWorker.start();
-        server.log.info('ElasticLyricWorker started (Elastic Auto-scaling Concurrency & Deepgram Onset Alignment)');
     } catch (err) {
         server.log.error(err);
         process.exit(1);

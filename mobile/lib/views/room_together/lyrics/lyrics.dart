@@ -8,6 +8,9 @@ import '../../../models/room_phase2_models.dart';
 /// `[offset:±ms]`) and structured JSON lines. Pure functions, unit-tested.
 abstract final class LyricsParser {
   static final _stamp = RegExp(r'\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]');
+  static final _rangeStamp = RegExp(
+    r'^\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\s*(?:[\-–—]|->|,)\s*(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]',
+  );
   static final _word = RegExp(r'<(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?>');
   static final _offset = RegExp(r'^\[offset:\s*([+-]?\d+)\]', caseSensitive: false);
 
@@ -20,7 +23,7 @@ abstract final class LyricsParser {
   }
 
   static List<LyricLine> parseLrc(String lrc) {
-    final raw = <(int, String, List<LyricWord>)>[];
+    final raw = <(int, int?, String, List<LyricWord>)>[];
     var offset = 0;
     for (final line in lrc.split(RegExp(r'\r?\n'))) {
       final t = line.trim();
@@ -30,28 +33,60 @@ abstract final class LyricsParser {
         offset = int.parse(off.group(1)!);
         continue;
       }
+
+      List<LyricWord> extractWords(String input, List<RegExpMatch> wm) {
+        final words = <LyricWord>[];
+        if (wm.isNotEmpty) {
+          for (var i = 0; i < wm.length; i++) {
+            final end = i + 1 < wm.length ? wm[i + 1].start : input.length;
+            final w = input.substring(wm[i].end, end).trim();
+            if (w.isNotEmpty) {
+              words.add(LyricWord(_ms(wm[i].group(1)!, wm[i].group(2)!, wm[i].group(3)), w));
+            }
+          }
+        }
+        return words;
+      }
+
+      final rangeM = _rangeStamp.firstMatch(t);
+      if (rangeM != null) {
+        final sMs = _ms(rangeM.group(1)!, rangeM.group(2)!, rangeM.group(3)) + offset;
+        final eMs = _ms(rangeM.group(4)!, rangeM.group(5)!, rangeM.group(6)) + offset;
+        var text = t.substring(rangeM.end).trim();
+        final wm = _word.allMatches(text).toList();
+        final words = extractWords(text, wm);
+        if (wm.isNotEmpty) text = text.replaceAll(_word, '').replaceAll(RegExp(r'\s+'), ' ').trim();
+        raw.add((sMs, eMs > sMs ? eMs : null, text, words));
+        continue;
+      }
+
       final stamps = _stamp.allMatches(t).toList();
       if (stamps.isEmpty) continue; // metadata tags like [ar:], [ti:]
       var text = t.substring(stamps.last.end).trim();
-      final words = <LyricWord>[];
       final wm = _word.allMatches(text).toList();
+      final words = extractWords(text, wm);
       if (wm.isNotEmpty) {
-        for (var i = 0; i < wm.length; i++) {
-          final end = i + 1 < wm.length ? wm[i + 1].start : text.length;
-          final w = text.substring(wm[i].end, end).trim();
-          if (w.isNotEmpty) words.add(LyricWord(_ms(wm[i].group(1)!, wm[i].group(2)!, wm[i].group(3)), w));
-        }
         text = text.replaceAll(_word, '').replaceAll(RegExp(r'\s+'), ' ').trim();
       }
+      int? wordLastEnd;
+      if (wm.length >= 2) {
+        final lastW = _ms(wm.last.group(1)!, wm.last.group(2)!, wm.last.group(3));
+        if (wm.last.end == t.substring(stamps.last.end).trim().length) {
+          wordLastEnd = lastW + offset;
+        }
+      }
       for (final s in stamps) {
-        raw.add((_ms(s.group(1)!, s.group(2)!, s.group(3)) + offset, text, words));
+        final sMs = _ms(s.group(1)!, s.group(2)!, s.group(3)) + offset;
+        raw.add((sMs, (wordLastEnd != null && wordLastEnd > sMs) ? wordLastEnd : null, text, words));
       }
     }
     raw.sort((a, b) => a.$1.compareTo(b.$1));
     final out = <LyricLine>[];
     for (var i = 0; i < raw.length; i++) {
-      final end = i + 1 < raw.length ? raw[i + 1].$1 : null;
-      out.add(LyricLine(startMs: raw[i].$1.clamp(0, 1 << 30), endMs: end, text: raw[i].$2, words: raw[i].$3));
+      final start = raw[i].$1.clamp(0, 1 << 30);
+      final nextStart = i + 1 < raw.length ? raw[i + 1].$1 : null;
+      final end = raw[i].$2 ?? nextStart;
+      out.add(LyricLine(startMs: start, endMs: end, text: raw[i].$3, words: raw[i].$4));
     }
     return out;
   }

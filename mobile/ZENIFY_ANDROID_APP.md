@@ -51,14 +51,14 @@ Unlike conventional wrappers, Zenify interfaces directly with low-level audio re
 |---|---|
 | **Application Name** | Zenify |
 | **Package ID** | `com.zenify.mobile` |
-| **Current Version** | `v1.1.20` |
-| **Build Number** | `2033` |
+| **Current Version** | `v1.1.22` |
+| **Build Number** | `2036` |
 | **Target OS** | Android 15 (API level 35) |
 | **Minimum OS** | Android 8.0 (API level 26 - Oreo) |
 | **Native Compilation** | Kotlin 2.0.21 / JVM 17 |
 | **Cross-Platform Engine** | Flutter 3.44.2 / Dart 3.12.0 |
-| **Universal APK Size** | `36.1 MB` (`37,836,799` bytes) |
-| **ARM64 Optimized Split**| `15.9 MB` (`16,708,961` bytes) |
+| **Universal APK Size** | `36.8 MB` (`38,635,649` bytes) |
+| **ARM64 Optimized Split**| `16.2 MB` (`17,008,287` bytes) |
 | **Audio Bitrates** | 320 kbps (Lossless/HQ), 160 kbps (Opus), 128 kbps (AAC), 70 kbps (Data Saver) |
 | **Video Streaming** | 360p, 480p, 720p, 1080p, 4K (60fps) |
 
@@ -92,8 +92,8 @@ Unlike conventional wrappers, Zenify interfaces directly with low-level audio re
 
 #### 3. Storage Footprint & Offline Sizing
 * **Application Package Sizes**:
-  * **ARM64 Split APK**: **~15.9 MB** (`16,708,961` bytes)
-  * **Universal APK**: **~36.1 MB** (`37,836,799` bytes)
+  * **ARM64 Split APK**: **~16.2 MB** (`17,008,287` bytes)
+  * **Universal APK**: **~36.8 MB** (`38,635,649` bytes)
 * **Installed Application Footprint**: **~45 MB – 65 MB** (app binary + SQLite index).
 * **Offline Media File Sizing**:
   * **Single Audio Song (320kbps / 160kbps)**: **~3 MB to 6 MB** per track (`.m4a`).
@@ -298,7 +298,7 @@ flutter build apk --split-per-abi --release
 
 Generated packages will be located in:
 * `build/app/outputs/flutter-apk/app-release.apk` (Universal)
-* `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (Optimized ARM64, ~15.9MB)
+* `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (Optimized ARM64, ~16.2 MB)
 
 ---
 

@@ -25,56 +25,13 @@ export interface QuickLrcResult {
  *
  * Returns null if API key not set, quota exceeded, or request fails.
  */
-export async function alignWithQuickLrc(audioUrl: string, lyrics: string): Promise<string | null> {
-    const apiKey = config.QUICKLRC_API_KEY;
-    if (!apiKey) {
-        console.log('[QuickLRC] QUICKLRC_API_KEY not configured. Skipping.');
-        return null;
-    }
-
-    console.log(`[QuickLRC] Attempting forced alignment for audio: ${audioUrl.slice(0, 80)}...`);
-
-    try {
-        const response = await axios.post(
-            `${QUICKLRC_BASE}/api/v1/transcribe`,
-            {
-                fileUrl: audioUrl,
-                lyrics: lyrics,
-                format: 'lrc',
-                isWordLevel: false,
-                smartSections: false,
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json',
-                },
-                responseType: 'text',  // LRC is plain text
-                timeout: 120000, // 2 min — audio transcription can take time
-            }
-        );
-
-        if (typeof response.data === 'string' && response.data.includes('[')) {
-            console.log(`[QuickLRC] ✅ Forced alignment successful. LRC received (${response.data.length} chars).`);
-            return response.data;
-        }
-
-        console.warn('[QuickLRC] Unexpected response format:', String(response.data).slice(0, 200));
-        return null;
-    } catch (err: any) {
-        if (err.response?.status === 402) {
-            console.warn('[QuickLRC] ⚠️  Credit limit reached. Cannot process more songs this month.');
-        } else if (err.response?.status === 403) {
-            console.warn('[QuickLRC] ⚠️  Monthly usage cap reached.');
-        } else if (err.response?.status === 401) {
-            console.warn('[QuickLRC] Invalid API key.');
-        } else {
-            console.warn(`[QuickLRC] Alignment failed: ${err.message}`);
-        }
-        return null;
-    }
+export async function alignWithQuickLrc(_audioUrl: string, _lyrics: string): Promise<string | null> {
+    void QUICKLRC_BASE;
+    void axios;
+    return null;
 }
 
 export function isQuickLrcAvailable(): boolean {
-    return !!config.QUICKLRC_API_KEY;
+    void config;
+    return false;
 }

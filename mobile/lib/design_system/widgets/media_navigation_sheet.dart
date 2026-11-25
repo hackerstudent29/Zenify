@@ -4,10 +4,11 @@ import 'package:flutter/services.dart';
 
 import '../../models/artist_ref.dart';
 import '../../models/track.dart';
+import '../../services/album_resolver.dart';
 import '../../services/artist_service.dart';
 import '../../services/dock_visibility.dart';
+import '../../services/media_router.dart';
 import '../../utils/media_normalizer.dart';
-import '../../views/details/album_screen.dart';
 import '../../views/details/artist_screen.dart';
 import '../../views/shell_screen.dart' show ShellNavigationScope;
 import '../zen.dart';
@@ -16,7 +17,7 @@ import 'pressable_scale.dart';
 import 'zen_dropdown.dart';
 
 /// Apple Music-style navigation sheet displaying "Go to Artist" (one row per artist)
-/// and "Go to Album" with high-res artwork, overriding the miniplayer, bottom dock,
+/// and validated "Go to Album" with high-res artwork, overriding the miniplayer, bottom dock,
 /// and dynamic island as Layer 1 of the app.
 class MediaNavigationSheet extends StatefulWidget {
   const MediaNavigationSheet({
@@ -29,6 +30,10 @@ class MediaNavigationSheet extends StatefulWidget {
     this.initialTracks,
     required this.onOpenArtist,
     this.onOpenAlbum,
+    this.onOpenValidatedAlbum,
+    this.trackForResolution,
+    this.excludeAlbumBrowseId,
+    this.isVideo = false,
     this.isLandscape = false,
   });
 
@@ -40,6 +45,10 @@ class MediaNavigationSheet extends StatefulWidget {
   final List<Track>? initialTracks;
   final ValueChanged<ArtistRef> onOpenArtist;
   final VoidCallback? onOpenAlbum;
+  final void Function(ValidatedAlbumResult album)? onOpenValidatedAlbum;
+  final Track? trackForResolution;
+  final String? excludeAlbumBrowseId;
+  final bool isVideo;
   final bool isLandscape;
 
   /// Primary entrypoint to show the media navigation sheet across the entire application.
@@ -54,6 +63,8 @@ class MediaNavigationSheet extends StatefulWidget {
     String? albumBrowseId,
     List<Track>? initialTracks,
     bool showAlbum = true,
+    bool isVideo = false,
+    String? excludeAlbumBrowseId,
     void Function(ArtistRef artist)? onOpenArtist,
     VoidCallback? onOpenAlbum,
     VoidCallback? onBeforeNavigate,
@@ -98,24 +109,27 @@ class MediaNavigationSheet extends StatefulWidget {
       effectiveArtists = [ArtistRef.fromName('Unknown Artist')];
     }
 
+    // Video songs NEVER redirect to an album.
+    final isVidTrack =
+        isVideo ||
+        (track != null && AlbumResolver.isVideoTrack(track));
+
     String? effectiveAlbum;
-    final isVidTrack = track != null && (track.isVideo || Track.detectIsVideo(track.title, track.album));
-    if (showAlbum) {
-      if (albumTitle != null && albumTitle.trim().isNotEmpty) {
+    if (showAlbum && !isVidTrack) {
+      if (albumTitle != null &&
+          albumTitle.trim().isNotEmpty &&
+          AlbumResolver.isValidAlbumTitle(albumTitle)) {
         effectiveAlbum = albumTitle;
-      } else if (track != null) {
-        if (isVidTrack) {
-          effectiveAlbum = MediaNormalizer.cleanTitle(track.title);
-        } else if (track.album.isNotEmpty && track.album != 'Single') {
-          effectiveAlbum = track.album;
-        } else if (track.album == 'Single' || track.album.isEmpty) {
-          effectiveAlbum = '${track.title} - Single';
-        }
+      } else if (track != null &&
+          AlbumResolver.isValidAlbumTitle(track.album) &&
+          !AlbumResolver.isSingleReleaseTitle(track.album)) {
+        effectiveAlbum = track.album;
       }
     }
 
     final effectiveCover = albumCoverUrl ?? track?.coverUrl;
-    final effectiveBrowseId = albumBrowseId ?? track?.albumBrowseId;
+    final effectiveBrowseId =
+        AlbumResolver.sanitizeAlbumBrowseId(albumBrowseId ?? track?.albumBrowseId);
     final effectiveAlbumArtist = albumArtist ??
         (track?.artist ?? (effectiveArtists.isNotEmpty ? effectiveArtists.first.name : ''));
 
@@ -130,6 +144,14 @@ class MediaNavigationSheet extends StatefulWidget {
       albumCoverUrl: effectiveCover,
       albumBrowseId: effectiveBrowseId,
       initialTracks: initialTracks ?? (track != null ? [track] : null),
+      trackForResolution: (!isVidTrack && showAlbum && effectiveAlbum == null)
+          ? (track ??
+                (initialTracks != null && initialTracks.isNotEmpty
+                    ? initialTracks.first
+                    : null))
+          : null,
+      excludeAlbumBrowseId: excludeAlbumBrowseId,
+      isVideo: isVidTrack,
       isLandscape: isLandscape,
       onOpenArtist: (a) {
         DockVisibility.release(token);
@@ -144,10 +166,7 @@ class MediaNavigationSheet extends StatefulWidget {
           browseId: a.id.isNotEmpty && !a.id.contains('_') ? a.id : null,
           imageUrl: a.imageUrl,
         );
-        final shell = ShellNavigationScope.of(context);
-        if (shell != null) {
-          shell.openInActiveTab(page);
-        } else {
+        if (!ShellNavigationScope.openPage(context, page)) {
           final nav = callerNav.mounted ? callerNav : rootNav;
           nav.push(
             ZenPageRoute(
@@ -156,7 +175,24 @@ class MediaNavigationSheet extends StatefulWidget {
           );
         }
       },
-      onOpenAlbum: effectiveAlbum != null
+      onOpenValidatedAlbum: (showAlbum && !isVidTrack)
+          ? (validated) {
+              DockVisibility.release(token);
+              Navigator.of(sheetContext).pop();
+              onBeforeNavigate?.call();
+              MediaRouter.openRelease(
+                context,
+                albumTitle: validated.title,
+                artistName: validated.artist,
+                coverUrl: validated.coverUrl,
+                browseId: validated.browseId,
+                initialTracks: validated.tracks,
+                isSingle: false,
+                useShellTab: true,
+              );
+            }
+          : null,
+      onOpenAlbum: effectiveAlbum != null && !isVidTrack
           ? () {
               DockVisibility.release(token);
               Navigator.of(sheetContext).pop();
@@ -165,40 +201,17 @@ class MediaNavigationSheet extends StatefulWidget {
                 onOpenAlbum();
                 return;
               }
-              String? browseId = effectiveBrowseId;
-              if (browseId != null &&
-                  (browseId.startsWith('VLPL') ||
-                   browseId.startsWith('PL') ||
-                   browseId.startsWith('RD'))) {
-                browseId = null;
-              }
-              final isVid = isVidTrack ||
-                  (effectiveAlbum != null &&
-                      (effectiveAlbum.toLowerCase() == 'music video' ||
-                          effectiveAlbum.toLowerCase() == 'video' ||
-                          Track.detectIsVideo(effectiveAlbum, effectiveAlbum)));
-              final page = AlbumScreen(
-                albumTitle: isVid ? MediaNormalizer.cleanTitle(track?.title ?? effectiveAlbum!) : effectiveAlbum!,
+              MediaRouter.openRelease(
+                context,
+                albumTitle: effectiveAlbum!,
                 artistName: effectiveAlbumArtist,
                 coverUrl: effectiveCover,
-                browseId: isVid ? null : browseId,
-                initialTracks: initialTracks ??
-                    (track != null
-                        ? [track.copyWith(isVideo: isVid ? true : track.isVideo)]
-                        : null),
-                isVideo: isVid,
+                browseId: effectiveBrowseId,
+                initialTracks: initialTracks ?? (track != null ? [track] : null),
+                isSingle: false,
+                isVideo: false,
+                useShellTab: true,
               );
-              final shell = ShellNavigationScope.of(context);
-              if (shell != null) {
-                shell.openInActiveTab(page);
-              } else {
-                final nav = callerNav.mounted ? callerNav : rootNav;
-                nav.push(
-                  ZenPageRoute(
-                    builder: (_) => page,
-                  ),
-                );
-              }
             }
           : null,
     );
@@ -232,6 +245,7 @@ class MediaNavigationSheet extends StatefulWidget {
 class _MediaNavigationSheetState extends State<MediaNavigationSheet> {
   final Map<String, String> _photos = {};
   final Map<String, String> _browseIds = {};
+  ValidatedAlbumResult? _resolvedParentAlbum;
 
   @override
   void initState() {
@@ -245,6 +259,24 @@ class _MediaNavigationSheetState extends State<MediaNavigationSheet> {
       }
     }
     _resolveMissingArtistImages();
+    _resolveParentAlbumIfNeeded();
+  }
+
+  void _resolveParentAlbumIfNeeded() {
+    if (widget.isVideo) return;
+    if (widget.albumTitle != null && widget.albumTitle!.trim().isNotEmpty) {
+      return;
+    }
+    final tr = widget.trackForResolution;
+    if (tr == null) return;
+    AlbumResolver.resolveValidatedParentAlbumForTrack(
+      tr,
+      excludeBrowseId: widget.excludeAlbumBrowseId,
+    ).then((res) {
+      if (mounted && res != null) {
+        setState(() => _resolvedParentAlbum = res);
+      }
+    }).catchError((_) {});
   }
 
   void _resolveMissingArtistImages() {
@@ -268,6 +300,12 @@ class _MediaNavigationSheetState extends State<MediaNavigationSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.of(context).padding.bottom;
+    final hasExplicitAlbum =
+        !widget.isVideo &&
+        widget.albumTitle != null &&
+        widget.albumTitle!.trim().isNotEmpty &&
+        widget.onOpenAlbum != null;
+    final validatedAlbum = !widget.isVideo ? _resolvedParentAlbum : null;
 
     final content = Column(
       mainAxisSize: MainAxisSize.min,
@@ -279,11 +317,20 @@ class _MediaNavigationSheetState extends State<MediaNavigationSheet> {
           const SizedBox(height: 10),
         ],
 
-        // Album row (if available and requested)
-        if (widget.albumTitle != null &&
-            widget.albumTitle!.trim().isNotEmpty &&
-            widget.onOpenAlbum != null) ...[
-          _buildAlbumRow(),
+        // Validated Album row (if available and not a video song)
+        if (hasExplicitAlbum) ...[
+          _buildAlbumRow(
+            title: widget.albumTitle!,
+            coverUrl: widget.albumCoverUrl ?? '',
+            onTap: widget.onOpenAlbum!,
+          ),
+        ] else if (validatedAlbum != null &&
+            widget.onOpenValidatedAlbum != null) ...[
+          _buildAlbumRow(
+            title: validatedAlbum.title,
+            coverUrl: validatedAlbum.coverUrl,
+            onTap: () => widget.onOpenValidatedAlbum!(validatedAlbum),
+          ),
         ],
       ],
     );
@@ -438,14 +485,16 @@ class _MediaNavigationSheetState extends State<MediaNavigationSheet> {
     );
   }
 
-  Widget _buildAlbumRow() {
-    final cover = widget.albumCoverUrl ?? '';
-
+  Widget _buildAlbumRow({
+    required String title,
+    required String coverUrl,
+    required VoidCallback onTap,
+  }) {
     return PressableScale(
       scale: 0.98,
       onTap: () {
         HapticFeedback.lightImpact();
-        widget.onOpenAlbum?.call();
+        onTap();
       },
       child: Container(
         color: Colors.transparent,
@@ -458,9 +507,9 @@ class _MediaNavigationSheetState extends State<MediaNavigationSheet> {
               height: 48,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: cover.isNotEmpty
+                child: coverUrl.isNotEmpty
                     ? CachedNetworkImage(
-                        imageUrl: cover,
+                        imageUrl: coverUrl,
                         fit: BoxFit.cover,
                         fadeInDuration: const Duration(milliseconds: 200),
                         placeholder: (_, _) => Container(
@@ -512,7 +561,7 @@ class _MediaNavigationSheetState extends State<MediaNavigationSheet> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    widget.albumTitle!,
+                    title,
                     style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 13.5,

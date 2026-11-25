@@ -8,7 +8,12 @@ import '../utils/media_normalizer.dart';
 import 'innertube_service.dart';
 import 'user_preferences_service.dart';
 
-typedef YTArtistCard = ({String name, String? browseId, String? audience, String? thumb});
+typedef YTArtistCard = ({
+  String name,
+  String? browseId,
+  String? audience,
+  String? thumb,
+});
 
 class ArtistReleaseItem {
   const ArtistReleaseItem({
@@ -122,11 +127,13 @@ class ArtistService {
   ArtistService._();
   static final ArtistService instance = ArtistService._();
 
-  static const String _avatarCachePrefKey = 'zenify_persisted_artist_avatars_v1';
+  static const String _avatarCachePrefKey =
+      'zenify_persisted_artist_avatars_v1';
   static bool _avatarsLoaded = false;
   static Timer? _avatarSaveTimer;
 
-  static final Map<String, ({ArtistProfile profile, DateTime expires})> _cache = {};
+  static final Map<String, ({ArtistProfile profile, DateTime expires})> _cache =
+      {};
   static final Map<String, Future<ArtistProfile?>> _inFlight = {};
   static final Map<String, String> _avatarCache = {};
   static final Map<String, Future<String>> _inFlightAvatars = {};
@@ -169,7 +176,9 @@ class ArtistService {
     _inFlight.clear();
     if (!keepAvatars) {
       _avatarCache.clear();
-      SharedPreferences.getInstance().then((p) => p.remove(_avatarCachePrefKey)).catchError((_) => false);
+      SharedPreferences.getInstance()
+          .then((p) => p.remove(_avatarCachePrefKey))
+          .catchError((_) => false);
     }
     _inFlightAvatars.clear();
   }
@@ -201,7 +210,8 @@ class ArtistService {
     }
 
     // 1. Check user favorite artists from preferences
-    for (final fa in UserPreferencesService.instance.currentPrefs.favoriteArtists) {
+    for (final fa
+        in UserPreferencesService.instance.currentPrefs.favoriteArtists) {
       if (fa.name.trim().toLowerCase() == key && fa.image.isNotEmpty) {
         cacheAvatar(clean, fa.image);
         return fa.image;
@@ -212,7 +222,10 @@ class ArtistService {
     final future = () async {
       try {
         // Strategy A: Native InnerTube searchArtists (returns official artist circular avatar directly)
-        final artists = await InnerTubeService.instance.searchArtists(clean, limit: 3);
+        final artists = await InnerTubeService.instance.searchArtists(
+          clean,
+          limit: 3,
+        );
         if (artists.isNotEmpty) {
           for (final a in artists) {
             if (a.name.toLowerCase() == key ||
@@ -234,7 +247,10 @@ class ArtistService {
         // Strategy B: searchArtist (musicCardShelf / artistChannel hit)
         final hit = await InnerTubeService.instance.searchArtist(clean);
         if (hit != null && hit.thumb != null && hit.thumb!.isNotEmpty) {
-          final upgraded = MediaNormalizer.upgradeArtworkUrl(hit.thumb!, isArtistAvatar: true);
+          final upgraded = MediaNormalizer.upgradeArtworkUrl(
+            hit.thumb!,
+            isArtistAvatar: true,
+          );
           cacheAvatar(clean, upgraded);
           return upgraded;
         }
@@ -244,8 +260,13 @@ class ArtistService {
         if (songHits.isNotEmpty) {
           for (final song in songHits) {
             for (final ar in song.resolvedArtists) {
-              if (ar.name.toLowerCase() == key && ar.imageUrl != null && ar.imageUrl!.isNotEmpty) {
-                final upgraded = MediaNormalizer.upgradeArtworkUrl(ar.imageUrl!, isArtistAvatar: true);
+              if (ar.name.toLowerCase() == key &&
+                  ar.imageUrl != null &&
+                  ar.imageUrl!.isNotEmpty) {
+                final upgraded = MediaNormalizer.upgradeArtworkUrl(
+                  ar.imageUrl!,
+                  isArtistAvatar: true,
+                );
                 cacheAvatar(clean, upgraded);
                 return upgraded;
               }
@@ -253,7 +274,10 @@ class ArtistService {
           }
           final first = songHits.first;
           if (first.coverUrl.isNotEmpty) {
-            final upgraded = MediaNormalizer.upgradeArtworkUrl(first.coverUrl, isArtistAvatar: true);
+            final upgraded = MediaNormalizer.upgradeArtworkUrl(
+              first.coverUrl,
+              isArtistAvatar: true,
+            );
             cacheAvatar(clean, upgraded);
             return upgraded;
           }
@@ -275,10 +299,13 @@ class ArtistService {
     var u = url.trim();
     if (u.contains('googleusercontent.com') || u.contains('ggpht.com')) {
       final base = u.replaceAll(
-        RegExp(r'=(?:w\d+-h\d+|s\d+|w\d+)(?:-[a-z0-9_-]+)*$', caseSensitive: false),
+        RegExp(
+          r'=(?:w\d+-h\d+|s\d+|w\d+)(?:-[a-z0-9_-]+)*$',
+          caseSensitive: false,
+        ),
         '',
       );
-      return '$base=w1600-l90-rj';
+      return '$base=w720-l85-rj';
     }
     return MediaNormalizer.upgradeBannerUrl(u);
   }
@@ -297,11 +324,17 @@ class ArtistService {
     return null;
   }
 
-  Future<ArtistProfile?> getArtist(String artistName, {String? browseId, bool forceRefresh = false}) async {
+  Future<ArtistProfile?> getArtist(
+    String artistName, {
+    String? browseId,
+    bool forceRefresh = false,
+  }) async {
     final cleanName = artistName.trim();
     if (cleanName.isEmpty) return null;
 
-    final cacheKey = (browseId != null && browseId.isNotEmpty) ? browseId.toLowerCase() : cleanName.toLowerCase();
+    final cacheKey = (browseId != null && browseId.isNotEmpty)
+        ? browseId.toLowerCase()
+        : cleanName.toLowerCase();
     if (!forceRefresh) {
       final cached = getCached(cleanName, browseId: browseId);
       if (cached != null) return cached;
@@ -321,7 +354,10 @@ class ArtistService {
     }
   }
 
-  Future<ArtistProfile?> _loadArtistInternal(String cleanName, {String? browseId}) async {
+  Future<ArtistProfile?> _loadArtistInternal(
+    String cleanName, {
+    String? browseId,
+  }) async {
     void storeCache(ArtistProfile profile, Duration ttl) {
       final expires = DateTime.now().add(ttl);
       _cache[cleanName.toLowerCase()] = (profile: profile, expires: expires);
@@ -329,13 +365,19 @@ class ArtistService {
         _cache[browseId.toLowerCase()] = (profile: profile, expires: expires);
       }
       if (profile.name.isNotEmpty) {
-        _cache[profile.name.toLowerCase()] = (profile: profile, expires: expires);
+        _cache[profile.name.toLowerCase()] = (
+          profile: profile,
+          expires: expires,
+        );
       }
     }
 
     try {
-      final isValidYtBrowseId = browseId != null &&
-          (browseId.startsWith('UC') || browseId.startsWith('FEmusic_') || browseId.startsWith('MPREb_'));
+      final isValidYtBrowseId =
+          browseId != null &&
+          (browseId.startsWith('UC') ||
+              browseId.startsWith('FEmusic_') ||
+              browseId.startsWith('MPREb_'));
       final targetBrowseId = isValidYtBrowseId ? browseId : '';
 
       // 1. Resolve artist channel via native InnerTube (YouTube Music)
@@ -359,9 +401,14 @@ class ArtistService {
       String? monthlyAudience;
 
       if (ytChannel != null) {
-        name = (ytChannel['name'] as String?)?.isNotEmpty == true ? ytChannel['name'] : cleanName;
-        final rawThumb = (ytChannel['thumb'] ?? ytChannel['imageUrl']) as String?;
-        final rawBanner = (ytChannel['banner'] ?? ytChannel['coverUrl'] ?? rawThumb) as String?;
+        name = (ytChannel['name'] as String?)?.isNotEmpty == true
+            ? ytChannel['name']
+            : cleanName;
+        final rawThumb =
+            (ytChannel['thumb'] ?? ytChannel['imageUrl']) as String?;
+        final rawBanner =
+            (ytChannel['banner'] ?? ytChannel['coverUrl'] ?? rawThumb)
+                as String?;
 
         imageUrl = rawThumb != null && rawThumb.isNotEmpty
             ? MediaNormalizer.upgradeArtworkUrl(rawThumb, isArtistAvatar: true)
@@ -391,13 +438,28 @@ class ArtistService {
         if (ytChannel['albums'] is List) {
           for (final item in (ytChannel['albums'] as List)) {
             if (item is Map) {
-              albums.add(ArtistReleaseItem(
-                title: item['title'] ?? 'Album',
-                year: (item['year'] ?? '').toString(),
-                type: 'Album',
-                coverUrl: item['coverUrl'] ?? '',
-                browseId: item['browseId']?.toString(),
-              ));
+              final rawTitle = MediaNormalizer.cleanTitle(
+                item['title'] as String?,
+              );
+              final rawType = (item['albumType'] ?? '').toString().trim();
+              final isSingleFlag =
+                  item['isSingle'] == true ||
+                  rawType.toLowerCase() == 'single' ||
+                  rawTitle.toLowerCase().endsWith('- single');
+              final targetList = isSingleFlag ? singles : albums;
+              targetList.add(
+                ArtistReleaseItem(
+                  title: rawTitle.isNotEmpty
+                      ? rawTitle
+                      : (isSingleFlag ? 'Single' : 'Album'),
+                  year: (item['year'] ?? '').toString(),
+                  type: isSingleFlag
+                      ? 'Single'
+                      : (rawType.toLowerCase() == 'ep' ? 'EP' : 'Album'),
+                  coverUrl: item['coverUrl'] ?? '',
+                  browseId: item['browseId']?.toString(),
+                ),
+              );
             }
           }
         }
@@ -405,13 +467,19 @@ class ArtistService {
         if (ytChannel['singles'] is List) {
           for (final item in (ytChannel['singles'] as List)) {
             if (item is Map) {
-              singles.add(ArtistReleaseItem(
-                title: item['title'] ?? 'Single',
-                year: (item['year'] ?? '').toString(),
-                type: 'Single',
-                coverUrl: item['coverUrl'] ?? '',
-                browseId: item['browseId']?.toString(),
-              ));
+              final rawTitle = MediaNormalizer.cleanTitle(
+                item['title'] as String?,
+              );
+              final rawType = (item['albumType'] ?? '').toString().trim();
+              singles.add(
+                ArtistReleaseItem(
+                  title: rawTitle.isNotEmpty ? rawTitle : 'Single',
+                  year: (item['year'] ?? '').toString(),
+                  type: rawType.toLowerCase() == 'ep' ? 'EP' : 'Single',
+                  coverUrl: item['coverUrl'] ?? '',
+                  browseId: item['browseId']?.toString(),
+                ),
+              );
             }
           }
         }
@@ -419,11 +487,13 @@ class ArtistService {
         if (ytChannel['playlists'] is List) {
           for (final item in (ytChannel['playlists'] as List)) {
             if (item is Map) {
-              playlists.add(ArtistPlaylistItem(
-                title: item['title'] ?? 'Playlist',
-                coverUrl: item['coverUrl'] ?? '',
-                browseId: item['browseId']?.toString(),
-              ));
+              playlists.add(
+                ArtistPlaylistItem(
+                  title: item['title'] ?? 'Playlist',
+                  coverUrl: item['coverUrl'] ?? '',
+                  browseId: item['browseId']?.toString(),
+                ),
+              );
             }
           }
         }
@@ -431,12 +501,14 @@ class ArtistService {
         if (ytChannel['related'] is List) {
           for (final item in (ytChannel['related'] as List)) {
             if (item is Map) {
-              related.add(RelatedArtistItem(
-                name: item['name'] ?? 'Artist',
-                imageUrl: item['imageUrl'] ?? '',
-                subs: item['subs']?.toString(),
-                browseId: item['browseId']?.toString(),
-              ));
+              related.add(
+                RelatedArtistItem(
+                  name: item['name'] ?? 'Artist',
+                  imageUrl: item['imageUrl'] ?? '',
+                  subs: item['subs']?.toString(),
+                  browseId: item['browseId']?.toString(),
+                ),
+              );
             }
           }
         }
@@ -446,16 +518,25 @@ class ArtistService {
             var vidArtist = item.artist;
             if (vidArtist.isEmpty ||
                 vidArtist.toLowerCase() == 'unknown artist' ||
-                MediaNormalizer.isDistributorOrLabel(vidArtist)) {
+                MediaNormalizer.isDistributorOrLabel(vidArtist) ||
+                MediaNormalizer.isNonArtistCreditSegment(vidArtist)) {
               vidArtist = MediaNormalizer.extractArtistsFromVideoTitle(
                 item.title,
                 defaultArtist: cleanName,
               );
             }
-            musicVideos.add(item.copyWith(
-              artist: vidArtist,
-              isVideo: true,
-            ));
+            if (vidArtist.isEmpty) vidArtist = cleanName;
+            final cleanVidTitle = MediaNormalizer.cleanVideoTitle(
+              item.title,
+              knownArtists: vidArtist,
+            );
+            musicVideos.add(
+              item.copyWith(
+                title: cleanVidTitle,
+                artist: vidArtist,
+                isVideo: true,
+              ),
+            );
           }
         }
       }
@@ -463,74 +544,46 @@ class ArtistService {
       // If musicVideos is empty, supplement by searching official videos
       if (musicVideos.isEmpty) {
         try {
-          final searchedVids = await InnerTubeService.instance.searchVideos('$cleanName official video');
+          final searchedVids = await InnerTubeService.instance.searchVideos(
+            '$cleanName official video',
+          );
           for (final v in searchedVids) {
             var vidArtist = v.artist;
             if (vidArtist.isEmpty ||
                 vidArtist.toLowerCase() == 'unknown artist' ||
-                MediaNormalizer.isDistributorOrLabel(vidArtist)) {
+                MediaNormalizer.isDistributorOrLabel(vidArtist) ||
+                MediaNormalizer.isNonArtistCreditSegment(vidArtist)) {
               vidArtist = MediaNormalizer.extractArtistsFromVideoTitle(
                 v.title,
                 defaultArtist: cleanName,
               );
             }
-            musicVideos.add(v.copyWith(
-              artist: vidArtist,
-              isVideo: true,
-            ));
+            if (vidArtist.isEmpty) vidArtist = cleanName;
+            final cleanVidTitle = MediaNormalizer.cleanVideoTitle(
+              v.title,
+              knownArtists: vidArtist,
+            );
+            musicVideos.add(
+              v.copyWith(
+                title: cleanVidTitle,
+                artist: vidArtist,
+                isVideo: true,
+              ),
+            );
             if (musicVideos.length >= 10) break;
           }
         } catch (_) {}
       }
 
-      // Concurrently resolve authentic upload years and description credits for initial videos
-      if (musicVideos.isNotEmpty) {
-        try {
-          final futures = musicVideos.take(8).map((t) async {
-            final cleanId = t.id.replaceFirst(RegExp(r'^(yt-|yt:)'), '');
-            if (cleanId.isEmpty) return t;
-            final hasYear = t.year != null && RegExp(r'\b(19\d{2}|20\d{2})\b').hasMatch(t.year!);
-            final hasArtist = t.artist.isNotEmpty &&
-                t.artist.toLowerCase() != 'unknown artist' &&
-                !MediaNormalizer.isDistributorOrLabel(t.artist);
-            if (hasYear && hasArtist) return t;
-
-            final details = await InnerTubeService.instance.getVideoDetails(cleanId);
-            if (details != null) {
-              var art = t.artist;
-              if (!hasArtist) {
-                final fromDesc = MediaNormalizer.extractArtistsFromDescription(details.description);
-                if (fromDesc.isNotEmpty) {
-                  art = fromDesc;
-                } else {
-                  art = MediaNormalizer.extractArtistsFromVideoTitle(
-                    details.title.isNotEmpty ? details.title : t.title,
-                    defaultArtist: cleanName,
-                  );
-                }
-              }
-              return t.copyWith(
-                year: (details.year != null && details.year!.isNotEmpty) ? details.year : t.year,
-                artist: art,
-                isVideo: true,
-              );
-            }
-            return t;
-          });
-          final updated = await Future.wait(futures).timeout(
-            const Duration(milliseconds: 3000),
-            onTimeout: () => musicVideos.take(8).toList(),
-          );
-          for (var i = 0; i < updated.length; i++) {
-            musicVideos[i] = updated[i];
-          }
-        } catch (_) {}
-      }
+      // Video upload years and description credits are resolved lazily in ArtistScreen._resolveVideosMetadata
+      // so the artist hero, songs, and discography render without blocking for 3+ seconds.
 
       // If topSongs is empty, fetch via InnerTube search directly
       if (topSongs.isEmpty) {
         try {
-          final searchedSongs = await InnerTubeService.instance.search('$cleanName songs');
+          final searchedSongs = await InnerTubeService.instance.search(
+            '$cleanName songs',
+          );
           final lower = cleanName.toLowerCase();
           for (final s in searchedSongs) {
             if (s.artist.toLowerCase().contains(lower) || topSongs.length < 5) {
@@ -544,28 +597,48 @@ class ArtistService {
       // If albums are empty, search albums via InnerTube
       if (albums.isEmpty && singles.isEmpty) {
         try {
-          final searchedAlbums = await InnerTubeService.instance.searchAlbumsNative(cleanName);
+          final searchedAlbums = await InnerTubeService.instance
+              .searchAlbumsNative(cleanName);
           for (final alb in searchedAlbums) {
-            albums.add(ArtistReleaseItem(
-              title: alb['title']?.toString() ?? 'Album',
-              year: alb['year']?.toString() ?? '',
-              type: 'Album',
-              coverUrl: (alb['coverUrl'] ?? alb['thumbnail'])?.toString() ?? '',
-              browseId: (alb['browseId'] ?? alb['id'])?.toString(),
-            ));
+            final title = MediaNormalizer.cleanTitle(alb['title']?.toString());
+            final rawType = (alb['albumType'] ?? '').toString().trim();
+            final isSingleFlag =
+                alb['isSingle'] == true ||
+                rawType.toLowerCase() == 'single' ||
+                title.toLowerCase().endsWith('- single');
+            final list = isSingleFlag ? singles : albums;
+            list.add(
+              ArtistReleaseItem(
+                title: title.isNotEmpty
+                    ? title
+                    : (isSingleFlag ? 'Single' : 'Album'),
+                year: alb['year']?.toString() ?? '',
+                type: isSingleFlag
+                    ? 'Single'
+                    : (rawType.toLowerCase() == 'ep' ? 'EP' : 'Album'),
+                coverUrl:
+                    (alb['coverUrl'] ?? alb['thumbnail'])?.toString() ?? '',
+                browseId: (alb['browseId'] ?? alb['id'])?.toString(),
+              ),
+            );
           }
         } catch (_) {}
       }
 
       if (bio.isEmpty) {
-        bio = 'Official verified artist profile for $name on Zenify. Explore top popular tracks, complete discography, albums, singles, and video songs.';
+        bio =
+            'Official verified artist profile for $name on Zenify. Explore top popular tracks, complete discography, albums, singles, and video songs.';
       }
 
       if (topSongs.isNotEmpty || albums.isNotEmpty) {
         final profile = ArtistProfile(
           name: name,
-          imageUrl: imageUrl.isNotEmpty ? imageUrl : (topSongs.isNotEmpty ? topSongs.first.coverUrl : ''),
-          coverUrl: coverUrl.isNotEmpty ? coverUrl : (topSongs.isNotEmpty ? topSongs.first.coverUrl : ''),
+          imageUrl: imageUrl.isNotEmpty
+              ? imageUrl
+              : (topSongs.isNotEmpty ? topSongs.first.coverUrl : ''),
+          coverUrl: coverUrl.isNotEmpty
+              ? coverUrl
+              : (topSongs.isNotEmpty ? topSongs.first.coverUrl : ''),
           bio: bio,
           subscriberCount: subscriberCount,
           monthlyAudience: monthlyAudience,
@@ -586,6 +659,4 @@ class ArtistService {
     }
     return null;
   }
-
-
 }

@@ -27,6 +27,7 @@ import '../../design_system/zen.dart';
 import '../../features/story_sharing/story_sharing.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
+import '../../services/album_resolver.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/download_service.dart';
 import '../../services/innertube_service.dart';
@@ -258,15 +259,18 @@ Future<T?> _push<T>(BuildContext c, Widget page, {bool modal = false}) {
 void _openArtist(BuildContext c, String name) =>
     _push(c, ArtistScreen(artistName: MediaNormalizer.stripIdNoise(name)));
 
-void _openAlbum(BuildContext c, String title, String artist, String cover) =>
-    _push(
-      c,
-      AlbumScreen(
-        albumTitle: MediaNormalizer.stripIdNoise(title),
-        artistName: MediaNormalizer.stripIdNoise(artist),
-        coverUrl: cover,
-      ),
-    );
+void _openAlbum(BuildContext c, String title, String artist, String cover) {
+  final isSing = AlbumResolver.isSingleReleaseTitle(title);
+  _push(
+    c,
+    AlbumScreen(
+      albumTitle: MediaNormalizer.stripIdNoise(title),
+      artistName: MediaNormalizer.stripIdNoise(artist),
+      coverUrl: cover,
+      isSingle: isSing,
+    ),
+  );
+}
 
 Future<String?> _promptName(
   BuildContext c, {
@@ -1222,7 +1226,11 @@ class _LibraryPageShellState extends State<_LibraryPageShell> {
                 slivers: [
                   SliverToBoxAdapter(child: SizedBox(height: top + 56)),
                   ...widget.slivers,
-                  const SliverToBoxAdapter(child: SizedBox(height: 120)),
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: 180 + MediaQuery.paddingOf(context).bottom,
+                    ),
+                  ),
                 ],
               ),
               Positioned(
@@ -1382,10 +1390,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 child: Column(
                   children: [
                     for (final c in _Cat.values)
-                      _CategoryRow(
-                        cat: c,
-                        onTap: () => _open(c),
-                      ),
+                      _CategoryRow(cat: c, onTap: () => _open(c)),
                   ],
                 ),
               ),
@@ -1433,10 +1438,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
 }
 
 class _CategoryRow extends StatelessWidget {
-  const _CategoryRow({
-    required this.cat,
-    required this.onTap,
-  });
+  const _CategoryRow({required this.cat, required this.onTap});
   final _Cat cat;
   final VoidCallback onTap;
 
@@ -2871,18 +2873,6 @@ class _LikedPageState extends State<_LikedPage> {
                 _sortSheet(ctx, _sort, (v) => setState(() => _sort = v)),
             onRemoveTrack: (t) {
               LibraryStore.instance.toggleLove(t);
-              IslandNotifier.instance.show(
-                IslandNotification(
-                  id: 'unfav_${t.id}',
-                  title: 'Removed from Favourites',
-                  body: t.title,
-                  leading: const Icon(
-                    CupertinoIcons.star,
-                    color: Colors.white70,
-                    size: 18,
-                  ),
-                ),
-              );
             },
             removeLabel: 'Unlike',
             empty: _Empty(

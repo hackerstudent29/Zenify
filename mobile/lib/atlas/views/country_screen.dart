@@ -222,7 +222,9 @@ class _CountryScreenState extends State<CountryScreen> {
               );
             },
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 140)),
+          SliverToBoxAdapter(
+            child: SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom),
+          ),
         ],
       ),
     );

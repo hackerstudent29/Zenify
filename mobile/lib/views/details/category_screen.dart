@@ -15,9 +15,9 @@ import '../../design_system/zen.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/innertube_service.dart';
+import '../../services/media_router.dart';
 import '../../services/player_state.dart';
 import '../../utils/media_normalizer.dart';
-import 'album_screen.dart';
 import 'artist_popup.dart';
 import 'artist_screen.dart';
 
@@ -335,10 +335,7 @@ class _CategoryScreenState extends State<CategoryScreen>
   void _queueAll() {
     if (_tracks.isEmpty) return;
     HapticFeedback.selectionClick();
-    final p = context.read<PlayerState>();
-    for (final t in _tracks) {
-      p.playLast(t);
-    }
+    context.read<PlayerState>().playLastBatch(_tracks);
   }
 
   void _menu() {
@@ -370,19 +367,7 @@ class _CategoryScreenState extends State<CategoryScreen>
     );
   }
 
-  void _openAlbum(Track t) {
-    Navigator.push(
-      context,
-      ZenPageRoute(
-        builder: (_) => AlbumScreen(
-          albumTitle: t.album,
-          artistName: t.artist,
-          coverUrl: t.coverUrl,
-          browseId: t.albumBrowseId,
-        ),
-      ),
-    );
-  }
+  void _openAlbum(Track t) => MediaRouter.openForTrack(context, t);
 
   void _trackMenu(Track track) {
     HapticFeedback.mediumImpact();

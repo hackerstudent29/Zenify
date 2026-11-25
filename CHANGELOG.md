@@ -2,6 +2,33 @@
 
 All notable user updates and improvements to Zenify are documented here.
 
+## [1.1.22] - 2026-11-25
+
+### What's New
+- **Smart Single, Album & Video Song Routing**:
+  - Clicking a song in Singles opens its Single view with an interactive **Artist & Album Redirection Sheet** (`MediaNavigationSheet`) instead of misrouting to an unrelated album or unplugged version.
+  - Dedicated Video Single playback view with recommended video songs & artist links, clean title normalization, accurate artist extraction, `Title + Year` on Artist Video Songs, and `Title + Artist` on Home shelves.
+- **Full Song Credits & Plain Static View Lyrics**:
+  - Dedicated `SongCreditsScreen` showing performing artists, movie cast, composers & lyricists, production/engineering, release details, and gated `View Lyrics` access.
+  - Plain static `FullLyricsScreen` with LRC/word-tag stripping, RTL preservation, stationary `DynamicIslandHeader`, and zero scroll-to-dock movement.
+- **Rigid 90° Portrait ↔ Landscape Player Morph & Landscape Video Controls**:
+  - iOS-style rigid 90° rotation morph across `PlayerShell` components with neutral white `ScrubberSlider` time labels.
+  - Landscape video mode adds ±10s skip controls, double-tap seek accumulation, and a fit/fill zoom toggle.
+- **Transparent Liquid Glass Top Picks & Hero**:
+  - Refined Top Picks and hero surfaces to use a clean transparent liquid-glass backdrop without heavy frosted borders.
+- **New Zendrum Instrument Identity**:
+  - Updated Android adaptive/legacy launcher icons to white background with rose Zendrum emblem and switched website/repo favicons and `"Z"`-only marks to the transparent rose Zendrum logo while keeping full `"ZENIFY"` wordmarks intact.
+
+### Fixes & Improvements
+- **Media3 1.9.2 Playback & `LoadControl` Fix**:
+  - Aligned `:app` Media3 compile dependencies to `1.9.2` and forwarded every `LoadControl` interface method (including `getBackBufferDurationUs(PlayerId)`) in `ZenAudioPlugin.kt`, resolving `PlatformException(zen_audio, getBackBufferDurationUs not implemented)` during audio and video initialization.
+- **Persistent Dock & MiniPlayer Across All Detail Pages**:
+  - Routed `View Credits`, `View Lyrics`, `Artist`, and `Album/Release` navigation from `PlayerShell`, `QueuePanel`, `ZenDropdown`, `showArtistPopup`, `MediaNavigationSheet`, and Home modal sheets through `ShellNavigationScope.openPage` so the bottom Dock and MiniPlayer stay visible.
+- **Unified Bottom Scroll Clearance**:
+  - Added `180 + safeBottom` clearance across Artist, Album, Library, Song Credits, Full Lyrics, and Sound Atlas screens so bottom text never hides behind the Dock or MiniPlayer.
+- **Website Disconnection & Leaner Backend**:
+  - Disconnected legacy website `.env` connections, CORS origins, redirects, and web-only routes while removing AI and Cloudflare R2 keys from the backend (preserving Auth, Postgres sync, Room Together, Cloudinary, RapidAPI, and Apple Music for Android).
+
 ## [1.1.21] - 2026-11-24 (Stable Version 1)
 
 > 🎉 **First Stable Version:** Zenify v1.1.21 marks the official **Stable Version 1** milestone release for the Zenify Flutter Android application.

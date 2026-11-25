@@ -1,6 +1,5 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config/env';
-import { askAI, FAST_MODEL as DEFAULT_MODEL } from '../utils/ai.js';
 
 export class MailService {
   private static transporter: any = null;
@@ -171,29 +170,12 @@ export class MailService {
 
   static async sendWelcome(to: string, name?: string) {
     const username = name || 'there';
-    let aiContent = { 
+    const aiContent = { 
       subject: 'Your sound starts here — Welcome to Zenify', 
       intro: `Hi ${username}, welcome to Zenify.`, 
       body: `Your space is waiting. Experience millions of songs, ad-free, with high-fidelity studio precision. Every detail. Every layer.`, 
       outro: `Let the music take over.` 
     };
-    try {
-      const prompt = `You are the AI copywriter for Zenify, a high-fidelity premium streaming service. Write a welcoming intro email for "${username}".
-Write in Zenify's voice: modern, music-focused, warm but not corporate.
-Return ONLY a raw JSON object with the schema:
-{
-  "subject": "A creative welcoming subject line",
-  "intro": "1-2 sentences welcoming them",
-  "body": "2-3 sentences about what makes Zenify special (high fidelity, studio quality, pure sound)",
-  "outro": "1-2 sentences wishing them an amazing listening journey"
-}
-Do not include markdown or backticks. Just raw JSON.`;
-      const res = await askAI(prompt, DEFAULT_MODEL);
-      const cleanJson = res.replace(/```json/g, '').replace(/```/g, '').trim();
-      aiContent = JSON.parse(cleanJson);
-    } catch (err) {
-      console.error('[Mail] Welcome AI content failure:', err);
-    }
 
     const html = this.getEmailTemplate(aiContent.subject, `
       <div style="background-color: #111118; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 40px; text-align: center; margin-bottom: 30px;">
@@ -214,24 +196,10 @@ Do not include markdown or backticks. Just raw JSON.`;
     const timeStr = purchaseDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     const expiryStr = expiryDate ? expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A';
 
-    let aiContent = { 
+    const aiContent = { 
       subject: 'Your Zenify Premium is active!', 
       thankYou: 'Thank you for your purchase. Your premium membership is activated and you now have full access to Zenify.' 
     };
-    try {
-      const prompt = `You are the AI copywriter for Zenify. Write a purchase confirmation thank you note for "${username}" who bought "${itemName}" for ₹${amount.toFixed(2)}.
-Return ONLY a raw JSON object with the schema:
-{
-  "subject": "A creative subject line celebrating their premium upgrade",
-  "thankYou": "A 2-3 sentence enthusiastic paragraph confirming their payment and welcoming them to premium sound features"
-}
-Do not include markdown or backticks. Just raw JSON.`;
-      const res = await askAI(prompt, DEFAULT_MODEL);
-      const cleanJson = res.replace(/```json/g, '').replace(/```/g, '').trim();
-      aiContent = JSON.parse(cleanJson);
-    } catch (err) {
-      console.error('[Mail] Purchase confirmation AI content failure:', err);
-    }
 
     const html = this.getEmailTemplate(aiContent.subject, `
       <div style="background-color: #111118; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 40px; margin-bottom: 30px;">
@@ -261,26 +229,11 @@ Do not include markdown or backticks. Just raw JSON.`;
   static async sendSubscriptionExpiryReminder(to: string, username: string, expiryDate: Date) {
     const expiryStr = expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    let aiContent = { 
+    const aiContent = { 
       subject: 'Action Required: Your Zenify Premium is expiring tomorrow', 
       intro: `Your subscription expires tomorrow on ${expiryStr}.`, 
       renewHype: `Keep the music flowing with high-fidelity sound, ad-free streaming, and your entire library.` 
     };
-    try {
-      const prompt = `You are the AI copywriter for Zenify. Write a subscription expiry reminder for "${username}" whose subscription expires tomorrow (${expiryStr}).
-Return ONLY a raw JSON object with the schema:
-{
-  "subject": "A creative urgent subject line warning them",
-  "intro": "1-2 sentences warning them that their premium plan expires tomorrow",
-  "renewHype": "2-3 sentences hyping them about keeping premium (no ads, offline downloads, studio audio) to renew"
-}
-Do not include markdown or backticks. Just raw JSON.`;
-      const res = await askAI(prompt, DEFAULT_MODEL);
-      const cleanJson = res.replace(/```json/g, '').replace(/```/g, '').trim();
-      aiContent = JSON.parse(cleanJson);
-    } catch (err) {
-      console.error('[Mail] Subscription expiry reminder AI content failure:', err);
-    }
 
     const html = this.getEmailTemplate(aiContent.subject, `
       <div style="background-color: #111118; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 40px; margin-bottom: 30px;">
@@ -300,24 +253,10 @@ Do not include markdown or backticks. Just raw JSON.`;
   }
 
   static async sendAccountDeleted(to: string) {
-    let aiContent = { 
+    const aiContent = { 
       subject: 'We\'ve closed your Zenify account', 
       message: `Your account has been deleted as requested. We've removed all your saved playlists, history, and uploaded tracks from our systems.` 
     };
-    try {
-      const prompt = `You are the AI copywriter for Zenify. Write a deletion confirmation email.
-Return ONLY a raw JSON object with the schema:
-{
-  "subject": "A creative subject line acknowledging account closure",
-  "message": "3-4 sentences of warm, respectful, music-first farewell. Confirming all data (likes, playlists) is removed."
-}
-Do not include markdown or backticks. Just raw JSON.`;
-      const res = await askAI(prompt, DEFAULT_MODEL);
-      const cleanJson = res.replace(/```json/g, '').replace(/```/g, '').trim();
-      aiContent = JSON.parse(cleanJson);
-    } catch (err) {
-      console.error('[Mail] Account deleted AI content failure:', err);
-    }
 
     const html = this.getEmailTemplate(aiContent.subject, `
       <div style="background-color: #111118; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 40px; margin-bottom: 30px;">
@@ -366,7 +305,7 @@ Do not include markdown or backticks. Just raw JSON.`;
     const topTrackName = stats.topTrack?.title || '';
     const durationHours = Math.round(stats.totalDuration / 60);
 
-    let aiContent = {
+    const aiContent = {
       subject: topArtistName
         ? `Your week in music — ${durationHours} hrs and a lot of ${topArtistName}`
         : `Your week in music — ${durationHours} hrs, ${stats.favoritesCount} favorites`,
@@ -378,36 +317,7 @@ Do not include markdown or backticks. Just raw JSON.`;
       updatesBlurb: `We've centered the full view player lyrics on mobile, introduced auto-romanization for regional lyrics, and optimized stream buffering.`,
       outro: `See you next week on Zenify!`
     };
-
-    try {
-      const prompt = `You are the AI copywriter for Zenify. Write the personalized text paragraphs for ${username}'s Weekly Summary email.
-Use this context data:
-${statsText}
-
-Platform updates this week to report:
-- Centered lyrics layout in the full-view player on mobile devices for improved readability
-- Smooth, continuous gradient color transitions on the Zenify logo
-- High-fidelity audio cache optimizations to speed up song play
-
-Return ONLY a raw JSON object with the schema:
-{
-  "subject": "A creative subject line summarizing their week (e.g., 'Your week in music — 14 hrs, 3 new favourites, and a lot of Anirudh')",
-  "intro": "1-2 sentences introducing the weekly recap",
-  "insight": "2-3 sentences explaining their listening habits/patterns and artist preferences based on the stats",
-  "persona": "A fun, creative 2-3 word music persona title representing their listening vibe this week (e.g. 'Midnight Melody Chaser', 'Vibe Architect', 'Vocal Purist', 'Acoustic Explorer')",
-  "updatesBlurb": "2-3 sentences summarizing the new platform updates",
-  "outro": "1-2 sentences of clean closing encouragement"
-}
-Do not include markdown or backticks. Just raw JSON.`;
-      const res = await askAI(prompt, DEFAULT_MODEL);
-      const jsonMatch = res.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        aiContent = { ...aiContent, ...parsed };
-      }
-    } catch (err) {
-      console.error('[Mail] Weekly Summary AI generation failure:', err);
-    }
+    void statsText;
 
     const durationHrs = Math.floor(stats.totalDuration / 60);
     const durationMins = stats.totalDuration % 60;
@@ -681,39 +591,12 @@ Do not include markdown or backticks. Just raw JSON.`;
     scheduledAt?: Date;
   }) {
     const artist = track.artist || track.artistName || 'Unknown Artist';
-    let aiContent = {
+    const aiContent = {
       subject: `New music from ${artist} — "${track.title}"`,
       intro: `Hi ${username}, look who just dropped some fresh sound.`,
       promo: `A brand new ${track.type.toLowerCase()} has just hit Zenify. Immerse yourself in the composition of "${track.title}" by ${artist}.`,
       outro: `Play it now on your favorite audio platform.`
     };
-
-    try {
-      const prompt = `You are the AI copywriter for Zenify. Write a personalized new release notification email to the listener ${username}.
-Song details:
-- Title: "${track.title}"
-- Artist: "${artist}"
-- Genre: "${track.genre || 'N/A'}"
-- Type: "${track.type || 'single'}"
-- Composers: "${track.composers || 'N/A'}"
-- Producers: "${track.producers || 'N/A'}"
-- Production Label: "${track.copyrightLabel || 'N/A'}"
-
-Write in Zenify's voice: modern, music-focused, warm but not corporate.
-Return ONLY a raw JSON object with the schema:
-{
-  "subject": "A creative dynamic subject line (e.g. 'Raga of Revenge just dropped — Anirudh's latest is here')",
-  "intro": "1-2 sentences opening line greeting the user and announcing the track",
-  "promo": "2-3 sentences description of this track, why it is unique, and why it appeals to their taste",
-  "outro": "1 sentence closing call to play"
-}
-Do not include markdown or backticks. Just raw JSON.`;
-      const res = await askAI(prompt, DEFAULT_MODEL);
-      const cleanJson = res.replace(/```json/g, '').replace(/```/g, '').trim();
-      aiContent = JSON.parse(cleanJson);
-    } catch (err) {
-      console.error('[Mail] New Release AI generation failure:', err);
-    }
 
     const html = this.getEmailTemplate(aiContent.subject, `
       <div style="background-color: #111118; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 40px; margin-bottom: 30px;">
@@ -797,34 +680,12 @@ Do not include markdown or backticks. Just raw JSON.`;
       minute: '2-digit'
     });
 
-    let aiContent = {
+    const aiContent = {
       subject: `24 hours to go — "${track.title}" drops tomorrow`,
       intro: `Your upcoming release is almost live on Zenify.`,
       body: `Get ready to share "${track.title}" with your listeners. Let's make sure everything is polished before launch.`
     };
-
-    try {
-      const prompt = `You are the AI copywriter for Zenify. Write the scheduled release reminder email copy for artist "${username}".
-Track details:
-- Title: "${track.title}"
-- Genre: "${track.genre || 'N/A'}"
-- Type: "${track.type}"
-- Scheduled Live Date/Time: "${scheduledTimeStr}"
-
-Write in Zenify's voice: modern, music-focused, warm.
-Return ONLY a raw JSON object with the schema:
-{
-  "subject": "A creative subject line highlighting the 24-hour countdown (e.g. '24 hours to go — Vairam drops tomorrow')",
-  "intro": "1-2 sentences warm opening greeting the artist",
-  "body": "2-3 sentences hyping the artist about the song release, referencing the track details and genre"
-}
-Do not include markdown. Just raw JSON.`;
-      const res = await askAI(prompt, DEFAULT_MODEL);
-      const cleanJson = res.replace(/```json/g, '').replace(/```/g, '').trim();
-      aiContent = JSON.parse(cleanJson);
-    } catch (err) {
-      console.error('[Mail] Scheduled Release Reminder AI generation failure:', err);
-    }
+    void scheduledTimeStr;
 
     const durationMins = track.duration ? `${Math.floor(track.duration / 60)}m ${track.duration % 60}s` : 'N/A';
 
@@ -925,33 +786,11 @@ Do not include markdown. Just raw JSON.`;
     streamsFirstHour: number;
     listenersFirstHour: number;
   }) {
-    let aiContent = {
+    const aiContent = {
       subject: `It's live — "${track.title}" is now streaming on Zenify`,
       intro: `Congratulations ${username}! Your new release is live.`,
       body: `Your track "${track.title}" has officially launched on Zenify. Listeners can now stream, buy, and enjoy your work.`
     };
-
-    try {
-      const prompt = `You are the AI copywriter for Zenify. Write the release live confirmation email for artist "${username}".
-Song details:
-- Title: "${track.title}"
-- Genre: "${track.genre || 'N/A'}"
-- Type: "${track.type}"
-
-Write in Zenify's voice: modern, music-focused, warm, congratulatory.
-Return ONLY a raw JSON object with the schema:
-{
-  "subject": "A creative congratulatory subject line (e.g. 'It's live. Vairam is now streaming on Zenify')",
-  "intro": "1-2 sentences congratulatory opening greeting the artist",
-  "body": "2-3 sentences of copy hyping the live status and encouraging them to share the track with fans"
-}
-Do not include markdown. Just raw JSON.`;
-      const res = await askAI(prompt, DEFAULT_MODEL);
-      const cleanJson = res.replace(/```json/g, '').replace(/```/g, '').trim();
-      aiContent = JSON.parse(cleanJson);
-    } catch (err) {
-      console.error('[Mail] Release Live Confirmation AI generation failure:', err);
-    }
 
     const durationMins = track.duration ? `${Math.floor(track.duration / 60)}m ${track.duration % 60}s` : 'N/A';
 

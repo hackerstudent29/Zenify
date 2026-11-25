@@ -530,7 +530,8 @@ class LibraryStore extends ChangeNotifier {
     for (final id in ids) {
       var t = _seen[id] ?? index[id];
       if (t != null) {
-        final isVid = t.isVideo ||
+        final isVid =
+            t.isVideo ||
             Track.detectIsVideo(t.title, t.album, coverUrl: t.coverUrl);
         if (isVid && !t.isVideo) {
           t = t.copyWith(isVideo: true, album: 'Music Video');
@@ -581,10 +582,7 @@ class LibraryStore extends ChangeNotifier {
     final k = _key(t);
     _seen[k] = t;
     final cleanId = t.id.replaceFirst('yt-', '').trim();
-    final target = IslandNotification.artistOrTitle(
-      artist: t.artist,
-      title: t.title,
-    );
+    final target = IslandNotification.itemTitle(t.title, fallback: t.artist);
     final isAdd =
         !_liked.remove(k) &&
         !_liked.remove(cleanId) &&
@@ -692,10 +690,8 @@ class LibraryStore extends ChangeNotifier {
     final cTitle = title.trim();
     final cArtist = artist.trim();
     if (cTitle.isEmpty) return;
-    final target = IslandNotification.artistOrTitle(
-      artist: cArtist,
-      title: cTitle,
-    );
+    final cleanAlb = MediaNormalizer.cleanAlbumTitle(cTitle).trim();
+    final target = (cleanAlb.isNotEmpty && cleanAlb != 'Single') ? cleanAlb : cTitle;
     final i = _albums.indexWhere(
       (a) =>
           a.title.toLowerCase() == cTitle.toLowerCase() &&
@@ -875,10 +871,7 @@ class LibraryStore extends ChangeNotifier {
     if (p == null) return false;
     final k = _key(t);
     _seen[k] = t;
-    final target = IslandNotification.artistOrTitle(
-      artist: t.artist,
-      title: t.title,
-    );
+    final target = IslandNotification.itemTitle(t.title, fallback: t.artist);
     if (p.trackIds.contains(k)) {
       IslandNotifier.instance.show(
         IslandNotification(
@@ -952,10 +945,7 @@ class LibraryStore extends ChangeNotifier {
         IslandNotification(
           id: 'playlist_rm_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Removed',
-          body: IslandNotification.artistOrTitle(
-            artist: t.artist,
-            title: t.title,
-          ),
+          body: IslandNotification.itemTitle(t.title, fallback: t.artist),
           leading: const Icon(
             CupertinoIcons.minus_circle,
             color: Colors.white70,

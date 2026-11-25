@@ -258,7 +258,7 @@ class _Line extends StatelessWidget {
         final isActive = index == active;
         final opacity = isActive ? 1.0 : (index < active ? 0.32 : (dist <= 2 ? 0.55 : 0.38));
         final size = isActive ? 30.0 : 26.0;
-        final base = TextStyle(fontSize: size, fontWeight: FontWeight.w700, letterSpacing: -0.6, height: 1.2, color: AT.label.withValues(alpha: opacity));
+        final base = TextStyle(fontSize: size, fontWeight: FontWeight.w800, letterSpacing: 0.5, height: 1.2, color: AT.label.withValues(alpha: opacity));
 
         Widget text;
         if (isActive && karaoke && line.words.isNotEmpty) {
@@ -280,7 +280,7 @@ class _Line extends StatelessWidget {
           pressedScale: 0.98,
           child: AnimatedPadding(
             duration: const Duration(milliseconds: 260),
-            padding: EdgeInsets.symmetric(vertical: isActive ? 12 : 8),
+            padding: EdgeInsets.symmetric(vertical: isActive ? 16 : 13),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               text,
               if (session.showRomanization && line.romanization != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(line.romanization!, style: AT.subhead.copyWith(color: AT.label.withValues(alpha: opacity * 0.8)))),

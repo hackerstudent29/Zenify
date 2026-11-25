@@ -34,11 +34,11 @@
   <p align="center">
     <span style="color: rgba(255,255,255,0.25); font-family: monospace; font-size: 18px;">+</span>
     &nbsp;&nbsp;&nbsp;
-    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk">
+    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.22/zenify-v1.1.22.apk">
       <img src="assets/buttons/btn_download_android.svg" alt="Download APK for Android" height="48" />
     </a>
     &nbsp;&nbsp;&nbsp;
-    <a href="https://github.com/hackerstudent29/Zenify/releases/tag/v1.1.21">
+    <a href="https://github.com/hackerstudent29/Zenify/releases/tag/v1.1.22">
       <img src="assets/buttons/btn_github_releases.svg" alt="GitHub Releases" height="48" />
     </a>
     &nbsp;&nbsp;&nbsp;
@@ -55,7 +55,7 @@
 
   <!-- Signature Rose Spec Capsules -->
   <p align="center">
-    <img src="assets/badges/badge_release.svg" alt="Release v1.1.21 Stable 1" height="26" />
+    <img src="assets/badges/badge_release.svg" alt="Release v1.1.22" height="26" />
     &nbsp;
     <img src="assets/badges/badge_audio.svg" alt="320kbps Audio" height="26" />
     &nbsp;
@@ -75,8 +75,8 @@
 ---
 
 > [!IMPORTANT]
-> **Zenify v1.1.21 is the official Stable Version 1 milestone.**  
-> It delivers pure YouTube Music search parity, 16:9 landscape video previews, sub-300ms parallel lyrics racing with video skip, 20-style hardware DJ crossfade, Studio FX DSP, Room Together WebRTC voice sync, and offline downloads with **strictly zero ads and zero subscriptions**.
+> **Zenify v1.1.22 (Build 2036) is now available for Android.**  
+> Features the new Zendrum instrument branding across Android app icons & transparent rose favicons, fixed Media3 `1.9.2` `LoadControl` audio/video playback stability, plain static Full Lyrics with dock/miniplayer preservation across Lyrics, Credits, and Artist pages, soundtrack album metadata upgrades, and disconnected web AI/R2 keys with **strictly zero ads and zero subscriptions**.
 
 ---
 
@@ -129,7 +129,7 @@
 
 ## 📊 Zenify vs Commercial Music Platforms
 
-| Capability / Feature | 🌸 **Zenify v1.1.21 (Stable 1)** | 🟢 Spotify Free | 🍎 Apple Music | 🔴 YouTube Music Free |
+| Capability / Feature | 🌸 **Zenify v1.1.22** | 🟢 Spotify Free | 🍎 Apple Music | 🔴 YouTube Music Free |
 |---|:---:|:---:|:---:|:---:|
 | **Cost & Subscription** | **100% Free Forever** | Ad-Supported ($11.99/mo) | $10.99/month | Ad-Supported ($10.99/mo) |
 | **Advertisements** | **Strictly ZERO Ads** | Audio & Banner Ads | None (Paid) | Video & Audio Ads |
@@ -167,11 +167,11 @@
     </tr>
     <tr>
       <td><b>Release Milestone</b></td>
-      <td><b>v1.1.21 · Stable Version 1</b></td>
+      <td><b>v1.1.22</b></td>
     </tr>
     <tr>
       <td><b>Build Number</b></td>
-      <td><code>2035</code></td>
+      <td><code>2036</code></td>
     </tr>
     <tr>
       <td><b>Mobile Framework</b></td>
@@ -183,7 +183,7 @@
     </tr>
     <tr>
       <td><b>Media Engine Core</b></td>
-      <td>AndroidX Media3 ExoPlayer 1.5.1 with Custom 16-bit PCM AudioProcessor</td>
+      <td>AndroidX Media3 ExoPlayer 1.9.2 with Custom 16-bit PCM AudioProcessor</td>
     </tr>
     <tr>
       <td><b>Minimum Supported OS</b></td>
@@ -195,11 +195,11 @@
     </tr>
     <tr>
       <td><b>ARM64 Optimized Split APK</b></td>
-      <td><b>15.9 MB</b> (<code>16,708,961</code> bytes) &nbsp;•&nbsp; <i>Recommended for all modern smartphones</i></td>
+      <td><b>16.2 MB</b> (<code>17,008,287</code> bytes) &nbsp;•&nbsp; <i>Recommended for all modern smartphones</i></td>
     </tr>
     <tr>
       <td><b>Universal Multi-ABI APK</b></td>
-      <td><b>36.1 MB</b> (<code>37,836,799</code> bytes) &nbsp;•&nbsp; <i>Supports arm64-v8a, armeabi-v7a, and x86_64</i></td>
+      <td><b>36.8 MB</b> (<code>38,635,649</code> bytes) &nbsp;•&nbsp; <i>Supports arm64-v8a, armeabi-v7a, and x86_64</i></td>
     </tr>
     <tr>
       <td><b>Supported Bitrate Profiles</b></td>
@@ -392,7 +392,7 @@ Engineered directly in native Kotlin (`XfFxProcessor.kt`) and synchronized via F
 
 ## ⬇️ Download & Installation for Android
 
-### Release Packages (v1.1.21 · Stable Version 1 · Build 2035)
+### Release Packages (v1.1.22 · Build 2036)
 
 <table width="100%">
   <thead>
@@ -407,19 +407,19 @@ Engineered directly in native Kotlin (`XfFxProcessor.kt`) and synchronized via F
     <tr>
       <td><b>🤖 Android ARM64 (Recommended)</b></td>
       <td>ARM64-v8a · <i>Pixel, Galaxy, OnePlus, Xiaomi, Nothing, Vivo, OPPO, Motorola</i></td>
-      <td align="center"><code>15.9 MB</code></td>
-      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk"><b>⬇️ Download APK</b></a></td>
+      <td align="center"><code>16.2 MB</code></td>
+      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.22/zenify-v1.1.22.apk"><b>⬇️ Download APK</b></a></td>
     </tr>
     <tr>
       <td><b>🌐 Android Universal</b></td>
       <td>All Architectures (`arm64-v8a`, `armeabi-v7a`, `x86_64`) · <i>Works on all Android devices & emulators</i></td>
-      <td align="center"><code>36.1 MB</code></td>
-      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21-universal.apk"><b>⬇️ Download Universal</b></a></td>
+      <td align="center"><code>36.8 MB</code></td>
+      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.22/zenify-v1.1.22-universal.apk"><b>⬇️ Download Universal</b></a></td>
     </tr>
     <tr>
       <td><b>📦 All GitHub Releases</b></td>
       <td>Release history, changelogs, and SHA-256 integrity checksums</td>
-      <td align="center"><code>Build 2035</code></td>
+      <td align="center"><code>Build 2036</code></td>
       <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases"><b>View Releases</b></a></td>
     </tr>
   </tbody>
@@ -433,11 +433,11 @@ Engineered directly in native Kotlin (`XfFxProcessor.kt`) and synchronized via F
   <tr>
     <td width="25%" align="center">
       <h3>1️⃣ Download</h3>
-      <p>Tap <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk"><b>Download APK</b></a> on your phone to fetch the ARM64 package.</p>
+      <p>Tap <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.22/zenify-v1.1.22.apk"><b>Download APK</b></a> on your phone to fetch the ARM64 package.</p>
     </td>
     <td width="25%" align="center">
       <h3>2️⃣ Open Package</h3>
-      <p>Tap the download notification or locate <code>zenify-v1.1.21.apk</code> in your <b>Downloads</b> folder.</p>
+      <p>Tap the download notification or locate <code>zenify-v1.1.22.apk</code> in your <b>Downloads</b> folder.</p>
     </td>
     <td width="25%" align="center">
       <h3>3️⃣ Allow Source</h3>
@@ -492,7 +492,7 @@ flutter build apk --split-per-abi --release
 
 The compiled binaries will be output to:
 * `mobile/build/app/outputs/flutter-apk/app-release.apk` (Universal)
-* `mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (ARM64 Optimized, ~15.9 MB)
+* `mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (ARM64 Optimized, ~16.2 MB)
 
 ---
 

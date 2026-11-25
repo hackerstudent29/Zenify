@@ -10,9 +10,9 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../features/story_sharing/story_sharing.dart';
 import '../../models/track.dart';
+import '../../services/album_resolver.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/download_service.dart';
-import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/lyrics_service.dart';
 import '../../services/player_state.dart';
@@ -21,6 +21,9 @@ import '../../utils/media_normalizer.dart';
 import '../../views/details/album_screen.dart';
 import '../../views/details/artist_popup.dart';
 import '../../views/details/artist_screen.dart';
+import '../../views/details/song_credits_screen.dart';
+import '../../views/lyrics/full_lyrics_screen.dart';
+import '../../views/shell_screen.dart' show ShellNavigationScope;
 import '../tokens/app_colors.dart';
 import '../zen.dart';
 import 'monogram_avatar.dart';
@@ -34,6 +37,7 @@ class ZenDropdownItem {
     this.subtitle,
     this.isDestructive = false,
     this.isSelected = false,
+    this.enabled = true,
     this.iconColor,
     this.onTap,
   });
@@ -43,6 +47,7 @@ class ZenDropdownItem {
   final String? subtitle;
   final bool isDestructive;
   final bool isSelected;
+  final bool enabled;
   final Color? iconColor;
   final VoidCallback? onTap;
 }
@@ -473,18 +478,6 @@ class ZenDropdown {
                               if (name != null && name.isNotEmpty) {
                                 store.createPlaylist(name, first: track);
                                 HapticFeedback.lightImpact();
-                                IslandNotifier.instance.show(
-                                  IslandNotification(
-                                    id: 'pl_create_${DateTime.now().millisecondsSinceEpoch}',
-                                    title: 'Created',
-                                    body: name,
-                                    leading: const Icon(
-                                      CupertinoIcons.music_note_list,
-                                      color: Zen.rose,
-                                      size: 18,
-                                    ),
-                                  ),
-                                );
                               }
                             },
                           ),
@@ -705,9 +698,67 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
     final isDownloading = dl.isDownloading(effectiveTrack.id);
     final downloadedItem = dl.getDownloaded(effectiveTrack.id);
 
+    final isVideoTrack =
+        effectiveTrack.isVideo || AlbumResolver.isVideoTrack(effectiveTrack);
+    final normEffId = effectiveTrack.id.replaceFirst('yt-', '').trim();
+    final normCurId = player?.currentTrack?.id.replaceFirst('yt-', '').trim();
+    final isActiveTrack =
+        player?.currentTrack != null &&
+        normEffId.isNotEmpty &&
+        normEffId == normCurId;
+    final LyricsResult? knownLyrics = (isActiveTrack && player!.hasLyrics)
+        ? LyricsResult(
+            lines: player.lyricsLines,
+            synced: player.lyricsSynced,
+            source: 'current',
+          )
+        : LyricsService.instance.getCachedSync(effectiveTrack.id);
+    final bool canViewLyrics =
+        !isVideoTrack &&
+        (!isActiveTrack || player!.hasLyrics || player.isLoadingLyrics);
+    final bool lyricsCheckedKnown =
+        isVideoTrack || (isActiveTrack && !player!.isLoadingLyrics);
+
+    void pushTabPage(Widget page) {
+      if (!widget.callerContext.mounted) return;
+      if (!ShellNavigationScope.openPage(widget.callerContext, page)) {
+        widget.callerNav.push(CupertinoPageRoute(builder: (_) => page));
+      }
+    }
+
     // Build Action Menu Rows
     final List<ZenDropdownItem> rows = [
-      // 1. Share Lyrics (when lyrics are available for the song)
+      // 1. View Credits
+      ZenDropdownItem(
+        title: 'View Credits',
+        icon: CupertinoIcons.info_circle,
+        onTap: () {
+          pushTabPage(
+            SongCreditsScreen(
+              track: effectiveTrack,
+              initialLyrics: knownLyrics,
+              lyricsAlreadyChecked: lyricsCheckedKnown,
+            ),
+          );
+        },
+      ),
+      // 2. View Lyrics (dimmed & non-clickable when unavailable)
+      ZenDropdownItem(
+        title: 'View Lyrics',
+        icon: CupertinoIcons.quote_bubble,
+        enabled: canViewLyrics,
+        onTap: canViewLyrics
+            ? () {
+                pushTabPage(
+                  FullLyricsScreen(
+                    track: effectiveTrack,
+                    initialLyrics: knownLyrics,
+                  ),
+                );
+              }
+            : null,
+      ),
+      // 3. Share Lyrics (when lyrics are available for the song)
       if (player != null &&
           (player.hasLyrics || player.currentTrack?.id == effectiveTrack.id))
         ZenDropdownItem(
@@ -870,44 +921,62 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
               if (resolved.length > 1 && widget.callerContext.mounted) {
                 showArtistPopup(widget.callerContext, artists: resolved);
               } else if (resolved.isNotEmpty) {
-                widget.callerNav.push(
-                  ZenPageRoute(
-                    builder: (_) => ArtistScreen(
-                      artistName: resolved.first.name,
-                      browseId: resolved.first.id.isNotEmpty
-                          ? resolved.first.id
-                          : null,
-                    ),
+                pushTabPage(
+                  ArtistScreen(
+                    artistName: resolved.first.name,
+                    browseId: resolved.first.id.isNotEmpty
+                        ? resolved.first.id
+                        : null,
                   ),
                 );
               } else {
-                widget.callerNav.push(
-                  ZenPageRoute(
-                    builder: (_) => ArtistScreen(artistName: widget.artist),
-                  ),
-                );
+                pushTabPage(ArtistScreen(artistName: widget.artist));
               }
             },
       ),
-      // 4. Go to album
-      if (widget.album.isNotEmpty)
+      // 4. Go to album (Audio tracks only; Video songs go to Video Singles page)
+      if (AlbumResolver.isVideoTrack(effectiveTrack))
+        ZenDropdownItem(
+          title: 'Go to Music Video',
+          icon: CupertinoIcons.play_rectangle_fill,
+          onTap: () {
+            pushTabPage(
+              AlbumScreen(
+                albumTitle: MediaNormalizer.cleanTitle(effectiveTrack.title),
+                artistName: MediaNormalizer.formatArtists(
+                  effectiveTrack.artist,
+                ),
+                coverUrl: widget.coverUrl,
+                initialTracks: [effectiveTrack.copyWith(isVideo: true)],
+                isVideo: true,
+                isSingle: true,
+              ),
+            );
+          },
+        )
+      else if (widget.album.isNotEmpty)
         ZenDropdownItem(
           title: 'Go to album',
           icon: CupertinoIcons.music_albums,
           onTap:
               widget.onGoToAlbum ??
               () {
-                widget.callerNav.push(
-                  ZenPageRoute(
-                    builder: (_) => AlbumScreen(
-                      albumTitle: widget.album,
-                      artistName: widget.artist,
-                      coverUrl: widget.coverUrl,
-                      browseId: widget.track?.albumBrowseId,
-                      initialTracks: widget.track != null
-                          ? [widget.track!]
-                          : [effectiveTrack],
-                    ),
+                final validBrowseId = AlbumResolver.sanitizeAlbumBrowseId(
+                  widget.track?.albumBrowseId,
+                );
+                final isSing =
+                    validBrowseId == null &&
+                    AlbumResolver.isSingleReleaseTitle(widget.album);
+                pushTabPage(
+                  AlbumScreen(
+                    albumTitle: widget.album,
+                    artistName: widget.artist,
+                    coverUrl: widget.coverUrl,
+                    browseId: validBrowseId,
+                    initialTracks: widget.track != null
+                        ? [widget.track!]
+                        : [effectiveTrack],
+                    isSingle: isSing,
                   ),
                 );
               },
@@ -919,31 +988,9 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
         onTap:
             widget.onStartMix ??
             () {
-              player?.playMedia(effectiveTrack);
-              if (widget.track != null) {
-                InnerTubeService.instance.getNextQueue(widget.track!.id).then((
-                  nextTracks,
-                ) {
-                  for (final next in nextTracks) {
-                    player?.playLast(next);
-                  }
-                });
+              if (player != null) {
+                unawaited(player.startMix(effectiveTrack));
               }
-              IslandNotifier.instance.show(
-                IslandNotification(
-                  id: 'mix_${effectiveTrack.id}',
-                  title: 'Mix',
-                  body: IslandNotification.artistOrTitle(
-                    artist: widget.artist,
-                    title: widget.title,
-                  ),
-                  leading: const Icon(
-                    CupertinoIcons.antenna_radiowaves_left_right,
-                    color: Color(0xFFE11D48),
-                    size: 18,
-                  ),
-                ),
-              );
             },
       ),
       // 6. Report
@@ -957,9 +1004,9 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                 IslandNotification(
                   id: 'report_${widget.title.hashCode}',
                   title: 'Reported',
-                  body: IslandNotification.artistOrTitle(
-                    artist: widget.artist,
-                    title: widget.title,
+                  body: IslandNotification.itemTitle(
+                    effectiveTrack.title,
+                    fallback: widget.title,
                   ),
                   leading: const Icon(
                     CupertinoIcons.checkmark_shield_fill,
@@ -1078,9 +1125,9 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                 IslandNotification(
                   id: 'copy_link_${DateTime.now().millisecondsSinceEpoch}',
                   title: 'Copied',
-                  body: IslandNotification.artistOrTitle(
-                    artist: widget.artist,
-                    title: widget.title,
+                  body: IslandNotification.itemTitle(
+                    effectiveTrack.title,
+                    fallback: widget.title,
                   ),
                   leading: const Icon(
                     CupertinoIcons.link,
@@ -1357,15 +1404,11 @@ class _ActionMenuRow extends StatelessWidget {
     final iconColor =
         item.iconColor ?? (item.isDestructive ? AppColors.danger : Zen.rose);
 
-    return PressableScale(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        Navigator.of(context, rootNavigator: true).pop();
-        item.onTap?.call();
-      },
-      child: Container(
-        color: Colors.transparent,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+    final row = Container(
+      color: Colors.transparent,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      child: Opacity(
+        opacity: item.enabled ? 1.0 : 0.35,
         child: Row(
           children: [
             SizedBox(
@@ -1417,6 +1460,17 @@ class _ActionMenuRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+
+    if (!item.enabled) return row;
+
+    return PressableScale(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        Navigator.of(context, rootNavigator: true).pop();
+        item.onTap?.call();
+      },
+      child: row,
     );
   }
 }

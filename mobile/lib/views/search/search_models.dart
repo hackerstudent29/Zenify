@@ -158,6 +158,8 @@ class SearchSongItem extends SearchItem {
     this.durationSeconds = 210,
     this.durationText = '3:30',
     this.musicVideoType = 'ATV', // ATV (Audio), OMV (Video), UGC
+    this.playCount,
+    this.playCountText,
   }) : super(type: SearchItemType.song);
 
   final List<ArtistRef> artists;
@@ -166,6 +168,8 @@ class SearchSongItem extends SearchItem {
   final int durationSeconds;
   final String durationText;
   final String musicVideoType;
+  final int? playCount;
+  final String? playCountText;
 
   bool get isOfficialAudio => musicVideoType == 'ATV' || musicVideoType == 'MUSIC_VIDEO_TYPE_ATV';
 
@@ -189,7 +193,7 @@ class SearchSongItem extends SearchItem {
     return Track(
       id: id.startsWith('yt-') ? id : 'yt-$id',
       title: title,
-      artist: subtitle,
+      artist: artists.isNotEmpty ? ArtistRef.formatList(artists) : subtitle,
       artists: artists,
       album: isVid && (albumName == null || albumName == 'Single') ? 'Music Video' : (albumName ?? 'Single'),
       albumBrowseId: albumBrowseId,
@@ -224,6 +228,8 @@ class SearchSongItem extends SearchItem {
       durationSeconds: durationSeconds,
       durationText: durationText,
       musicVideoType: musicVideoType,
+      playCount: playCount,
+      playCountText: playCountText,
     );
   }
 }
@@ -465,13 +471,13 @@ class MusicVideoFilter {
 
   static final List<String> _bannedNonMusicKeywords = [
     'tech', 'technology', 'review', 'unboxing', 'unbox', 'tutorial', 'how to',
-    'course', 'lecture', 'class', 'podcast', 'episode', 'interview', 'vlog',
-    'daily vlog', 'gaming', 'gameplay', 'walkthrough', 'news', 'politics',
-    'political', 'roast', 'prank', 'comedy', 'funny', 'meme', 'reaction',
+    'course', 'lecture', 'podcast', 'episode', 'interview', 'vlog',
+    'daily vlog', 'gaming', 'gameplay', 'walkthrough', 'politics',
+    'political', 'roast', 'prank', 'meme', 'reaction',
     'camera test', 'battery test', 'speed test', 'benchmark', 'specifications',
     'specs', 'trading', 'crypto', 'stock market', 'finance', 'workout routine',
-    'gym routine', 'diet plan', 'recipe', 'cooking', 'diy', 'craft', 'makeup',
-    'haul', 'skincare', 'unfiltered', 'behind the scenes', 'bts interview',
+    'gym routine', 'diet plan', 'recipe', 'cooking', 'diy', 'skincare',
+    'unfiltered', 'behind the scenes', 'bts interview',
     'press meet', 'audio launch speech', 'trailer reaction', 'teaser reaction',
     'movie review', 'teaser breakdown', 'trailer breakdown', 'public review',
     'theatre response', 'audience reaction', 'press conference', 'status video',
@@ -508,11 +514,11 @@ class MusicVideoFilter {
     final cLower = (channel ?? '').toLowerCase();
     final fullText = '$tLower $sLower $cLower';
 
-    // 1. Strict ban on Shorts (< 60s or #shorts)
+    // 1. Strict ban on Shorts (< 25s or #shorts)
     if (_shortsRegex.hasMatch(title) || _shortsRegex.hasMatch(subtitle)) {
       return false;
     }
-    if (durationSeconds > 0 && durationSeconds < 60) {
+    if (durationSeconds > 0 && durationSeconds < 25) {
       return false;
     }
     if (durationText != null && durationText.isNotEmpty) {
@@ -520,7 +526,7 @@ class MusicVideoFilter {
       if (parts.length == 2) {
         final mins = int.tryParse(parts[0]) ?? 0;
         final secs = int.tryParse(parts[1]) ?? 0;
-        if (mins == 0 && secs < 60) return false;
+        if (mins == 0 && secs < 25) return false;
       }
     }
 

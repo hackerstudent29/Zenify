@@ -180,7 +180,9 @@ class _CityScreenState extends State<CityScreen> {
               ),
             ),
           ],
-          const SliverToBoxAdapter(child: SizedBox(height: 140)),
+          SliverToBoxAdapter(
+            child: SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom),
+          ),
         ],
       ),
     );

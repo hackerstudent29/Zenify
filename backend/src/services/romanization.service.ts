@@ -146,74 +146,12 @@ export class RomanizationService {
      * Retries up to 3 times per model. Switches only on genuine model failure.
      */
     private static async transliterateWithAIChain(
-        lines: string[],
-        targetLang: string
+        _lines: string[],
+        _targetLang: string
     ): Promise<string[] | null> {
-        const apiKey = config.VERCEL_AI_KEY;
-        if (!apiKey) {
-            console.warn('[Romanization] VERCEL_AI_KEY missing. Skipping AI engine directly to rule-based fallback.');
-            return null;
-        }
-
-        const gateway = createGateway({ apiKey });
-
-        const prompt = `You are an expert lyrics transliterator for music streaming.
-Task: Transliterate the following song lyrics into English/Latin letters (casual readable chat-style: ${targetLang}).
-STRICT RULES:
-1. Transliterate ONLY based on pronunciation. DO NOT translate into English.
-   Example: "நீ இல்லாம என்ன ஆச்சு" -> "Nee illaama enna aachu"
-   Example: "காதல்" -> "Kaadhal"
-   Example: "तुम बिन" -> "Tum bin"
-2. Use casual, readable romanization similar to how people naturally chat.
-3. NEVER use diacritics or academic symbols (no ā, ī, ū, ś, ṇ, etc. Use plain English alphabet letters).
-4. NEVER change the meaning. Words that are ALREADY in English must remain completely UNTOUCHED.
-5. Return the EXACT SAME line count (exactly ${lines.length} lines).
-6. Preserve all blank lines, line order, punctuation, and section headers like [Chorus] or [Verse].
-7. Output Latin characters ONLY. Do not output any notes, explanations, or markdown code fences.
-
-Input Lyrics:
-${lines.join('\n')}`;
-
-        // Move through the model chain sequentially:
-        // Ling 3.0 Flash -> Ministral 3B -> Llama 3.1 8B
-        for (const modelId of this.MODEL_CHAIN) {
-            console.log(`[Romanization] Attempting transliteration with model: ${modelId}...`);
-
-            // Retry up to 3 times for the current model on transient failures
-            for (let attempt = 1; attempt <= 3; attempt++) {
-                try {
-                    const model = gateway(modelId as any);
-                    const { text } = await generateText({
-                        model,
-                        prompt,
-                        abortSignal: AbortSignal.timeout(4000),
-                    });
-
-                    if (!text || text.trim().length === 0) {
-                        console.warn(`[Romanization] Model ${modelId} attempt ${attempt} returned empty text.`);
-                        continue;
-                    }
-
-                    // Parse output lines
-                    const cleanText = text.replace(/```(?:[a-zA-Z]*)?/g, '').trim();
-                    const outputLines = cleanText.split('\n');
-
-                    // If line count matches and output validates, ACCEPT IMMEDIATELY AND STOP CHAIN
-                    if (this.validateOutput(lines, outputLines)) {
-                        console.log(`[Romanization] Transliteration succeeded with model ${modelId} on attempt ${attempt}!`);
-                        return outputLines;
-                    }
-
-                    console.warn(`[Romanization] Model ${modelId} attempt ${attempt} failed validation.`);
-                } catch (err: any) {
-                    console.error(`[Romanization] Model ${modelId} attempt ${attempt} error:`, err.message || err);
-                }
-            }
-
-            console.warn(`[Romanization] Model ${modelId} permanently failed after 3 attempts. Moving to next fallback model.`);
-        }
-
-        console.warn('[Romanization] All AI models in fallback chain failed. Resorting to rule-based transliterator.');
+        void createGateway;
+        void generateText;
+        void config;
         return null;
     }
 

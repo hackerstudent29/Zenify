@@ -16,8 +16,9 @@ import 'monogram_avatar.dart';
 import 'pressable_scale.dart';
 
 /// Notification shown in the second-row island pill.
-/// [title] = the action ("Added to Liked"), [body] = name of the thing,
-/// [leading] = artwork (use [trackThumb]).
+/// [title] = the action ("Added to Liked"), [body] = name of the item
+/// (song name, album name, playlist name, or artist name for artist actions),
+/// [leading] = optional artwork (use [trackThumb], omit for bulk actions).
 class IslandNotification {
   IslandNotification({
     required this.id,
@@ -33,16 +34,19 @@ class IslandNotification {
   final Widget? leading;
   final VoidCallback? onTap;
 
-  /// Picks cleaned artist name when known, otherwise cleaned track title.
-  static String artistOrTitle({String? artist, String? title}) {
-    final a = MediaNormalizer.formatArtists(artist ?? '').trim();
-    if (a.isNotEmpty &&
-        a.toLowerCase() != 'unknown artist' &&
-        a.toLowerCase() != 'unknown') {
-      return a;
+  /// Returns cleaned item title (song, album, or playlist name) with optional fallback.
+  static String itemTitle(String? title, {String? fallback}) {
+    final raw = (title ?? '').trim();
+    if (raw.isNotEmpty) {
+      final cleaned = MediaNormalizer.cleanTitle(raw).trim();
+      if (cleaned.isNotEmpty && cleaned != 'Unknown Title') return cleaned;
     }
-    return MediaNormalizer.cleanTitle(title ?? '').trim();
+    return (fallback ?? '').trim();
   }
+
+  /// Picks cleaned title when known (song/album/playlist), falling back to artist only if empty.
+  static String artistOrTitle({String? artist, String? title}) =>
+      itemTitle(title, fallback: MediaNormalizer.formatArtists(artist ?? ''));
 
   /// Consistent 26x26 artwork thumbnail / icon badge.
   static Widget trackThumb(
@@ -276,6 +280,127 @@ class _NotifPill extends StatelessWidget {
   }
 }
 
+/// Renders ONLY the drop-down [IslandNotifier] pill (no top Dynamic Island chrome).
+/// Used over full-screen surfaces like [PlayerShell] so in-app notifications appear
+/// cleanly on top while reusing the exact same spring and dismiss gestures.
+class IslandNotificationOverlay extends StatelessWidget {
+  const IslandNotificationOverlay({
+    super.key,
+    this.topOffset,
+    this.horizontalMargin = 16.0,
+  });
+
+  final double? topOffset;
+  final double horizontalMargin;
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final isLandscape = mq.size.width > mq.size.height;
+    final top =
+        topOffset ??
+        (isLandscape
+            ? math.max(12.0, mq.padding.top + 8.0)
+            : math.max(54.0, mq.padding.top + 4.0) + 46.0 + 8.0);
+    final maxWidth = math.max(120.0, mq.size.width - horizontalMargin * 2 - 8);
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(horizontalMargin, top, horizontalMargin, 0),
+        child: _IslandNotifRunner(maxWidth: maxWidth),
+      ),
+    );
+  }
+}
+
+class _IslandNotifRunner extends StatefulWidget {
+  const _IslandNotifRunner({required this.maxWidth});
+
+  final double maxWidth;
+
+  @override
+  State<_IslandNotifRunner> createState() => _IslandNotifRunnerState();
+}
+
+class _IslandNotifRunnerState extends State<_IslandNotifRunner>
+    with SingleTickerProviderStateMixin {
+  static const _openSpring = SpringDescription(
+    mass: 1,
+    stiffness: 420,
+    damping: 23,
+  );
+  static const _closeSpring = SpringDescription(
+    mass: 1,
+    stiffness: 380,
+    damping: 34,
+  );
+  static const double _notifHeight = 40.0;
+
+  late final AnimationController _n = AnimationController.unbounded(
+    vsync: this,
+    value: IslandNotifier.instance.current == null ? 0.0 : 1.0,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    IslandNotifier.instance.addListener(_onNotifChanged);
+  }
+
+  @override
+  void dispose() {
+    IslandNotifier.instance.removeListener(_onNotifChanged);
+    _n.dispose();
+    super.dispose();
+  }
+
+  void _onNotifChanged() {
+    if (!mounted) return;
+    final notifier = IslandNotifier.instance;
+    final open = notifier.current != null && !notifier.isClosing;
+    final to = open ? 1.0 : 0.0;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _n.value = to;
+    } else {
+      _n.animateWith(
+        SpringSimulation(
+          open ? _openSpring : _closeSpring,
+          _n.value,
+          to,
+          _n.velocity,
+        ),
+      );
+    }
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _n,
+      builder: (context, _) {
+        final cur = IslandNotifier.instance.current;
+        final p = _n.value;
+        if (cur == null || p < 0.002) return const SizedBox.shrink();
+        return SizedBox(
+          height: _notifHeight,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: _NotifPill(
+              key: ValueKey(cur.id),
+              notif: cur,
+              progress: p,
+              height: _notifHeight,
+              maxWidth: widget.maxWidth,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Apple Dynamic Island-style floating header.
 ///
 /// Row 1 (main pill): left dock (back / logo) · centre title · right dock.
@@ -346,17 +471,11 @@ class DynamicIslandHeader extends StatefulWidget {
 }
 
 class _DynamicIslandHeaderState extends State<DynamicIslandHeader>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   // Main pill merge: ~critically damped so circles glide together with just
   // a hint of softness (no visible rubber-banding on the glass).
   static const _mergeSpring =
       SpringDescription(mass: 1, stiffness: 380, damping: 32);
-
-  // Notification pill: slightly bouncy open, firmer close.
-  static const _openSpring =
-      SpringDescription(mass: 1, stiffness: 420, damping: 23);
-  static const _closeSpring =
-      SpringDescription(mass: 1, stiffness: 380, damping: 34);
 
   static const double _notifGap = 8.0;
   static const double _notifHeight = 40.0;
@@ -366,10 +485,6 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader>
     value: (widget.alwaysShowTitle || (widget.isDockPage == true && widget.scrollController == null))
         ? 1.0
         : 0.0,
-  );
-  late final AnimationController _n = AnimationController.unbounded(
-    vsync: this,
-    value: IslandNotifier.instance.current == null ? 0.0 : 1.0,
   );
   bool _shown = false;
   ScrollController? _activeSc;
@@ -428,26 +543,6 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader>
     }
   }
 
-  void _onNotifChanged() {
-    if (!mounted) return;
-    final notifier = IslandNotifier.instance;
-    final open = notifier.current != null && !notifier.isClosing;
-    final to = open ? 1.0 : 0.0;
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _n.value = to;
-    } else {
-      _n.animateWith(
-        SpringSimulation(
-          open ? _openSpring : _closeSpring,
-          _n.value,
-          to,
-          _n.velocity,
-        ),
-      );
-    }
-    setState(() {});
-  }
-
   @override
   void initState() {
     super.initState();
@@ -457,7 +552,6 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader>
     }
     widget.scrollController?.addListener(_listener);
     _activeSc = widget.scrollController;
-    IslandNotifier.instance.addListener(_onNotifChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncScrollOffset();
       _check(true);
@@ -514,9 +608,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader>
   void dispose() {
     _activeSc?.removeListener(_listener);
     widget.scrollController?.removeListener(_listener);
-    IslandNotifier.instance.removeListener(_onNotifChanged);
     _c.dispose();
-    _n.dispose();
     super.dispose();
   }
 
@@ -605,23 +697,8 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader>
             left: widget.horizontalMargin,
             right: widget.horizontalMargin,
             height: _notifHeight,
-            child: AnimatedBuilder(
-              animation: _n,
-              builder: (context, _) {
-                final cur = IslandNotifier.instance.current;
-                final p = _n.value;
-                if (cur == null || p < 0.002) return const SizedBox.shrink();
-                return Align(
-                  alignment: Alignment.topCenter,
-                  child: _NotifPill(
-                    key: ValueKey(cur.id),
-                    notif: cur,
-                    progress: p,
-                    height: _notifHeight,
-                    maxWidth: screenW - widget.horizontalMargin * 2 - 8,
-                  ),
-                );
-              },
+            child: _IslandNotifRunner(
+              maxWidth: screenW - widget.horizontalMargin * 2 - 8,
             ),
           ),
         ],

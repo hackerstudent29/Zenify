@@ -136,56 +136,74 @@ class MediaNormalizer {
     caseSensitive: false,
   );
 
-  /// Exact and substring pattern for known record labels, distributors, channels, and production banners
+  /// Exact and substring pattern for known record labels, distributors, channels, and movie production banners
   static final RegExp _distributorLabelExactPattern = RegExp(
     r'^(?:'
     r'Think\s*Music(?:\s*(?:India|South|Official))?'
-    r'|Sony\s*Music(?:\s*(?:South|India|Entertainment|Official))?'
+    r'|Sony\s*Music(?:\s*(?:South|India|Entertainment|Official|Regional))?'
     r'|SonyMusicSouthVEVO|SonyMusicIndiaVEVO'
-    r'|T-Series(?:\s*(?:Tamil|Telugu|Bhakti|Apna|Music|Company|Malayalam|Kannada|Bhakti\s*Sagar|Old))?'
-    r'|Zee\s*Music(?:\s*(?:South|Company|Tamil|Telugu))?'
+    r'|T-Series(?:\s*(?:Tamil|Telugu|Bhakti|Apna|Music|Company|Malayalam|Kannada|Bhakti\s*Sagar|Old|Films|Haryanvi|Punjabi|Marathi|Bhojpuri|Gujarati))?'
+    r'|Zee\s*Music(?:\s*(?:South|Company|Tamil|Telugu|India))?'
     r'|Zee\s*Studios?'
-    r'|Saregama(?:\s*(?:Tamil|Telugu|Malayalam|Music|Kannada|Bhojpuri))?'
-    r'|Aditya\s*Music(?:\s*(?:Tamil|Telugu|India|Devotional))?'
+    r'|Saregama(?:\s*(?:Tamil|Telugu|Malayalam|Music|Kannada|Bhojpuri|Gujarati|Bengali|Punjabi))?'
+    r'|Aditya\s*Music(?:\s*(?:Tamil|Telugu|India|Devotional|NXT))?'
     r'|Lahari\s*Music(?:\s*(?:T-Series|South))?'
     r'|Speed\s*Audio(?:\s*Video)?|Speed\s*Records'
     r'|YRF(?:\s*Music)?|Yash\s*Raj\s*Films?'
-    r'|Tips(?:\s*(?:Official|Music|Industries|Bhojpuri|Gujarati))?'
-    r'|Muzik247|Divo(?:\s*(?:Music|Movies|South))?|Anand\s*Audio'
-    r'|Times\s*Music(?:\s*South)?|Junglee\s*Music(?:\s*(?:Tamil|Telugu|South))?'
+    r'|Tips(?:\s*(?:Official|Music|Industries|Bhojpuri|Gujarati|Punjabi))?'
+    r'|Muzik\s*247|Muzik247|Divo(?:\s*(?:Music|Movies|South|Media))?|Anand\s*Audio'
+    r'|Times\s*Music(?:\s*South|Spiritual)?|Junglee\s*Music(?:\s*(?:Tamil|Telugu|South|Hindi))?'
     r'|Eros\s*Now(?:\s*(?:Music|South))?|SVF|Rajshri(?:\s*(?:Tamil|Telugu|Music))?|Geetha\s*Arts|Trend\s*Music|MRT\s*Music|Silly\s*Monks'
-    r'|Universal\s*Music(?:\s*(?:India|Group))?|Warner\s*Music(?:\s*(?:India|South\s*Asia))?|Def\s*Jam(?:\s*India)?|Atlantic\s*Records|Columbia\s*Records'
+    r'|Mango\s*Music|Volga\s*Video|Madhura\s*Audio|Millennium\s*Audios|Star\s*Music|Five\s*Star\s*Audio|Ayngaran'
+    r'|White\s*Hill\s*Music|Desi\s*Music\s*Factory|DMF\s*Play|VYRL\s*Originals|DM\s*Desi\s*Melodies'
+    r'|Universal\s*Music(?:\s*(?:India|Group))?|Warner\s*Music(?:\s*(?:India|South\s*Asia))?|Def\s*Jam(?:\s*India)?|Atlantic\s*Records|Columbia\s*Records|Republic\s*Records|Interscope|RCA\s*Records|Island\s*Records'
     r'|Sun\s*TV|Sun\s*Pictures|Sun\s*NXT'
     r'|Sony\s*Pictures(?:\s*(?:India|Releasing))?'
-    r'|Red\s*Giant\s*Movies|Lyca\s*Productions'
-    r'|Studio\s*Green|Seven\s*Screen\s*Studio'
+    r'|Red\s*Giant\s*Movies|Lyca\s*Productions|Hombale\s*Films|Mythri\s*Movie\s*Makers|DVV\s*Entertainment'
+    r'|Studio\s*Green|Seven\s*Screen\s*Studio|7\s*Screen\s*Studio|Sathya\s*Jyothi\s*Films|Wunderbar\s*Films'
+    r'|Raaj\s*Kamal\s*Films(?:\s*International)?|Raajkamal\s*Films(?:\s*International)?|AGS\s*Entertainment|2D\s*Entertainment|Madras\s*Talkies'
+    r'|Sri\s*Venkateswara\s*Creations|Sithara\s*Entertainment|Haarika\s*(?:&|and)\s*Hassine\s*Creations|Vyjayanthi\s*Movies'
+    r'|KVN\s*Productions|Dharma\s*Productions|Red\s*Chillies\s*Entertainment|Viacom\s*18(?:\s*Studios)?|Jio\s*Studios|T-Series\s*Films'
+    r'|Aashirvad\s*Cinemas|Prithviraj\s*Productions|Wayfarer\s*Films|Gokulam\s*Movies|Thenandal\s*Studios?'
+    r'|YouTube\s*Music|Unknown\s*Artist|Various\s*Artists'
     r')$',
     caseSensitive: false,
   );
 
-  /// Trailing suffixes indicating distributor channels rather than individual musical artists
+  /// Trailing suffixes indicating distributor/film-production channels rather than recording artists
   static final RegExp _distributorSuffixPattern = RegExp(
     r'\b(?:'
-    r'music(?:\s*(?:south|india|company|entertainment|official|tamil|telugu))?'
-    r'|records|recordings|entertainment|audio\s*video|production[s]?|vevo|studios?|pictures?|films?|media|channel|tv'
+    r'music(?:\s*(?:south|india|company|entertainment|official|tamil|telugu|malayalam|kannada|punjabi|hindi|factory))?'
+    r'|records|recordings|entertainment[s]?|audio\s*video|audios|production[s]?|creations|cinematics|cinemas|vevo|studios?|pictures?|films?|movies|media|channel|tv|network'
     r')\b',
     caseSensitive: false,
   );
 
+  /// Non-musical movie/production credit roles or actor honorifics that must never be treated as singer/composer artists.
+  static final RegExp _nonArtistRoleLinePattern = RegExp(
+    r'^(?:starring|featuring\s*actor|star\s*cast|cast|actor[s]?|actress(?:es)?|hero|heroine|director|directed\s*by|written\s*by|story|screenplay|dialogue[s]?|producer|produced\s*by|co-?producer|executive\s*producer|banner|presents|presented\s*by|movie|film|dop|cinematograph(?:y|er)|editor|editing|choreograph(?:y|er)|vfx|stunt[s]?|action|costume[s]?|art\s*director|publicity|label|audio\s*label|music\s*label|video\s*label|lyrics|lyricist|words|subscribe|follow|copyright|rights)\b',
+    caseSensitive: false,
+  );
+
+  static final RegExp _actorHonorificPattern = RegExp(
+    r'^(?:superstar|thalapathy|thalaivar|ulaganayagan|makkal\s*selvan|rebel\s*star|icon\s*star|power\s*star|stylish\s*star|mega\s*star|natural\s*star|rocking\s*star|man\s*of\s*masses|global\s*star|real\s*star|young\s*tiger|chiyaan|naga|prince)\b',
+    caseSensitive: false,
+  );
+
   /// Checks whether a name corresponds to a music distributor, record label,
-  /// video publisher, or production house rather than an actual recording artist.
+  /// video publisher, or movie production house rather than an actual recording artist.
   static bool isDistributorOrLabel(String? raw) {
     if (raw == null) return false;
     final s = decodeHtml(raw).trim();
     if (s.isEmpty) return false;
     if (_distributorLabelExactPattern.hasMatch(s)) return true;
 
-    // Check lowercase token match
     final lower = s.toLowerCase();
     if (lower == 'sun tv' ||
         lower == 'sun pictures' ||
         lower == 'sun nxt' ||
         lower == 'muzik247' ||
+        lower == 'muzik 247' ||
         lower == 'divo' ||
         lower == 'divo music' ||
         lower == 'divo movies' ||
@@ -196,7 +214,10 @@ class MediaNormalizer {
         lower == 'saregama' ||
         lower == 't-series' ||
         lower == 'tseries' ||
-        lower == 'vevo') {
+        lower == 'vevo' ||
+        lower == 'lyca' ||
+        lower == 'hombale' ||
+        lower == 'geetha arts') {
       return true;
     }
 
@@ -209,16 +230,37 @@ class MediaNormalizer {
         lower.contains('speed audio') ||
         lower.contains('junglee music') ||
         lower.contains('times music') ||
-        lower.contains('speed records')) {
+        lower.contains('speed records') ||
+        lower.contains('mango music') ||
+        lower.contains('lyca productions') ||
+        lower.contains('hombale films') ||
+        lower.contains('mythri movie') ||
+        lower.contains('red giant movies') ||
+        lower.contains('sathya jyothi') ||
+        lower.contains('studio green') ||
+        lower.contains('seven screen studio') ||
+        lower.contains('7 screen studio') ||
+        lower.contains('yash raj') ||
+        lower.contains('dharma productions') ||
+        lower.contains('red chillies') ||
+        lower.contains('dvv entertainment') ||
+        lower.contains('sithara entertainment') ||
+        lower.contains('vyjayanthi movies') ||
+        lower.contains('white hill music') ||
+        lower.contains('vevo')) {
       return true;
     }
 
-    // Check if name ends with common channel / distributor markers e.g. "Foo Records", "Bar Music"
     if (_distributorSuffixPattern.hasMatch(s) &&
         (lower.contains('music') ||
             lower.contains('records') ||
             lower.contains('pictures') ||
             lower.contains('studios') ||
+            lower.contains('films') ||
+            lower.contains('movies') ||
+            lower.contains('creations') ||
+            lower.contains('productions') ||
+            lower.contains('cinematics') ||
             lower.contains('entertainment') ||
             lower.contains('audio video'))) {
       return true;
@@ -227,46 +269,124 @@ class MediaNormalizer {
     return false;
   }
 
-  /// Extracts true recording artists and vocalists from a video song's description text.
-  /// Handles distributor credit blocks ("Singers: ...", "Vocals: ...", "Music: ...")
-  /// as well as YouTube Music automated release delivery blocks.
+  /// True when a video credit token explicitly designates a non-music role (actor/director/producer/label/lyricist).
+  static bool isNonArtistCreditSegment(String? raw) {
+    if (raw == null) return false;
+    final s = decodeHtml(raw).trim();
+    if (s.isEmpty) return true;
+    if (isDistributorOrLabel(s)) return true;
+    if (_nonArtistRoleLinePattern.hasMatch(s)) return true;
+    if (_actorHonorificPattern.hasMatch(s)) return true;
+    if (s.startsWith('#') || s.startsWith('@') || s.contains('http://') || s.contains('https://')) {
+      return true;
+    }
+    return false;
+  }
+
+  static String _sanitizeCreditNames(String raw) {
+    var s = decodeHtml(raw).trim();
+    // Drop social handles, URLs, parenthetical instrument/vocal-part notes & emoji/brackets
+    s = s.replaceAll(RegExp(r'https?://\S+'), '');
+    s = s.replaceAll(RegExp(r'@[\w.\-]+'), '');
+    s = s.replaceAll(
+      RegExp(
+        r'\((?:male|female|rap|chorus|backing|vocals?|voice|flute|guitar|violin|piano|keys|drums?|bass|additional|ft\.?|feat\.?)[^)]*\)',
+        caseSensitive: false,
+      ),
+      '',
+    );
+    s = s.replaceAll(_bracketLabelPattern, '');
+    s = s.replaceAll(RegExp(r'[#@•|]+'), ', ');
+    s = s.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
+    return s;
+  }
+
+  /// Extracts explicit song title from YouTube video description blocks (e.g. "Song: Naa Ready", "Track Name - Monica").
+  static String? extractTitleFromDescription(String? description) {
+    if (description == null || description.trim().isEmpty) return null;
+    final text = decodeHtml(description);
+
+    // 1. Auto-generated YouTube release line: "Provided to YouTube by ..." followed by "Title · Artist"
+    final autoMatch = RegExp(
+      r'Provided to YouTube by[^\r\n]*\r?\n+([^\r\n]+)',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (autoMatch != null) {
+      final line = autoMatch.group(1)?.trim() ?? '';
+      if (line.contains('·')) {
+        final songPart = line.split('·').first.trim();
+        final cleaned = cleanCompactTitle(songPart);
+        if (cleaned.isNotEmpty && cleaned != 'Unknown Title' && !isDistributorOrLabel(cleaned)) {
+          return cleaned;
+        }
+      }
+    }
+
+    // 2. Explicit Song/Track metadata line
+    final songMatch = RegExp(
+      r'^(?:\s*(?:Song(?:\s*(?:Name|Title))?|Track(?:\s*(?:Name|Title))?))\s*[:\-–—|]\s*([^\r\n•|]+)',
+      caseSensitive: false,
+      multiLine: true,
+    ).firstMatch(text);
+    if (songMatch != null) {
+      final raw = songMatch.group(1)?.trim() ?? '';
+      if (raw.isNotEmpty &&
+          !raw.contains('http') &&
+          !_nonArtistRoleLinePattern.hasMatch(raw) &&
+          !isDistributorOrLabel(raw)) {
+        final cleaned = cleanCompactTitle(raw);
+        if (cleaned.length >= 2 && cleaned != 'Unknown Title') {
+          return cleaned;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Extracts movie/album name from description credits (e.g. "Movie: Coolie", "Album: Vikram").
+  static String? extractMovieOrAlbumFromDescription(String? description) {
+    if (description == null || description.trim().isEmpty) return null;
+    final text = decodeHtml(description);
+    final m = RegExp(
+      r'^(?:\s*(?:Movie|Film|Album|Soundtrack))\s*[:\-–—|]\s*([^\r\n•|]+)',
+      caseSensitive: false,
+      multiLine: true,
+    ).firstMatch(text);
+    if (m == null) return null;
+    final raw = m.group(1)?.trim() ?? '';
+    if (raw.isEmpty || isDistributorOrLabel(raw)) return null;
+    final cleaned = cleanAlbumTitle(raw);
+    return (cleaned.isNotEmpty && cleaned != 'Single') ? cleaned : null;
+  }
+
+  /// Extracts true recording artists (vocalists and music directors/composers)
+  /// from a video song's description text while strictly excluding actors, directors,
+  /// film producers, lyricists, and distributor labels.
   static String extractArtistsFromDescription(String? description) {
     if (description == null || description.trim().isEmpty) return '';
     final text = decodeHtml(description);
+    final collectedNames = <String>[];
 
-    // 1. Singer(s) / Vocal(s) / Artist(s) line
-    final vocalMatch = RegExp(
-      r'(?:Singers?|Vocals?|Artists?|Singers?\s*(?:&|and)\s*Vocals?)\s*[:\-–—|]\s*([^\r\n•\t|]+)',
-      caseSensitive: false,
-    ).firstMatch(text);
-    if (vocalMatch != null) {
-      final raw = vocalMatch.group(1)?.trim();
-      if (raw != null && raw.isNotEmpty && !isDistributorOrLabel(raw)) {
-        final formatted = formatArtists(raw);
-        if (formatted.isNotEmpty && formatted.toLowerCase() != 'unknown artist') {
-          return formatted;
+    void addExtracted(String? rawValue) {
+      if (rawValue == null || rawValue.trim().isEmpty) return;
+      final cleaned = _sanitizeCreditNames(rawValue);
+      if (cleaned.isEmpty) return;
+      for (final name in splitArtistNames(cleaned)) {
+        if (name.isEmpty ||
+            name.toLowerCase() == 'unknown artist' ||
+            isDistributorOrLabel(name) ||
+            _nonArtistRoleLinePattern.hasMatch(name) ||
+            _actorHonorificPattern.hasMatch(name)) {
+          continue;
+        }
+        if (!collectedNames.any((n) => n.toLowerCase() == name.toLowerCase())) {
+          collectedNames.add(name);
         }
       }
     }
 
-    // 2. Music Director / Composer line (prominent primary creator in Indian and global releases)
-    final musicMatch = RegExp(
-      r'(?:Music(?:\s*Director|\s*Composed\s*by|\s*by)?|Composed\s*by|Composer)\s*[:\-–—|]\s*([^\r\n•\t|]+)',
-      caseSensitive: false,
-    ).firstMatch(text);
-    if (musicMatch != null) {
-      final raw = musicMatch.group(1)?.trim();
-      if (raw != null && raw.isNotEmpty && !isDistributorOrLabel(raw)) {
-        final formatted = formatArtists(raw);
-        if (formatted.isNotEmpty && formatted.toLowerCase() != 'unknown artist') {
-          return formatted;
-        }
-      }
-    }
-
-    // 3. YouTube Music automated delivery description:
-    // "Provided to YouTube by ..."
-    // "Track Title · Artist 1 · Artist 2"
+    // 1. YouTube Music automated release delivery block:
+    // "Provided to YouTube by ..." -> "Track Title · Artist 1 · Artist 2"
     final autoMatch = RegExp(
       r'Provided to YouTube by[^\r\n]*\r?\n+([^\r\n]+)',
       caseSensitive: false,
@@ -276,15 +396,70 @@ class MediaNormalizer {
       if (line.contains('·')) {
         final parts = line.split('·').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
         if (parts.length > 1) {
-          final artistParts = parts.sublist(1).where((a) => !isDistributorOrLabel(a)).toList();
-          if (artistParts.isNotEmpty) {
-            final formatted = formatArtists(artistParts);
-            if (formatted.isNotEmpty && formatted.toLowerCase() != 'unknown artist') {
-              return formatted;
-            }
+          for (final p in parts.sublist(1)) {
+            addExtracted(p);
+          }
+          if (collectedNames.isNotEmpty) {
+            return formatArtists(collectedNames);
           }
         }
       }
+    }
+
+    // 2. Scan credit lines: Vocalists/Singers + Music Director/Composer (combining unique artists)
+    final lines = text.split(RegExp(r'\r?\n'));
+    final vocalKey = RegExp(
+      r'^\s*(?:Singers?|Vocals?|Lead\s*Vocals?|Sung\s*by|Rendered\s*by|Voice[s]?|Artists?|Singers?\s*(?:&|and)\s*Vocals?|Featured\s*Artists?|Ft\.?)\s*[:\-–—|]\s*(.+)$',
+      caseSensitive: false,
+    );
+    final musicKey = RegExp(
+      r'^\s*(?:Music(?:\s*(?:Director|Composed\s*(?:&|and)?\s*(?:Arranged\s*)?by|Composed\s*(?:&|and)\s*Produced\s*by|by|Production))?|Composed\s*(?:&|and\s*Produced\s*)?by|Composer|Music\s*Producer)\s*[:\-–—|]\s*(.+)$',
+      caseSensitive: false,
+    );
+
+    final vocalCredits = <String>[];
+    final musicCredits = <String>[];
+
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isEmpty) continue;
+      if (_nonArtistRoleLinePattern.hasMatch(line)) continue;
+
+      final vm = vocalKey.firstMatch(line);
+      if (vm != null) {
+        vocalCredits.add(vm.group(1)!);
+        continue;
+      }
+      final mm = musicKey.firstMatch(line);
+      if (mm != null) {
+        musicCredits.add(mm.group(1)!);
+        continue;
+      }
+
+      // Natural prose credits e.g. "Sung by Anirudh Ravichander & Jonita Gandhi"
+      final proseVocal = RegExp(
+        r'\b(?:Sung|Performed|Voiced)\s+by\s+([^\r\n•.|(]+)',
+        caseSensitive: false,
+      ).firstMatch(line);
+      if (proseVocal != null) vocalCredits.add(proseVocal.group(1)!);
+
+      final proseMusic = RegExp(
+        r'\b(?:Music\s+composed\s+by|Composed\s+by|Music\s+by)\s+([^\r\n•.|(]+)',
+        caseSensitive: false,
+      ).firstMatch(line);
+      if (proseMusic != null) musicCredits.add(proseMusic.group(1)!);
+    }
+
+    // Add vocalists first, then composer(s) (deduped) so e.g. Singers: A, B + Music: A -> "A & B", or Singer: B + Music: A -> "B & A"
+    for (final v in vocalCredits) {
+      addExtracted(v);
+    }
+    for (final m in musicCredits) {
+      addExtracted(m);
+    }
+
+    if (collectedNames.isNotEmpty) {
+      return formatArtists(collectedNames);
     }
 
     return '';
@@ -311,7 +486,7 @@ class MediaNormalizer {
     if (dateMatch != null) return dateMatch.group(1);
 
     final yearMatch = RegExp(
-      r'\b(?:Year|Premiered|Uploaded?|Published)\s*[:\-–—]?\s*[^\r\n]*?\b(19\d{2}|20\d{2})\b',
+      r'\b(?:Year|Premiered|Uploaded?|Published|Audio\s*Release)\s*[:\-–—]?\s*[^\r\n]*?\b(19\d{2}|20\d{2})\b',
       caseSensitive: false,
     ).firstMatch(text);
     if (yearMatch != null) return yearMatch.group(1);
@@ -321,35 +496,60 @@ class MediaNormalizer {
 
   /// Extracts authentic musical artists from a video song's title when the uploader
   /// is a distributor / channel or when metadata attribution is missing.
+  /// Strictly rejects film actors, directors, producers, lyricists, and production banners.
   static String extractArtistsFromVideoTitle(
     String? rawTitle, {
     String? defaultArtist,
   }) {
     if (rawTitle == null || rawTitle.trim().isEmpty) {
-      return defaultArtist ?? '';
+      return (defaultArtist != null && !isDistributorOrLabel(defaultArtist))
+          ? cleanArtistName(defaultArtist)
+          : '';
     }
     final raw = decodeHtml(rawTitle).trim();
 
-    // 1. Pipe-separated Indian cinema music video format:
-    // "LEO - Naa Ready Lyric Video | Thalapathy Vijay | Lokesh Kanagaraj | Anirudh Ravichander"
+    // 1. Extract explicit (feat. X) / (ft. Y) artist attributions from title
+    final featMatches = RegExp(
+      r'[\(\[]\s*(?:feat\.?|ft\.?|featuring)\s+([^\]\)]+)[\)\]]',
+      caseSensitive: false,
+    ).allMatches(raw);
+    final featArtists = <String>[
+      for (final m in featMatches)
+        if (m.group(1) != null) ...splitArtistNames(m.group(1)!),
+    ];
+
+    // 2. Pipe-separated cinema/music video format:
     // "Monica - Video Song | COOLIE | Superstar Rajinikanth | Sun Pictures | Lokesh | Anirudh | Pooja Hegde"
-    // "Remo - Sirikkadhey Music Video | Anirudh Ravichander"
     if (raw.contains('|')) {
       final parts = raw.split('|').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
-      final artistCandidates = <String>[];
+      final explicitMusicCandidates = <String>[];
+      final fallbackCandidates = <String>[];
 
       for (var i = 1; i < parts.length; i++) {
-        var segment = parts[i];
-        segment = segment.replaceAll(
-          RegExp(
-            r'^(?:superstar|starring|cast|director|directed by|produced by|music(?:\s*by)?|singer[s]?|vocal[s]?)\s*[:\-–—]?\s*',
-            caseSensitive: false,
-          ),
-          '',
-        ).trim();
+        var segment = parts[i].replaceAll(RegExp(r'#\S+'), '').trim();
+        if (segment.isEmpty) continue;
 
-        if (segment.isEmpty ||
-            isDistributorOrLabel(segment) ||
+        // Discard explicit non-music roles first ("Movie:", "Music Label:", "Starring:", "Directed by:", "Produced by:")
+        if (_nonArtistRoleLinePattern.hasMatch(segment) ||
+            _actorHonorificPattern.hasMatch(segment)) {
+          continue;
+        }
+
+        // Extract explicit music credits ("Music: X", "Singers: Y, Z") BEFORE label-keyword check
+        final explicitMusicMatch = RegExp(
+          r'^(?:music(?:\s*(?:by|director))?|composed\s*by|composer|singer[s]?|vocal[s]?|artist[s]?)\s*[:\-–—]\s*(.+)$',
+          caseSensitive: false,
+        ).firstMatch(segment);
+        if (explicitMusicMatch != null) {
+          for (final n in splitArtistNames(explicitMusicMatch.group(1))) {
+            if (!isNonArtistCreditSegment(n)) {
+              explicitMusicCandidates.add(n);
+            }
+          }
+          continue;
+        }
+
+        if (isNonArtistCreditSegment(segment) ||
             isMetadataNoise(segment) ||
             _bracketTagsPattern.hasMatch(segment) ||
             _descriptorTailPattern.hasMatch(segment)) {
@@ -365,65 +565,96 @@ class MediaNormalizer {
             lower.contains('video song') ||
             lower.contains('full video') ||
             lower.contains('song video') ||
-            lower.contains('lyrical video')) {
+            lower.contains('lyrical video') ||
+            RegExp(r'^(?:4k|8k|hd|uhd|tamil|telugu|hindi|malayalam|kannada|punjabi)$').hasMatch(lower)) {
           continue;
         }
 
-        artistCandidates.add(segment);
+        // Skip plain ALL-CAPS single movie banners e.g. COOLIE, LEO, JAILER
+        if (parts[i].trim().length >= 3 &&
+            parts[i].trim() == parts[i].trim().toUpperCase() &&
+            !parts[i].trim().contains(' ')) {
+          continue;
+        }
+
+        fallbackCandidates.add(segment);
       }
 
-      if (artistCandidates.isNotEmpty) {
-        if (defaultArtist != null && defaultArtist.isNotEmpty) {
-          final defLower = defaultArtist.toLowerCase();
-          final matches = artistCandidates
-              .where((a) =>
+      if (explicitMusicCandidates.isNotEmpty) {
+        return formatArtists([...explicitMusicCandidates, ...featArtists]);
+      }
+
+      if (defaultArtist != null && defaultArtist.isNotEmpty && !isDistributorOrLabel(defaultArtist)) {
+        final defLower = defaultArtist.toLowerCase();
+        final all = [...fallbackCandidates, ...featArtists];
+        final matches = all
+            .where(
+              (a) =>
                   a.toLowerCase().contains(defLower) ||
-                  defLower.contains(a.toLowerCase()))
-              .toList();
-          if (matches.isNotEmpty) {
-            return formatArtists(matches.first);
-          }
+                  defLower.contains(a.toLowerCase()),
+            )
+            .toList();
+        if (matches.isNotEmpty) {
+          return formatArtists(matches.first);
         }
-        return formatArtists(artistCandidates.take(3).toList());
+      }
+
+      if (featArtists.isNotEmpty) {
+        return formatArtists(featArtists);
+      }
+      // Without explicit music labels, Indian cinema pipe titles mix movie/actor/director tokens (which require description/panel credits);
+      // only return a clean non-distributor fallback if defaultArtist isn't present and we didn't find anything noisy.
+      if (fallbackCandidates.isNotEmpty && parts.length <= 3) {
+        return formatArtists(fallbackCandidates.take(2).toList());
       }
     }
 
-    // 2. "Artist - Title" or "Title - Artist" format
-    // e.g. "Cartoon, Jéja - On & On (feat. Daniel Levi)"
-    // e.g. "Alan Walker - Faded"
-    // e.g. "Ed Sheeran - Shape of You"
-    final dashMatch = RegExp(r'^([^\-–—|]+)\s*[\-–—]\s*([^\-–—|]+)').firstMatch(raw);
+    // 3. "Artist - Title" format e.g. "Cartoon, Jéja - On & On (feat. Daniel Levi)", "The Weeknd - Blinding Lights"
+    final dashMatch = RegExp(r'^([^\-–—|]+?)\s+[\-–—]\s+([^\-–—|]+)').firstMatch(raw);
     if (dashMatch != null) {
       final left = dashMatch.group(1)!.trim();
       final right = dashMatch.group(2)!.trim();
+      final leftUpperMovie = left.length >= 2 &&
+          left.length <= 12 &&
+          left == left.toUpperCase() &&
+          !left.contains(' ') &&
+          RegExp(r'^[A-Z0-9]+$').hasMatch(left);
 
-      final leftClean = cleanArtistName(left);
-      if (leftClean.isNotEmpty &&
-          !isDistributorOrLabel(leftClean) &&
-          !isMetadataNoise(leftClean) &&
-          !_bracketTagsPattern.hasMatch(left) &&
-          leftClean.length > 2) {
-        final featMatch = RegExp(
-          r'[\(\[]\s*(?:feat\.?|ft\.?|featuring)\s+([^\]\)]+)[\)\]]',
-          caseSensitive: false,
-        ).firstMatch(right);
-        if (featMatch != null) {
-          return formatArtists('$leftClean, ${featMatch.group(1)}');
+      if (!leftUpperMovie && !isNonArtistCreditSegment(left)) {
+        final leftClean = cleanArtistName(left);
+        if (leftClean.isNotEmpty &&
+            !isDistributorOrLabel(leftClean) &&
+            !isMetadataNoise(leftClean) &&
+            !_bracketTagsPattern.hasMatch(left) &&
+            leftClean.length > 2) {
+          if (featArtists.isNotEmpty) {
+            return formatArtists([leftClean, ...featArtists]);
+          }
+          return formatArtists(leftClean);
         }
-        return formatArtists(leftClean);
       }
 
-      final rightClean = cleanArtistName(right);
-      if (rightClean.isNotEmpty &&
-          !isDistributorOrLabel(rightClean) &&
-          !isMetadataNoise(rightClean) &&
-          !_bracketTagsPattern.hasMatch(right) &&
-          rightClean.length > 2) {
-        return formatArtists(rightClean);
+      if (!isNonArtistCreditSegment(right)) {
+        final rightClean = cleanArtistName(right);
+        if (rightClean.isNotEmpty &&
+            !isDistributorOrLabel(rightClean) &&
+            !isMetadataNoise(rightClean) &&
+            !_bracketTagsPattern.hasMatch(right) &&
+            !rightClean.toLowerCase().contains('video song') &&
+            !rightClean.toLowerCase().contains('lyric video') &&
+            rightClean.length > 2) {
+          return formatArtists(rightClean);
+        }
       }
     }
 
-    if (defaultArtist != null && defaultArtist.trim().isNotEmpty) {
+    if (featArtists.isNotEmpty) {
+      return formatArtists(featArtists);
+    }
+
+    if (defaultArtist != null &&
+        defaultArtist.trim().isNotEmpty &&
+        !isDistributorOrLabel(defaultArtist)) {
       return cleanArtistName(defaultArtist);
     }
 
@@ -514,6 +745,16 @@ class MediaNormalizer {
     return s;
   }
 
+  static final RegExp _genericVideoSegmentPattern = RegExp(
+    r'^(?:#\S+\s*)+$|^(?:official\s*(?:music\s*)?video|music\s*video|video\s*song|full\s*video(?:\s*song)?|lyric(?:al)?\s*video|song\s*promo|teaser|trailer|promo|4k(?:\s*(?:uhd|ultra\s*hd|video|hd|song))?|8k(?:\s*video)?|(?:full\s*)?hd(?:\s*video)?|audio\s*song)$',
+    caseSensitive: false,
+  );
+
+  static final RegExp _trailingUnwrappedVideoNoisePattern = RegExp(
+    r'\s+(?:official\s*(?:music\s*)?(?:video|audio|lyric(?:al)?\s*video)|full\s*video\s*song|video\s*song|lyric(?:al)?\s*video|song\s*promo|full\s*song|audio\s*song|4k(?:\s*(?:uhd|ultra\s*hd|video))?|8k|full\s*hd|1080p|2160p|dolby\s*atmos)\s*$',
+    caseSensitive: false,
+  );
+
   /// Cleans titles by decoding HTML entities, removing surrounding/stray quotes,
   /// cleaning unbalanced closing parentheses, removing video descriptor tags,
   /// and stripping credit/label spam after pipes or hyphens.
@@ -523,29 +764,53 @@ class MediaNormalizer {
     s = stripIdNoise(s);
     if (s.isEmpty) return 'Unknown Title';
 
+    // Strip inline hashtags like #Coolie #Trending before pipe/descriptor cleanup
+    s = s.replaceAll(RegExp(r'\s*#[A-Za-z0-9_\u0B80-\u0DFF]+'), ' ').trim();
+
     // 1. If title contains '|' (YouTube video credits spam: Song | Movie | Cast | Label),
-    // only keep the primary song title before the first '|'.
+    // pick the primary song segment (skipping leading promo/resolution/distributor tokens).
     if (s.contains('|')) {
-      final parts = s.split('|');
-      final firstPart = parts.first.trim();
-      if (firstPart.length >= 2) {
-        s = firstPart;
+      final parts = s.split('|').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+      final chosen = parts.firstWhere(
+        (p) =>
+            p.length >= 2 &&
+            !_genericVideoSegmentPattern.hasMatch(p) &&
+            !isDistributorOrLabel(p) &&
+            !isNonArtistCreditSegment(p),
+        orElse: () => parts.isNotEmpty ? parts.first : s,
+      );
+      if (chosen.length >= 2) {
+        s = chosen;
       }
     }
+
+    // Strip leading promo prefixes like "Video Song: " or "Full Video - "
+    s = s
+        .replaceAll(
+          RegExp(
+            r'^(?:official\s*(?:music\s*)?video|video\s*song|full\s*video(?:\s*song)?|lyric(?:al)?\s*video|song\s*promo)\s*[:\-–—]+\s*',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .trim();
 
     // 2. Strip record label brackets, unclosed labels & channel tails repeatedly
     s = s.replaceAll(_bracketLabelPattern, ' ').trim();
     s = s.replaceAll(_unclosedLabelPattern, ' ').trim();
     s = s.replaceAll(_labelTailPattern, '').trim();
 
-    // 3. Strip descriptor tails after hyphen, dash, or pipe (e.g. - Video Song, | Lyric Video)
-    s = s.replaceAll(_descriptorTailPattern, '').trim();
-
-    // 4. Strip bracket / parenthesis tags repeatedly until none remain
-    while (_bracketTagsPattern.hasMatch(s)) {
-      s = s.replaceAll(_bracketTagsPattern, ' ').trim();
+    // 3. Strip descriptor tails after hyphen, dash, or pipe AND unwrapped video noise tails repeatedly
+    for (var pass = 0; pass < 3; pass++) {
+      final prev = s;
+      s = s.replaceAll(_descriptorTailPattern, '').trim();
+      s = s.replaceAll(_trailingUnwrappedVideoNoisePattern, '').trim();
+      while (_bracketTagsPattern.hasMatch(s)) {
+        s = s.replaceAll(_bracketTagsPattern, ' ').trim();
+      }
+      s = s.replaceAll(_unclosedDescriptorPattern, ' ').trim();
+      if (s == prev) break;
     }
-    s = s.replaceAll(_unclosedDescriptorPattern, ' ').trim();
 
     // 5. Strip featuring tags (complete, unclosed, or trailing free-standing)
     s = s.replaceAll(_featuringPattern, ' ').trim();
@@ -623,6 +888,101 @@ class MediaNormalizer {
     return cleaned.isNotEmpty ? cleaned : (raw ?? 'Unknown Title');
   }
 
+  /// Deep-cleans a YouTube music video title down to the exact canonical song name,
+  /// removing channel names, "Artist - " / "Movie - " prefixes, movie credits, hashtags,
+  /// 4K/HD resolution tags, and distributor banners.
+  static String cleanVideoTitle(
+    String? raw, {
+    String? knownArtists,
+    String? knownMovieOrAlbum,
+    String? descriptionTitle,
+  }) {
+    final cleanedDescTitle = descriptionTitle != null && descriptionTitle.trim().isNotEmpty
+        ? cleanCompactTitle(descriptionTitle)
+        : '';
+    if (cleanedDescTitle.length >= 2 &&
+        cleanedDescTitle != 'Unknown Title' &&
+        !isDistributorOrLabel(cleanedDescTitle) &&
+        !_genericVideoSegmentPattern.hasMatch(cleanedDescTitle)) {
+      if (knownMovieOrAlbum == null ||
+          cleanedDescTitle.toLowerCase() != knownMovieOrAlbum.trim().toLowerCase()) {
+        return cleanedDescTitle;
+      }
+    }
+
+    if (raw == null || raw.trim().isEmpty) return 'Unknown Title';
+    final decoded = decodeHtml(raw).trim();
+    final pipeParts = decoded.contains('|')
+        ? decoded.split('|').map((p) => p.trim()).where((p) => p.isNotEmpty).toList()
+        : const <String>[];
+
+    var base = cleanCompactTitle(decoded);
+    // Strip trailing year stamp e.g. "(2024)" or "[2024]"
+    base = base.replaceAll(RegExp(r'\s*[\(\[]?\s*(?:19|20)\d{2}\s*[\)\]]?$'), '').trim();
+    base = base.replaceAll(_trailingUnwrappedVideoNoisePattern, '').trim();
+
+    if (base.isEmpty || base == 'Unknown Title') return 'Unknown Title';
+
+    bool matchesAnyToken(String side, String? listText) {
+      if (listText == null || listText.trim().isEmpty) return false;
+      final sLower = side.toLowerCase().trim();
+      if (sLower.length < 2) return false;
+      final tokens = splitArtistNames(listText);
+      for (final t in tokens) {
+        final tl = t.toLowerCase().trim();
+        if (tl.length < 2) continue;
+        if (sLower == tl || sLower.contains(tl) || tl.contains(sLower)) {
+          return true;
+        }
+      }
+      final rawLower = listText.toLowerCase().trim();
+      return sLower == rawLower || rawLower.contains(sLower);
+    }
+
+    // Handle "Prefix - Song" or "Song - Movie/Artist" cleanly without splitting genuine hyphenated song names
+    final sepMatch = RegExp(r'^(.+?)\s+[\-–—:]\s+(.+)$').firstMatch(base);
+    if (sepMatch != null) {
+      final left = sepMatch.group(1)!.trim();
+      final right = sepMatch.group(2)!.trim();
+      final leftLower = left.toLowerCase();
+      final rightLower = right.toLowerCase();
+
+      final movieLower = knownMovieOrAlbum?.trim().toLowerCase() ?? '';
+      final leftMatchesMovie = (movieLower.length >= 2 &&
+              (leftLower == movieLower || leftLower.contains(movieLower))) ||
+          pipeParts.skip(1).any((p) => p.toLowerCase() == leftLower);
+      final rightMatchesMovie = (movieLower.length >= 2 &&
+              (rightLower == movieLower || rightLower.contains(movieLower))) ||
+          pipeParts.skip(1).any((p) => p.toLowerCase() == rightLower);
+
+      final leftIsUpperBanner = left.length >= 2 &&
+          left.length <= 16 &&
+          left == left.toUpperCase() &&
+          RegExp(r'^[A-Z0-9\s]+$').hasMatch(left) &&
+          right != right.toUpperCase();
+
+      if ((matchesAnyToken(left, knownArtists) && !matchesAnyToken(right, knownArtists)) ||
+          leftMatchesMovie ||
+          leftIsUpperBanner ||
+          isDistributorOrLabel(left)) {
+        if (right.length >= 2 && !isDistributorOrLabel(right)) {
+          base = right;
+        }
+      } else if ((matchesAnyToken(right, knownArtists) && !matchesAnyToken(left, knownArtists)) ||
+          rightMatchesMovie ||
+          isDistributorOrLabel(right)) {
+        if (left.length >= 2 && !isDistributorOrLabel(left)) {
+          base = left;
+        }
+      }
+    }
+
+    base = base.replaceAll(_trailingUnwrappedVideoNoisePattern, '').trim();
+    base = base.replaceAll(RegExp(r'[\s\-–—:|•/]+$'), '').trim();
+    base = base.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
+    return base.isNotEmpty ? base : 'Unknown Title';
+  }
+
   /// Pristine clean album title: strips soundtrack fluff like "(Original Motion Picture Soundtrack)",
   /// OST, Deluxe, and movie references.
   static String cleanAlbumTitle(String? raw) {
@@ -644,6 +1004,81 @@ class MediaNormalizer {
     s = s.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
 
     return s.isNotEmpty ? s : 'Single';
+  }
+
+  /// Extracts soundtrack/movie name from `(From "Movie")` or `[From "Movie"]`.
+  static String? extractFromMovie(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final m = RegExp(
+      r'[\(\[]\s*From\s+["\u201c\u201d\x27\u2018\u2019]?([^"\]\)\u201c\u201d]+)["\u201c\u201d\x27\u2018\u2019]?\s*[\)\]]',
+      caseSensitive: false,
+    ).firstMatch(decodeHtml(raw));
+    final movie = m
+        ?.group(1)
+        ?.replaceAll(RegExp(r'^["\u201c\u201d\x27\u2018\u2019]+'), '')
+        .replaceAll(RegExp(r'["\u201c\u201d\x27\u2018\u2019]+$'), '')
+        .trim();
+    if (movie == null || movie.isEmpty || isDistributorOrLabel(movie)) {
+      return null;
+    }
+    final cleaned = cleanAlbumTitle(movie);
+    if (cleaned.isNotEmpty && cleaned != 'Single') return cleaned;
+    return movie.toLowerCase() == 'single' ? null : movie;
+  }
+
+  /// True when [a] and [b] normalize to the exact same song/release core title.
+  static bool sameReleaseTitle(String? a, String? b) {
+    if (a == null || b == null) return false;
+    String norm(String v) => decodeHtml(v)
+        .toLowerCase()
+        .replaceAll(_fromMoviePattern, ' ')
+        .replaceAll(
+          RegExp(r'(?:-\s*single|\(\s*single\s*\)|\[\s*single\s*\])$'),
+          '',
+        )
+        .replaceAll(RegExp(r'[^\p{L}\p{N}\s]', unicode: true), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final na = norm(a);
+    final nb = norm(b);
+    return na.isNotEmpty && na == nb;
+  }
+
+  /// Resolves the canonical track album name without collapsing singles like
+  /// `"Hangova (From \"DC\")"` into the song's own name when a movie/soundtrack
+  /// attribution (`"DC"`) is present.
+  static String resolveTrackAlbum(
+    String? rawAlbum, {
+    String? rawTitle,
+    bool isVideo = false,
+  }) {
+    final decodedAlbum = decodeHtml(rawAlbum ?? '').trim();
+    final albumCore = cleanAlbumTitle(decodedAlbum);
+    if (isVideo &&
+        (decodedAlbum.isEmpty ||
+            albumCore == 'Single' ||
+            decodedAlbum.toLowerCase() == 'music video')) {
+      return 'Music Video';
+    }
+
+    final movie = extractFromMovie(decodedAlbum) ?? extractFromMovie(rawTitle);
+    final titleCore = (rawTitle != null && rawTitle.trim().isNotEmpty)
+        ? cleanTitle(rawTitle)
+        : '';
+    final isExplicitSingle = RegExp(
+      r'(?:-\s*single|\(\s*single\s*\)|\[\s*single\s*\])$',
+      caseSensitive: false,
+    ).hasMatch(decodedAlbum);
+
+    if (movie != null &&
+        movie.isNotEmpty &&
+        (albumCore == 'Single' ||
+            isExplicitSingle ||
+            (titleCore.isNotEmpty && sameReleaseTitle(albumCore, titleCore)))) {
+      return movie;
+    }
+
+    return albumCore;
   }
 
   /// Pristine clean playlist title: strips hashtags (#trending), year stamps ([2024]),
@@ -1053,17 +1488,7 @@ class MediaNormalizer {
         rawLower.contains('गाने') ||
         rawLower.contains('वीडियो');
 
-    if (defaultType == 'album') {
-      resolvedTitle = cleanAlbumTitle(resolvedTitle);
-    } else if (defaultType == 'playlist') {
-      resolvedTitle = cleanPlaylistTitle(resolvedTitle);
-    } else if (defaultType == 'podcast') {
-      resolvedTitle = cleanPodcastTitle(resolvedTitle);
-    } else {
-      resolvedTitle = cleanTitle(resolvedTitle);
-    }
-
-    // 2. Resolve Subtitle / Artists / Year / Type
+    // 2. Resolve Subtitle / Artists / Year / Type FIRST so video titles can strip known artist prefixes
     final artistCandidates = <String>[];
     String? resolvedYear = year;
     String resolvedType = defaultType;
@@ -1124,6 +1549,21 @@ class MediaNormalizer {
       } else {
         resolvedSubtitle = (defaultArtist != null && defaultArtist.isNotEmpty) ? defaultArtist : 'Unknown Artist';
       }
+    }
+
+    if (defaultType == 'album') {
+      resolvedTitle = cleanAlbumTitle(resolvedTitle);
+    } else if (defaultType == 'playlist') {
+      resolvedTitle = cleanPlaylistTitle(resolvedTitle);
+    } else if (defaultType == 'podcast') {
+      resolvedTitle = cleanPodcastTitle(resolvedTitle);
+    } else if (isVideoCandidate || resolvedType == 'video') {
+      resolvedTitle = cleanVideoTitle(
+        resolvedTitle,
+        knownArtists: resolvedSubtitle,
+      );
+    } else {
+      resolvedTitle = cleanTitle(resolvedTitle);
     }
 
     // Extract year from raw title if year is not yet resolved

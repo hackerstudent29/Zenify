@@ -141,19 +141,21 @@ object YtEngine {
             return if (hints.wantVideo) {
                 listOf(
                     YouTubeClient.IOS,
+                    YouTubeClient.ANDROID_VR_NO_AUTH,
                     YouTubeClient.VISIONOS,
-                    YouTubeClient.TVHTML5_SIMPLY,
                     YouTubeClient.ANDROID,
+                    YouTubeClient.TVHTML5_SIMPLY,
                     YouTubeClient.WEB,
                     YouTubeClient.WEB_REMIX,
                 )
             } else {
                 listOf(
                     YouTubeClient.IOS,
+                    YouTubeClient.ANDROID_VR_NO_AUTH,
                     YouTubeClient.VISIONOS,
+                    YouTubeClient.ANDROID_MUSIC,
                     YouTubeClient.TVHTML5_SIMPLY,
                     YouTubeClient.WEB_REMIX,
-                    YouTubeClient.ANDROID_MUSIC,
                 )
             }
         }
@@ -215,21 +217,41 @@ object YtEngine {
         force: Boolean = false,
         wantVideo: Boolean = false,
         quality: String = currentQuality,
+        maxVideoHeight: Int? = null,
+        allowHls: Boolean = true,
     ): Resolved {
         val effectiveQuality = if (quality.isNotBlank()) quality else currentQuality
-        val cacheKey = if (wantVideo) "$videoId#video#${videoMaxHeight}p#$effectiveQuality" else "$videoId#$effectiveQuality"
+        val effectiveMaxHeight = (maxVideoHeight ?: videoMaxHeight).coerceAtLeast(144)
+        val hlsTag = if (allowHls) "" else "#nohls"
+        val cacheKey = if (wantVideo) {
+            "$videoId#video#${effectiveMaxHeight}p#$effectiveQuality$hlsTag"
+        } else {
+            "$videoId#$effectiveQuality"
+        }
         if (force) {
             urlCache.invalidate(videoId)
             excluded.remove(videoId)
         } else {
             urlCache[cacheKey]?.let { cached ->
-                if (!wantVideo || !cached.videoUrl.isNullOrBlank()) {
+                val videoOk = !wantVideo ||
+                    (!cached.videoUrl.isNullOrBlank() &&
+                        (allowHls || (!cached.videoUrl.contains("/manifest/hls") && !cached.videoUrl.contains(".m3u8"))))
+                if (videoOk) {
                     return cached.toResolved()
                 }
             }
         }
         val d = inflight.getOrPut(cacheKey) {
-            scope.async { doResolve(videoId, wantVideo = wantVideo, cacheKey = cacheKey, quality = effectiveQuality) }
+            scope.async {
+                doResolve(
+                    videoId,
+                    wantVideo = wantVideo,
+                    cacheKey = cacheKey,
+                    quality = effectiveQuality,
+                    maxVideoHeight = effectiveMaxHeight,
+                    allowHls = allowHls,
+                )
+            }
         }
         return try {
             d.await()
@@ -238,15 +260,23 @@ object YtEngine {
         }
     }
 
-    private suspend fun doResolve(videoId: String, wantVideo: Boolean, cacheKey: String, quality: String): Resolved {
+    private suspend fun doResolve(
+        videoId: String,
+        wantVideo: Boolean,
+        cacheKey: String,
+        quality: String,
+        maxVideoHeight: Int = videoMaxHeight,
+        allowHls: Boolean = true,
+    ): Resolved {
         val gen = urlCache.generation(cacheKey)
         val aq = if (quality == "low" || quality == "ultra_low") AudioQuality.LOW else AudioQuality.HIGH
+        val maxAttempts = if (wantVideo && !allowHls) 5 else 3
 
         val result = withTimeoutOrNull(if (wantVideo) VIDEO_BUDGET_MS else AUDIO_BUDGET_MS) {
             var ex = excludedClients(videoId).toMutableSet()
-            for (attempt in 0 until 3) {
+            for (attempt in 0 until maxAttempts) {
                 val s = try {
-                    extract(videoId, ex, aq, wantVideo)
+                    extract(videoId, ex, aq, wantVideo, maxVideoHeight, allowHls)
                 } catch (e: StreamResolveException) {
                     if (ex.isNotEmpty()) {
                         ex.clear()
@@ -272,6 +302,15 @@ object YtEngine {
                     ex += s.clientName
                     continue
                 }
+                if (wantVideo && !allowHls) {
+                    val vu = s.videoUrl
+                    val isHlsUrl = vu.isNullOrBlank() || vu.contains("/manifest/hls") || vu.contains(".m3u8")
+                    if (isHlsUrl) {
+                        excludeClient(videoId, s.clientName)
+                        ex += s.clientName
+                        continue
+                    }
+                }
                 // Return immediately without blocking network probe; ExoPlayer handles native byte ranges
                 return@withTimeoutOrNull s.toResolved()
             }
@@ -289,12 +328,14 @@ object YtEngine {
         ex: Set<String>,
         q: AudioQuality,
         wantVideo: Boolean = false,
+        maxVideoHeight: Int = videoMaxHeight,
+        allowHls: Boolean = true,
     ): ExtractedStream {
         val hints = ContentHints(
             wantVideo = wantVideo,
-            maxVideoHeight = if (wantVideo) videoMaxHeight else null,
+            maxVideoHeight = if (wantVideo) maxVideoHeight else null,
         ).withStreamCapabilities(
-            allowHls = true,
+            allowHls = allowHls,
             allowSabr = false,
             allowBoundedRange = true, // Must allow bounded range: YouTube video streams require byte range requests
         )
@@ -378,7 +419,6 @@ object YtEngine {
             try {
                 extractorInstance?.prewarm()
                 cipherService.prewarmEjs()
-                poTokenGenerator?.prewarm()
             } catch (e: Throwable) {
                 Log.w(TAG, "Prewarm failed: ${e.message}")
             }

@@ -6,6 +6,8 @@
 // anti-repetition controls, strict language eligibility (never over-indexing
 // on isolated 1-song plays), and personalized shelf generation.
 
+import 'dart:math' as math;
+
 import '../models/track.dart';
 import 'artist_service.dart';
 import 'country_service.dart';
@@ -309,6 +311,7 @@ class RecommendationEngine {
     int limit = 12,
     double targetEnergy = 0.50,
     bool allowRecent = false,
+    bool forceShuffle = false,
   }) {
     if (candidates.isEmpty) return const [];
 
@@ -334,13 +337,17 @@ class RecommendationEngine {
 
     final pool = eligible.isNotEmpty ? eligible : deduped;
 
-    // 3. Score all candidates
+    // 3. Score all candidates (with exploration jitter on manual refresh)
+    final rng = forceShuffle ? math.Random() : null;
     final scored = pool.map((t) {
-      final s = calculateScore(
+      final baseScore = calculateScore(
         candidate: t,
         profile: profile,
         targetEnergy: targetEnergy,
       );
+      final s = rng != null
+          ? baseScore + (rng.nextDouble() * 18.0 - 9.0)
+          : baseScore;
       return (track: t, score: s);
     }).toList();
 
@@ -397,7 +404,10 @@ class RecommendationEngine {
   /// Generates truly personalized "Made for You / Quick Picks".
   /// Blends related tracks to loved songs, radio for favorite artists,
   /// and top hits in the user's primary languages.
-  Future<List<Track>> getPersonalizedQuickPicks({int limit = 16}) async {
+  Future<List<Track>> getPersonalizedQuickPicks({
+    int limit = 16,
+    bool forceRefresh = false,
+  }) async {
     final profile = buildTasteProfile();
     final futures = <Future<List<Track>>>[];
 
@@ -416,7 +426,10 @@ class RecommendationEngine {
     if (profile.favoriteArtists.isNotEmpty) {
       futures.add(
         InnerTubeService.instance
-            .search('${profile.favoriteArtists.first} radio')
+            .search(
+              '${profile.favoriteArtists.first} ${forceRefresh ? "best songs" : "radio"}',
+              forceRefresh: forceRefresh,
+            )
             .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
             .catchError((_) => <Track>[]),
       );
@@ -431,7 +444,10 @@ class RecommendationEngine {
     if (secondArtist != null && secondArtist.isNotEmpty) {
       futures.add(
         InnerTubeService.instance
-            .search('$secondArtist hits')
+            .search(
+              '$secondArtist ${forceRefresh ? "top tracks" : "hits"}',
+              forceRefresh: forceRefresh,
+            )
             .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
             .catchError((_) => <Track>[]),
       );
@@ -441,10 +457,10 @@ class RecommendationEngine {
     if (profile.primaryLanguage.isNotEmpty) {
       final q = profile.primaryGenre.isNotEmpty
           ? '${profile.primaryLanguage} ${profile.primaryGenre} top hits'
-          : '${profile.primaryLanguage} trending hits';
+          : '${profile.primaryLanguage} ${forceRefresh ? "popular" : "trending"} hits';
       futures.add(
         InnerTubeService.instance
-            .search(q)
+            .search(q, forceRefresh: forceRefresh)
             .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
             .catchError((_) => <Track>[]),
       );
@@ -455,7 +471,7 @@ class RecommendationEngine {
       final country = CountryService.instance.currentCountry;
       futures.add(
         InnerTubeService.instance
-            .getHomeFeed(countryCode: country.code)
+            .getHomeFeed(countryCode: country.code, forceRefresh: forceRefresh)
             .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
             .catchError((_) => <Track>[]),
       );
@@ -471,6 +487,7 @@ class RecommendationEngine {
         candidates: combined,
         profile: profile,
         limit: limit,
+        forceShuffle: forceRefresh,
       );
     } catch (_) {
       return const [];
@@ -478,7 +495,10 @@ class RecommendationEngine {
   }
 
   /// Generates New Releases strictly matching user's qualified languages & artists.
-  Future<List<Track>> getRecommendedNewReleases({int limit = 12}) async {
+  Future<List<Track>> getRecommendedNewReleases({
+    int limit = 12,
+    bool forceRefresh = false,
+  }) async {
     final profile = buildTasteProfile();
     final futures = <Future<List<Track>>>[];
 
@@ -486,7 +506,7 @@ class RecommendationEngine {
     for (final l in profile.recommendedLanguages.take(2)) {
       futures.add(
         InnerTubeService.instance
-            .search('latest $l songs 2026')
+            .search('latest $l songs 2026', forceRefresh: forceRefresh)
             .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
             .catchError((_) => <Track>[]),
       );
@@ -496,7 +516,10 @@ class RecommendationEngine {
     if (profile.favoriteArtists.isNotEmpty) {
       futures.add(
         InnerTubeService.instance
-            .search('new song ${profile.favoriteArtists.first}')
+            .search(
+              'new song ${profile.favoriteArtists.first}',
+              forceRefresh: forceRefresh,
+            )
             .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
             .catchError((_) => <Track>[]),
       );
@@ -507,7 +530,10 @@ class RecommendationEngine {
       final country = CountryService.instance.currentCountry;
       futures.add(
         InnerTubeService.instance
-            .getNewReleases(countryCode: country.code)
+            .getNewReleases(
+              countryCode: country.code,
+              forceRefresh: forceRefresh,
+            )
             .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
             .catchError((_) => <Track>[]),
       );
@@ -524,6 +550,7 @@ class RecommendationEngine {
         profile: profile,
         limit: limit,
         allowRecent: true, // New releases can be newly discovered
+        forceShuffle: forceRefresh,
       );
     } catch (_) {
       return const [];
@@ -531,7 +558,10 @@ class RecommendationEngine {
   }
 
   /// Context-aware Time of Day recommendations strictly matching user's language & mood.
-  Future<List<Track>> getTimeOfDayRecommendations({int limit = 12}) async {
+  Future<List<Track>> getTimeOfDayRecommendations({
+    int limit = 12,
+    bool forceRefresh = false,
+  }) async {
     final profile = buildTasteProfile();
     final timeCtx = ListeningHistoryService.getTimeOfDayContext(
       profile.primaryLanguage,
@@ -545,7 +575,7 @@ class RecommendationEngine {
 
     try {
       final tracks = await InnerTubeService.instance
-          .search(timeQuery)
+          .search(timeQuery, forceRefresh: forceRefresh)
           .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
           .catchError((_) => <Track>[]);
 
@@ -562,6 +592,7 @@ class RecommendationEngine {
         profile: profile,
         limit: limit,
         targetEnergy: targetEnergy,
+        forceShuffle: forceRefresh,
       );
     } catch (_) {
       return const [];
@@ -572,11 +603,12 @@ class RecommendationEngine {
   Future<List<Track>> getFavoriteArtistTracks(
     String artistName, {
     int limit = 8,
+    bool forceRefresh = false,
   }) async {
     final profile = buildTasteProfile();
     try {
       final tracks = await InnerTubeService.instance
-          .search('$artistName hits')
+          .search('$artistName hits', forceRefresh: forceRefresh)
           .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
           .catchError((_) => <Track>[]);
 
@@ -585,6 +617,7 @@ class RecommendationEngine {
         profile: profile,
         limit: limit,
         allowRecent: true, // Artist spotlight allows familiar favorite tracks
+        forceShuffle: forceRefresh,
       );
     } catch (_) {
       return const [];

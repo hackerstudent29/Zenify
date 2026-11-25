@@ -32,8 +32,8 @@ const double _kSameStartEps = 0.35;
 /// Karaoke glyph-fill subtle scale peak (1.0 to ~1.03-1.05 max).
 const double kKaraokeGlyphScalePeak = 1.04;
 
-/// Single lyric weight used for EVERY lyric line (SF Pro Bold).
-const FontWeight _kLyricWeight = FontWeight.w700;
+/// Single lyric weight used for EVERY lyric line (SF Pro Display Bold / ExtraBold).
+const FontWeight _kLyricWeight = FontWeight.w800;
 
 /// Three-dot interlude tunables. (Pulse constants are kept only so existing
 /// imports do not break - the dots no longer resize while waiting.)
@@ -53,7 +53,7 @@ const int _kGlideRange = 14;
 const double _kAnchor = 0.15;
 
 /// Typography (Apple Music / SF Pro style).
-const double _kWordGap = 0.27; // space between words, x font size
+const double _kWordGap = 0.29; // space between words, x font size
 const double _kLineHeight = 1.2;
 
 /// Fixed uniform typography sizes:
@@ -61,10 +61,10 @@ const double _kLineHeight = 1.2;
 const double kNormalLyricFontSize = 28.0;
 const double kBracketedLyricFontSize = 21.0;
 
-/// Very light weight boost for lyrics (variable-font wght axis, 700 = Bold).
-/// Only a hair above Bold so glyphs never touch / overlap. If SF Pro is
-/// registered as a static font this value is ignored (no change in weight).
-const double _kLyricWeightAxis = 740;
+/// Weight boost for variable fallback fonts (700 = Bold, 800 = ExtraBold).
+/// Together with FontWeight.w800 this gives slightly bolder display strokes
+/// without blurring diacritics or Indic vowel signs.
+const double _kLyricWeightAxis = 780;
 
 /// Fluid fill physics. The fill "head" is a damped spring that chases the
 /// song position: it accelerates into each word, glides through it and settles
@@ -136,7 +136,7 @@ TextStyle _sfStyle({
   required Color color,
   FontWeight weight = _kLyricWeight,
   double? height,
-  double letterSpacing = 0.24,
+  double letterSpacing = 0.6,
   List<Shadow>? shadows,
 }) {
   return TextStyle(
@@ -297,21 +297,49 @@ String _formatLyricCasing(String input) {
   return s;
 }
 
-/// True when the first strong character of [s] is a right-to-left letter
-/// (Hebrew, Arabic, Syriac, Thaana, presentation forms).
-bool _isRtl(String s) {
+/// Strong script direction for a single word token, or `null` if neutral.
+bool? _strongTokenDirection(String s) {
+  var rtl = 0;
+  var ltr = 0;
   for (final r in s.runes) {
     if ((r >= 0x0590 && r <= 0x08FF) || (r >= 0xFB1D && r <= 0xFEFC)) {
-      return true;
-    }
-    if ((r >= 0x41 && r <= 0x5A) ||
+      rtl++;
+    } else if ((r >= 0x41 && r <= 0x5A) ||
         (r >= 0x61 && r <= 0x7A) ||
+        (r >= 0x00C0 && r <= 0x02AF) ||
         (r >= 0x0900 && r <= 0x1FFF) ||
         (r >= 0x3040 && r <= 0xD7FF)) {
-      return false;
+      ltr++;
     }
   }
+  if (rtl == 0 && ltr == 0) return null;
+  if (rtl > 0 && rtl >= ltr) return true;
   return false;
+}
+
+/// True when the line's base reading/layout direction is right-to-left
+/// (Hebrew, Arabic, Syriac, Thaana, Persian/Urdu), handling mixed BiDi lines
+/// such as an LTR loan word leading an otherwise Arabic line.
+bool _isRtl(String s) {
+  bool? firstStrong;
+  var rtlCount = 0;
+  var ltrCount = 0;
+  for (final r in s.runes) {
+    if ((r >= 0x0590 && r <= 0x08FF) || (r >= 0xFB1D && r <= 0xFEFC)) {
+      firstStrong ??= true;
+      rtlCount++;
+    } else if ((r >= 0x41 && r <= 0x5A) ||
+        (r >= 0x61 && r <= 0x7A) ||
+        (r >= 0x00C0 && r <= 0x02AF) ||
+        (r >= 0x0900 && r <= 0x1FFF) ||
+        (r >= 0x3040 && r <= 0xD7FF)) {
+      firstStrong ??= false;
+      ltrCount++;
+    }
+  }
+  if (rtlCount == 0) return false;
+  if (firstStrong == true) return rtlCount * 2 >= ltrCount;
+  return rtlCount > ltrCount * 3;
 }
 
 String? _normSinger(String? s) {
@@ -465,9 +493,11 @@ class LyricsSheet extends StatelessWidget {
     final player = context.watch<PlayerState>();
     final track = player.currentTrack;
 
-    // Immediately trigger lyrics fetch if user opens the lyrics sheet
-    if (!player.hasLyrics) {
-      player.requestLyricsNow();
+    // Schedule lyrics fetch post-frame only when panel is open and not already loading/settled.
+    if (open && !player.hasLyrics && !player.isLoadingLyrics) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        player.requestLyricsNow();
+      });
     }
 
     if (player.isLoadingLyrics && !player.hasLyrics) {
@@ -580,10 +610,13 @@ class LyricsSheet extends StatelessWidget {
           }
         }
       }
-      final endMs = m['endMs'];
+      final rawEnd = m['endMs'] ?? m['endTimeMs'] ?? m['end'];
+      final derivedEnd = (rawEnd is num)
+          ? _ms(rawEnd)
+          : (words != null && words.isNotEmpty ? words.last.end : null);
       return LyricLine(
         start: _ms(m['timeMs'] ?? m['startMs']),
-        end: endMs is num ? _ms(endMs) : null,
+        end: derivedEnd,
         text: (m['text'] ?? '').toString(),
         translation: m['translation']?.toString(),
         words: words,
@@ -648,7 +681,11 @@ class _Depth {
 // Opacity, blur sigma, scale. The further from the active line, the fainter
 // and blurrier (Apple Music gradual depth-of-field blur).
 const _after = [
-  _Depth(0.95, 0.8, 0.98), // next line: clearly readable with subtle blur (sing-ahead)
+  _Depth(
+    0.95,
+    0.8,
+    0.98,
+  ), // next line: clearly readable with subtle blur (sing-ahead)
   _Depth(0.58, 2.4, 0.96), // +2: smooth gradual blur
   _Depth(0.38, 4.4, 0.93), // +3: deeper blur
   _Depth(0.22, 6.6, 0.90), // +4: heavy blur
@@ -846,6 +883,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
   late LyricsLang _lang = widget.initialLang;
 
   int _active = -1;
+  Set<int> _activeIndices = const {};
   bool _manual = false;
   bool _isAutoScrolling = false;
   Timer? _resume;
@@ -1001,6 +1039,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
 
   void _rebuildItems() {
     _active = -1;
+    _activeIndices = const {};
     final L = widget.isSynced
         ? _spreadSimultaneous(widget.lines)
         : widget.lines;
@@ -1143,16 +1182,46 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
     _publish(_raw());
   }
 
+  static bool _setEquals(Set<int> a, Set<int> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (final v in a) {
+      if (!b.contains(v)) return false;
+    }
+    return true;
+  }
+
+  Set<int> _computeActiveSet(double eff, int primaryActive) {
+    if (!widget.isSynced || primaryActive < 0) return const {};
+    final set = <int>{primaryActive};
+    // Any non-interlude line whose [start, end) time span still contains `eff`
+    // stays active so overlapping lines continue filling to their own end time
+    // while the next line starts filling from its own start time.
+    for (var k = 0; k < _items.length; k++) {
+      final item = _items[k];
+      if (item.interlude) continue;
+      if (item.start <= eff && eff < item.end - 0.001) {
+        set.add(k);
+      }
+    }
+    return set;
+  }
+
   void _publish(double raw) {
     final eff = raw + _offsetMs / 1000;
     _clock.value = eff;
     final i = _indexFor(eff);
-    if (i != _active) {
+    final nextSet = _computeActiveSet(eff, i);
+    if (i != _active || !_setEquals(_activeIndices, nextSet)) {
+      final activeMoved = i != _active;
       setState(() {
         _active = i;
+        _activeIndices = nextSet;
         _computeDists();
       });
-      WidgetsBinding.instance.addPostFrameCallback((_) => _follow());
+      if (activeMoved) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _follow());
+      }
     }
   }
 
@@ -1373,15 +1442,19 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
                     if (_isAutoScrolling) return false;
 
                     final isUserDrag =
-                        (n is ScrollStartNotification && n.dragDetails != null) ||
-                        (n is ScrollUpdateNotification && n.dragDetails != null) ||
+                        (n is ScrollStartNotification &&
+                            n.dragDetails != null) ||
+                        (n is ScrollUpdateNotification &&
+                            n.dragDetails != null) ||
                         (n is UserScrollNotification &&
                             n.direction != ScrollDirection.idle);
 
                     if (isUserDrag) {
                       _resume?.cancel();
                       if (!_manual) setState(() => _manual = true);
-                    } else if (n is ScrollEndNotification && _manual && n.dragDetails == null) {
+                    } else if (n is ScrollEndNotification &&
+                        _manual &&
+                        n.dragDetails == null) {
                       _onUserScrollEnd();
                     }
                     return false;
@@ -1407,8 +1480,12 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
                             glide: _glide,
                             scrollFx: _scrollFx,
                             synced: widget.isSynced,
-                            current: widget.isSynced && i == _active,
-                            past: widget.isSynced && i < _active,
+                            current:
+                                widget.isSynced && _activeIndices.contains(i),
+                            past:
+                                widget.isSynced &&
+                                !_activeIndices.contains(i) &&
+                                i < _active,
                             dist: _dists[i],
                             manual: _manual,
                             onResize: _onTileResize,
@@ -1423,10 +1500,12 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
                               );
                               _anchorPos = seekMs / 1000.0;
                               _anchorAt = _lastElapsed;
-                              _clock.value = line.start.inMicroseconds / 1e6;
+                              final effSeek = line.start.inMicroseconds / 1e6;
+                              _clock.value = effSeek;
                               setState(() {
                                 _manual = false;
                                 _active = i;
+                                _activeIndices = _computeActiveSet(effSeek, i);
                                 _computeDists();
                               });
                               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1768,9 +1847,11 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
                     : (right ? TextAlign.right : TextAlign.left),
                 style: _sfStyle(
                   size: 18,
-                  weight: FontWeight.w600,
+                  weight: FontWeight.w700,
                   height: _hasComplexScript(sub) ? 1.32 : 1.2,
-                  letterSpacing: _hasComplexScript(sub) ? 0.0 : 0.35,
+                  letterSpacing: _isRtl(sub)
+                      ? 0.0
+                      : (_hasComplexScript(sub) ? 0.35 : 0.55),
                   color: Colors.white.withValues(
                     alpha: widget.current ? 0.85 : 0.6,
                   ),
@@ -1824,7 +1905,7 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
             child: AnimatedContainer(
               duration: Duration(milliseconds: _pressed ? 90 : 320),
               curve: Curves.easeOutCubic,
-              margin: const EdgeInsets.symmetric(horizontal: 12),
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: _pressed ? 0.14 : 0.0),
@@ -1939,11 +2020,13 @@ class _RenderSizeProbe extends RenderProxyBox {
 // ---------------------------------------------------------------------------
 
 class _Layout {
-  _Layout(this.fs, this.tokens, this.s, this.e);
+  _Layout(this.fs, this.tokens, this.s, this.e, this.wordRtl, this.runs);
   final double fs;
   final List<String> tokens;
   final List<double> s;
   final List<double> e;
+  final List<bool> wordRtl;
+  final List<({bool rtl, List<int> indices})> runs;
 }
 
 class _WordLine extends StatefulWidget {
@@ -1998,17 +2081,17 @@ class _WordLineState extends State<_WordLine>
     );
   }
 
-  /// SF Pro only. Same weight, same size, never italic - for main lines AND
-  /// backing vocals. Only line height / letter spacing adapt for scripts with
-  /// joined glyphs.
+  /// SF Pro only. Slightly bolder display weight with comfortable letter
+  /// spacing (disabled for RTL cursive scripts so Arabic glyphs stay joined).
   TextStyle _style(double fs, Color c, List<Shadow>? shadows) {
     final complex = _hasComplexScript(widget.text);
+    final rtl = _isRtl(widget.text);
     return _sfStyle(
       size: fs,
       color: c,
       weight: _kLyricWeight,
       height: complex ? 1.3 : _kLineHeight,
-      letterSpacing: complex ? 0.0 : 0.24,
+      letterSpacing: rtl ? 0.0 : (complex ? 0.45 : 0.65),
       shadows: shadows,
     );
   }
@@ -2025,7 +2108,9 @@ class _WordLineState extends State<_WordLine>
 
     // Strict uniform sizing: exactly ONE size for normal lyrics,
     // and exactly ONE size for () bracketed lyrics. Never vary sizes across lines.
-    final double fs = widget.backing ? kBracketedLyricFontSize : kNormalLyricFontSize;
+    final double fs = widget.backing
+        ? kBracketedLyricFontSize
+        : kNormalLyricFontSize;
 
     // ---- word timings: ALWAYS ordered first word -> last word ----
     final s = List<double>.filled(n, 0);
@@ -2074,10 +2159,54 @@ class _WordLineState extends State<_WordLine>
       proportional(lineStart, b);
     }
 
+    // Measure each token width and build directional BiDi runs that never
+    // overflow `maxW` so mixed Arabic + LTR phrases stay in native reading order.
+    final wordRtl = <bool>[];
+    final tokenWidths = <double>[];
+    final lineRtl = _isRtl(widget.text);
+    final gapW = fs * _kWordGap;
+    for (var i = 0; i < n; i++) {
+      final token = tokens[i];
+      final wRtl = _strongTokenDirection(token) ?? lineRtl;
+      wordRtl.add(wRtl);
+      final tp = TextPainter(
+        text: TextSpan(text: token, style: _style(fs, Colors.white, null)),
+        textDirection: wRtl ? TextDirection.rtl : TextDirection.ltr,
+      )..layout();
+      tokenWidths.add(tp.width);
+      tp.dispose();
+    }
+
+    final runs = <({bool rtl, List<int> indices})>[];
+    var i = 0;
+    while (i < n) {
+      final wRtl = wordRtl[i];
+      if (wRtl == lineRtl) {
+        runs.add((rtl: wRtl, indices: [i]));
+        i++;
+      } else {
+        // Group consecutive opposite-direction words into one sub-run while they
+        // comfortably fit on a row together so phrases like "يا ويلي العربية"
+        // inside an LTR line or "Single down" inside an RTL line read properly.
+        final group = <int>[i];
+        var widthAcc = tokenWidths[i];
+        var j = i + 1;
+        while (j < n && wordRtl[j] == wRtl) {
+          final nextWidth = widthAcc + gapW + tokenWidths[j];
+          if (maxW.isFinite && maxW > 0 && nextWidth > maxW * 0.92) break;
+          group.add(j);
+          widthAcc = nextWidth;
+          j++;
+        }
+        runs.add((rtl: wRtl, indices: group));
+        i = j;
+      }
+    }
+
     _layW = maxW;
     _layText = widget.text;
     _layLines = widget.maxLines;
-    return _lay = _Layout(fs, tokens, s, e);
+    return _lay = _Layout(fs, tokens, s, e, wordRtl, runs);
   }
 
   @override
@@ -2148,23 +2277,39 @@ class _WordLineState extends State<_WordLine>
   @override
   Widget build(BuildContext context) {
     final reduce = MediaQuery.disableAnimationsOf(context);
-    final rtl = _isRtl(widget.text);
+    final lineRtl = _isRtl(widget.text);
     return LayoutBuilder(
       builder: (context, cons) {
         final lay = _layout(cons.maxWidth);
         Widget wrap(double? t, double settle) => Wrap(
-          textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+          textDirection: lineRtl ? TextDirection.rtl : TextDirection.ltr,
+          verticalDirection: VerticalDirection.down,
           alignment: widget.center
               ? WrapAlignment.center
-              : ((widget.right != rtl)
+              : ((widget.right != lineRtl)
                     ? WrapAlignment.end
                     : WrapAlignment.start),
           spacing: lay.fs * _kWordGap,
           runSpacing: lay.fs * 0.04,
           crossAxisAlignment: WrapCrossAlignment.end,
           children: [
-            for (var i = 0; i < lay.tokens.length; i++)
-              _buildWord(lay, i, t, reduce, settle, rtl),
+            for (final run in lay.runs)
+              if (run.indices.length == 1)
+                _buildWord(lay, run.indices.first, t, reduce, settle)
+              else
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  textDirection: run.rtl
+                      ? TextDirection.rtl
+                      : TextDirection.ltr,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    for (var r = 0; r < run.indices.length; r++) ...[
+                      if (r > 0) SizedBox(width: lay.fs * _kWordGap),
+                      _buildWord(lay, run.indices[r], t, reduce, settle),
+                    ],
+                  ],
+                ),
           ],
         );
 
@@ -2189,14 +2334,7 @@ class _WordLineState extends State<_WordLine>
     );
   }
 
-  Widget _buildWord(
-    _Layout lay,
-    int i,
-    double? t,
-    bool reduce,
-    double settle,
-    bool rtl,
-  ) {
+  Widget _buildWord(_Layout lay, int i, double? t, bool reduce, double settle) {
     final double raw;
     if (widget.plain) {
       raw = 2;
@@ -2214,20 +2352,37 @@ class _WordLineState extends State<_WordLine>
         ? Curves.easeOut.transform(settle.clamp(0.0, 1.0))
         : 0.0;
 
-    // Subtle glow only (no word movement at all).
+    // Leading-head glow + smoothly decaying tail across filled words behind _head.
     var glow = 0.0;
+    var tailGlow = 0.0;
     var soft = 0.25;
     if (!widget.plain && !reduce) {
       if (widget.current && t != null) {
         final cp = raw.clamp(0.0, 1.0).toDouble();
-        final rest = 0.10 * (cp * 3).clamp(0.0, 1.0);
-        glow = math.max(0.55 * math.sin(math.pi * cp), rest);
+        if (raw >= -0.05 && raw <= 1.05) {
+          // Blooms at the starting point of the active word fill and travels
+          // with the sweep frontier.
+          final entry = ((raw + 0.05) / 0.20).clamp(0.0, 1.0).toDouble();
+          final frontCurve = math.sin(
+            math.pi * ((raw + 0.05) / 1.10).clamp(0.0, 1.0),
+          );
+          glow = math.max(0.78 * entry * (0.45 + 0.55 * frontCurve), 0.50 * cp);
+          // Trailing edge behind sweep front sits slightly dimmer than leading point.
+          tailGlow = (glow * 0.38).clamp(0.0, 1.0).toDouble();
+        } else if (raw > 1.05) {
+          // Already-filled words form the glow tail: intensity decays smoothly
+          // as the filling frontier moves further forward.
+          final tailDist = raw - 1.05;
+          glow = (0.58 * math.exp(-tailDist * 0.70)).clamp(0.0, 1.0).toDouble();
+          tailGlow = (glow * 0.72).clamp(0.0, 1.0).toDouble();
+        }
         // Faster sweep -> slightly softer, more liquid leading edge.
         soft = (0.22 + 0.10 * _vel.abs().clamp(0.0, 3.0))
             .clamp(0.22, 0.5)
             .toDouble();
       } else if (widget.past) {
-        glow = 0.12 * hold; // faint afterglow while the line cools down
+        glow = 0.14 * hold; // faint afterglow while the line cools down
+        tailGlow = glow * 0.6;
       }
     }
 
@@ -2236,17 +2391,19 @@ class _WordLineState extends State<_WordLine>
       fs: lay.fs,
       style: _style,
       p: raw.clamp(0.0, 1.0).toDouble(),
-      rtl: rtl,
+      rtl: lay.wordRtl[i],
       soft: soft,
       hold: hold,
       bright: widget.current && !widget.plain,
       glow: glow.clamp(0.0, 1.0).toDouble(),
+      tailGlow: tailGlow.clamp(0.0, 1.0).toDouble(),
     );
   }
 }
 
-/// One word: dim base, soft-edged white fill (left to right, or right to left
-/// for RTL scripts) and a subtle white glow while it is sung. No movement.
+/// One word: dim base, soft-edged white fill (left to right for LTR words,
+/// right to left for RTL words) and a subtle white glow peaking at the
+/// leading fill point and tapering across its tail. No movement.
 class _Word extends StatelessWidget {
   const _Word({
     required this.text,
@@ -2254,6 +2411,7 @@ class _Word extends StatelessWidget {
     required this.style,
     required this.p,
     this.glow = 0,
+    this.tailGlow = 0,
     this.soft = 0.25,
     this.hold = 0,
     this.bright = false,
@@ -2261,7 +2419,7 @@ class _Word extends StatelessWidget {
   });
 
   final String text;
-  final double fs, p, glow, soft, hold;
+  final double fs, p, glow, tailGlow, soft, hold;
   final bool rtl;
   final bool bright; // active line: unsung words a bit brighter
   final TextStyle Function(double, Color, List<Shadow>?) style;
@@ -2279,18 +2437,18 @@ class _Word extends StatelessWidget {
         Text(text, textDirection: dir, style: style(fs, c, shadows));
     Widget out;
 
-    // Subtle neutral white glow (no gold / amber): two soft layers, low alpha.
+    // Subtle neutral white glow peaking near the sweep head, tapering behind it.
     final List<Shadow>? glowShadows;
     if (glow > 0.03) {
       final g = glow.clamp(0.0, 1.0);
       glowShadows = [
         Shadow(
-          color: Colors.white.withValues(alpha: 0.30 * g),
-          blurRadius: 5.0 + 5.0 * g,
+          color: Colors.white.withValues(alpha: 0.36 * g),
+          blurRadius: 6.0 + 6.0 * g,
         ),
         Shadow(
-          color: Colors.white.withValues(alpha: 0.14 * g),
-          blurRadius: 14.0 + 8.0 * g,
+          color: Colors.white.withValues(alpha: 0.17 * g),
+          blurRadius: 15.0 + 9.0 * g,
         ),
       ];
     } else {
@@ -2307,21 +2465,48 @@ class _Word extends StatelessWidget {
     } else {
       final a = (p * (1 + soft) - soft).clamp(0.0, 1.0).toDouble();
       final b = (p * (1 + soft)).clamp(0.0, 1.0).toDouble();
-      Shader mask(Rect r) => LinearGradient(
-        begin: rtl ? Alignment.centerRight : Alignment.centerLeft,
-        end: rtl ? Alignment.centerLeft : Alignment.centerRight,
+      final beginAlign = rtl ? Alignment.centerRight : Alignment.centerLeft;
+      final endAlign = rtl ? Alignment.centerLeft : Alignment.centerRight;
+
+      Shader fillMask(Rect r) => LinearGradient(
+        begin: beginAlign,
+        end: endAlign,
         colors: const [Colors.white, Colors.white, Color(0x00FFFFFF)],
         stops: [0, a, b],
+      ).createShader(r);
+
+      // Glow mask emphasizes the advancing leading edge of the fill and tapers
+      // smoothly across the filled tail behind it.
+      final tailStrength = glow > 0.001
+          ? (tailGlow / glow).clamp(0.18, 0.75).toDouble()
+          : 0.25;
+      final midStop = (a * 0.55).clamp(0.0, a).toDouble();
+      Shader headGlowMask(Rect r) => LinearGradient(
+        begin: beginAlign,
+        end: endAlign,
+        colors: [
+          Color.fromRGBO(255, 255, 255, tailStrength),
+          Color.fromRGBO(255, 255, 255, 0.45 + 0.55 * tailStrength),
+          Colors.white,
+          const Color(0x00FFFFFF),
+        ],
+        stops: [0.0, midStop, a, b],
       ).createShader(r);
 
       out = Stack(
         clipBehavior: Clip.none,
         children: [
           t(dim),
+          if (glowShadows != null)
+            ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: headGlowMask,
+              child: t(Colors.white, shadows: glowShadows),
+            ),
           ShaderMask(
             blendMode: BlendMode.dstIn,
-            shaderCallback: mask,
-            child: t(Colors.white, shadows: glowShadows),
+            shaderCallback: fillMask,
+            child: t(Colors.white),
           ),
         ],
       );

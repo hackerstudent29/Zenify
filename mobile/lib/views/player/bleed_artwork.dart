@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io' show File;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -137,6 +138,71 @@ class BleedArtworkService {
     return hit;
   }
 
+  /// Builds the appropriate [ImageProvider] for network, `file://`, or local
+  /// filesystem artwork paths.
+  static ImageProvider? providerForUrl(String url) {
+    final u = url.trim();
+    if (u.isEmpty) return null;
+    if (u.startsWith('http://') || u.startsWith('https://')) {
+      return CachedNetworkImageProvider(u);
+    }
+    if (!kIsWeb) {
+      if (u.startsWith('file://')) {
+        try {
+          return FileImage(File(Uri.parse(u).toFilePath()));
+        } catch (_) {
+          return null;
+        }
+      }
+      if (u.startsWith('/') || RegExp(r'^[A-Za-z]:[\\/]').hasMatch(u)) {
+        return FileImage(File(u));
+      }
+    }
+    return null;
+  }
+
+  /// Expands [primary] and [fallback] into ordered, deduplicated artwork URL
+  /// candidates so 404s on `maxresdefault.jpg` or high-res CDN variants fall
+  /// back cleanly instead of disabling edge bleed.
+  @visibleForTesting
+  static List<String> buildCandidateUrls(String primary, {String? fallback}) {
+    final out = <String>[];
+    final seen = <String>{};
+    void add(String? u) {
+      final t = u?.trim() ?? '';
+      if (t.isNotEmpty && seen.add(t)) out.add(t);
+    }
+
+    add(primary);
+    add(fallback);
+
+    final base = List<String>.from(out);
+    for (final u in base) {
+      if (u.contains('ytimg.com') || u.contains('img.youtube.com')) {
+        if (u.contains('maxresdefault.jpg')) {
+          add(u.replaceAll('maxresdefault.jpg', 'sddefault.jpg'));
+          add(u.replaceAll('maxresdefault.jpg', 'hqdefault.jpg'));
+        } else if (u.contains('sddefault.jpg')) {
+          add(u.replaceAll('sddefault.jpg', 'hqdefault.jpg'));
+        }
+      } else if (u.contains('googleusercontent.com') || u.contains('ggpht.com')) {
+        final degraded = u.replaceFirst(
+          RegExp(r'=w\d+-h\d+[^?#]*'),
+          '=w400-h400-l75-rj',
+        );
+        if (degraded != u) add(degraded);
+      } else if (u.contains('saavncdn.com')) {
+        if (u.contains('500x500')) {
+          add(u.replaceAll('500x500', '250x250'));
+          add(u.replaceAll('500x500', '150x150'));
+        } else if (u.contains('250x250')) {
+          add(u.replaceAll('250x250', '150x150'));
+        }
+      }
+    }
+    return out;
+  }
+
   /// Bakes (or returns the cached bake of) [key]. Returns null on failure.
   Future<BleedArtwork?> load(
     String key,
@@ -147,7 +213,17 @@ class BleedArtworkService {
     if (hit != null) return Future.value(hit);
     if (fallbackUrl != null && fallbackUrl.isNotEmpty) {
       final fbHit = peek(fallbackUrl);
-      if (fbHit != null) return Future.value(fbHit);
+      if (fbHit != null) {
+        final aliased = BleedArtwork(
+          key: key,
+          image: fbHit.image,
+          backdrop: fbHit.backdrop,
+          average: fbHit.average,
+          scrim: fbHit.scrim,
+        );
+        _cache[key] = aliased;
+        return Future.value(aliased);
+      }
     }
     return _inflight[key] ??= _bake(
       key,
@@ -163,11 +239,18 @@ class BleedArtworkService {
   }) async {
     ui.Image? src;
     try {
-      src = await _decode(provider);
-    } catch (e) {
-      if (fallbackUrl != null && fallbackUrl.isNotEmpty && fallbackUrl != key) {
+      src = await _decodeWithFallback(provider);
+    } catch (_) {}
+
+    if (src == null) {
+      final candidates = buildCandidateUrls(key, fallback: fallbackUrl);
+      for (final cand in candidates) {
+        if (cand == key) continue;
+        final p = providerForUrl(cand);
+        if (p == null) continue;
         try {
-          src = await _decode(CachedNetworkImageProvider(fallbackUrl));
+          src = await _decodeWithFallback(p);
+          if (src != null) break;
         } catch (_) {}
       }
     }
@@ -191,12 +274,19 @@ class BleedArtworkService {
     return null;
   }
 
+  Future<ui.Image?> _decodeWithFallback(ImageProvider provider) async {
+    try {
+      return await _decode(ResizeImage(provider, width: _kBakePx));
+    } on TimeoutException {
+      return null;
+    } catch (_) {
+      return await _decode(provider);
+    }
+  }
+
   Future<ui.Image> _decode(ImageProvider provider) {
     final completer = Completer<ui.Image>();
-    final stream = ResizeImage(
-      provider,
-      width: _kBakePx,
-    ).resolve(ImageConfiguration.empty);
+    final stream = provider.resolve(ImageConfiguration.empty);
     late final ImageStreamListener listener;
     listener = ImageStreamListener(
       (info, _) {
@@ -210,19 +300,96 @@ class BleedArtworkService {
     );
     stream.addListener(listener);
     return completer.future
-        .timeout(const Duration(seconds: 4))
+        .timeout(const Duration(seconds: 10))
         .whenComplete(() => stream.removeListener(listener));
   }
 
-  Future<BleedArtwork> _render(String key, ui.Image src) async {
-    // centre-crop to a square ("cover"), so 16:9 thumbnails work too
-    final side = math.min(src.width, src.height).toDouble();
-    final srcRect = Rect.fromLTWH(
-      (src.width - side) / 2,
-      (src.height - side) / 2,
+  /// Computes a centered square crop for [src], trimming symmetric dark
+  /// letterbox/pillarbox bars from non-square thumbnails (e.g. 4:3 YouTube
+  /// `hqdefault.jpg` / `sddefault.jpg`) so the actual artwork bleeds to edges.
+  @visibleForTesting
+  static Future<Rect> computeContentSquare(ui.Image src) async {
+    final w = src.width;
+    final h = src.height;
+    var left = 0.0;
+    var top = 0.0;
+    var right = w.toDouble();
+    var bottom = h.toDouble();
+
+    if ((w - h).abs() > 4 && w >= 32 && h >= 32) {
+      try {
+        final data = await src.toByteData(format: ui.ImageByteFormat.rawRgba);
+        if (data != null) {
+          final bytes = data.buffer.asUint8List();
+          bool isDarkRow(int y) {
+            final xStart = (w * 0.2).round();
+            final xEnd = (w * 0.8).round();
+            final step = math.max(1, (xEnd - xStart) ~/ 16);
+            for (var x = xStart; x < xEnd; x += step) {
+              final idx = (y * w + x) * 4;
+              if (bytes[idx] > 18 || bytes[idx + 1] > 18 || bytes[idx + 2] > 18) {
+                return false;
+              }
+            }
+            return true;
+          }
+
+          bool isDarkCol(int x) {
+            final yStart = (h * 0.2).round();
+            final yEnd = (h * 0.8).round();
+            final step = math.max(1, (yEnd - yStart) ~/ 16);
+            for (var y = yStart; y < yEnd; y += step) {
+              final idx = (y * w + x) * 4;
+              if (bytes[idx] > 18 || bytes[idx + 1] > 18 || bytes[idx + 2] > 18) {
+                return false;
+              }
+            }
+            return true;
+          }
+
+          if (w > h) {
+            final maxTrimY = (h * 0.18).floor();
+            var trimY = 0;
+            while (trimY < maxTrimY &&
+                isDarkRow(trimY) &&
+                isDarkRow(h - 1 - trimY)) {
+              trimY++;
+            }
+            if (trimY >= 4 && h - trimY * 2 >= 32) {
+              top = trimY.toDouble();
+              bottom = (h - trimY).toDouble();
+            }
+          } else {
+            final maxTrimX = (w * 0.18).floor();
+            var trimX = 0;
+            while (trimX < maxTrimX &&
+                isDarkCol(trimX) &&
+                isDarkCol(w - 1 - trimX)) {
+              trimX++;
+            }
+            if (trimX >= 4 && w - trimX * 2 >= 32) {
+              left = trimX.toDouble();
+              right = (w - trimX).toDouble();
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    final cw = right - left;
+    final ch = bottom - top;
+    final side = math.min(cw, ch);
+    return Rect.fromLTWH(
+      left + (cw - side) / 2,
+      top + (ch - side) / 2,
       side,
       side,
     );
+  }
+
+  Future<BleedArtwork> _render(String key, ui.Image src) async {
+    // centre-crop to a square ("cover"), trimming letterbox bars on 4:3/16:9 thumbs
+    final srcRect = await computeContentSquare(src);
 
     // Bake backdrop and full-size artwork in parallel for 2x faster completion:
     final results = await Future.wait([
@@ -414,7 +581,7 @@ class _BleedArtworkImageState extends State<BleedArtworkImage>
   void initState() {
     super.initState();
     _key = widget.art?.key;
-    if (_key != null) _appear.forward();
+    if (_key != null) _appear.value = 1.0;
   }
 
   @override
@@ -743,10 +910,11 @@ class _BleedBackdropState extends State<BleedBackdrop>
   }
 
   void _syncTicker() {
-    if (widget.flow && !_ticker.isActive) {
+    final shouldRun = widget.flow && widget.isPlaying;
+    if (shouldRun && !_ticker.isActive) {
       _lastTick = null;
       _ticker.start();
-    } else if (!widget.flow && _ticker.isActive) {
+    } else if (!shouldRun && _ticker.isActive) {
       _ticker.stop();
       _lastTick = null;
     }

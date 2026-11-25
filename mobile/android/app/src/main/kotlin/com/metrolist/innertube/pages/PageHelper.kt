@@ -156,5 +156,15 @@ object PageHelper {
                 ?.parseTime()
         }
 
+    fun extractReleaseType(runs: List<Run>?): String? {
+        for (run in runs.orEmpty()) {
+            val t = run.text.trim().lowercase()
+            if (t == "single") return "Single"
+            if (t == "ep") return "EP"
+            if (t == "album") return "Album"
+        }
+        return null
+    }
+
     private fun String.isDurationText(): Boolean = matches(Regex("""\d{1,2}[:.,]\d{2}(?:[:.,]\d{2})?"""))
 }

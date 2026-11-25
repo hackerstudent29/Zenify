@@ -903,4 +903,415 @@ void main() {
       expect(result.topResult!.item.id, equals('artist-weeknd'));
     });
   });
+
+  group('11. Prefix Expansion, Suggestion Bundle, Play Count & Popularity Parity Tests', () {
+    test('parseSuggestionBundle extracts queries and recommended entity items with monthly audience & play count', () {
+      final fixture = {
+        'contents': [
+          {
+            'searchSuggestionsSectionRenderer': {
+              'contents': [
+                {
+                  'searchSuggestionRenderer': {
+                    'suggestion': {
+                      'runs': [
+                        {'text': 'star'},
+                        {'text': 'boy'},
+                      ],
+                    },
+                  },
+                },
+                {
+                  'searchSuggestionRenderer': {
+                    'suggestion': {
+                      'runs': [
+                        {'text': 'star'},
+                        {'text': 'girl interlude'},
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
+          },
+          {
+            'searchSuggestionsSectionRenderer': {
+              'contents': [
+                {
+                  'musicResponsiveListItemRenderer': {
+                    'overlay': {
+                      'musicItemThumbnailOverlayRenderer': {
+                        'content': {
+                          'musicPlayButtonRenderer': {
+                            'playNavigationEndpoint': {
+                              'watchEndpoint': {
+                                'videoId': '34Na4j8AVgA',
+                                'watchEndpointMusicSupportedConfigs': {
+                                  'watchEndpointMusicConfig': {
+                                    'musicVideoType': 'MUSIC_VIDEO_TYPE_ATV',
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                    'thumbnail': {
+                      'musicThumbnailRenderer': {
+                        'thumbnail': {
+                          'thumbnails': [
+                            {'url': 'https://lh3.googleusercontent.com/starboy=w120-h120', 'width': 120},
+                          ],
+                        },
+                      },
+                    },
+                    'flexColumns': [
+                      {
+                        'musicResponsiveListItemFlexColumnRenderer': {
+                          'text': {
+                            'runs': [
+                              {
+                                'text': 'Starboy (feat. Daft Punk)',
+                                'navigationEndpoint': {
+                                  'watchEndpoint': {'videoId': '34Na4j8AVgA'},
+                                },
+                              },
+                            ],
+                          },
+                        },
+                      },
+                      {
+                        'musicResponsiveListItemFlexColumnRenderer': {
+                          'text': {
+                            'runs': [
+                              {'text': 'Song'},
+                              {'text': ' • '},
+                              {
+                                'text': 'The Weeknd',
+                                'navigationEndpoint': {
+                                  'browseEndpoint': {
+                                    'browseId': 'UC_weeknd',
+                                    'browseEndpointContextSupportedConfigs': {
+                                      'browseEndpointContextMusicConfig': {
+                                        'pageType': 'MUSIC_PAGE_TYPE_ARTIST',
+                                      },
+                                    },
+                                  },
+                                },
+                              },
+                            ],
+                          },
+                        },
+                      },
+                      {
+                        'musicResponsiveListItemFlexColumnRenderer': {
+                          'text': {
+                            'runs': [
+                              {'text': '4.1B plays'},
+                            ],
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+                {
+                  'musicResponsiveListItemRenderer': {
+                    'navigationEndpoint': {
+                      'browseEndpoint': {
+                        'browseId': 'UC_weeknd',
+                        'browseEndpointContextSupportedConfigs': {
+                          'browseEndpointContextMusicConfig': {
+                            'pageType': 'MUSIC_PAGE_TYPE_ARTIST',
+                          },
+                        },
+                      },
+                    },
+                    'thumbnail': {
+                      'musicThumbnailRenderer': {
+                        'thumbnail': {
+                          'thumbnails': [
+                            {'url': 'https://lh3.googleusercontent.com/weeknd=w120-h120', 'width': 120},
+                          ],
+                        },
+                      },
+                    },
+                    'flexColumns': [
+                      {
+                        'musicResponsiveListItemFlexColumnRenderer': {
+                          'text': {
+                            'runs': [
+                              {'text': 'The Weeknd'},
+                            ],
+                          },
+                        },
+                      },
+                      {
+                        'musicResponsiveListItemFlexColumnRenderer': {
+                          'text': {
+                            'runs': [
+                              {'text': '248M monthly audience'},
+                            ],
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      };
+
+      final bundle = SearchParser.parseSuggestionBundle(fixture);
+      expect(bundle.queries, equals(['starboy', 'stargirl interlude']));
+      expect(bundle.recommendedItems.length, equals(2));
+
+      final recSong = bundle.recommendedItems[0] as SearchSongItem;
+      expect(recSong.title, equals('Starboy (feat. Daft Punk)'));
+      expect(recSong.playCountText, equals('4.1B plays'));
+      expect(recSong.playCount, greaterThan(4000000000));
+      expect(recSong.sourceStream, equals('suggestion'));
+
+      final recArtist = bundle.recommendedItems[1] as SearchArtistItem;
+      expect(recArtist.name, equals('The Weeknd'));
+      expect(recArtist.subscriberCount, equals(248000000));
+      expect(recArtist.sourceStream, equals('suggestion'));
+    });
+
+    test('parses flexColumns[2] play counts and musicCardShelfRenderer video Top Result with sub-items', () {
+      final fixture = {
+        'contents': {
+          'tabbedSearchResultsRenderer': {
+            'tabs': [
+              {
+                'tabRenderer': {
+                  'selected': true,
+                  'content': {
+                    'sectionListRenderer': {
+                      'contents': [
+                        {
+                          'musicCardShelfRenderer': {
+                            'title': {
+                              'runs': [
+                                {
+                                  'text': 'Starboy (Official Video)',
+                                  'navigationEndpoint': {
+                                    'watchEndpoint': {
+                                      'videoId': '34Na4j8AVgA_vid',
+                                      'watchEndpointMusicSupportedConfigs': {
+                                        'watchEndpointMusicConfig': {
+                                          'musicVideoType': 'MUSIC_VIDEO_TYPE_OMV',
+                                        },
+                                      },
+                                    },
+                                  },
+                                },
+                              ],
+                            },
+                            'subtitle': {
+                              'runs': [
+                                {'text': 'Video'},
+                                {'text': ' • '},
+                                {'text': 'TheWeekndVEVO'},
+                                {'text': ' • '},
+                                {'text': '2.5B views'},
+                                {'text': ' • '},
+                                {'text': '4:33'},
+                              ],
+                            },
+                            'thumbnail': {
+                              'musicThumbnailRenderer': {
+                                'thumbnail': {
+                                  'thumbnails': [
+                                    {'url': 'https://i.ytimg.com/vi/34Na4j8AVgA/hqdefault.jpg', 'width': 480},
+                                  ],
+                                },
+                              },
+                            },
+                            'contents': [
+                              {
+                                'musicResponsiveListItemRenderer': {
+                                  'thumbnail': {
+                                    'musicThumbnailRenderer': {
+                                      'thumbnail': {
+                                        'thumbnails': [
+                                          {'url': 'https://lh3.googleusercontent.com/s=w120-h120', 'width': 120},
+                                        ],
+                                      },
+                                    },
+                                  },
+                                  'flexColumns': [
+                                    {
+                                      'musicResponsiveListItemFlexColumnRenderer': {
+                                        'text': {
+                                          'runs': [
+                                            {
+                                              'text': 'Die For You',
+                                              'navigationEndpoint': {
+                                                'watchEndpoint': {
+                                                  'videoId': 'uPD0QOGTmMI',
+                                                  'watchEndpointMusicSupportedConfigs': {
+                                                    'watchEndpointMusicConfig': {
+                                                      'musicVideoType': 'MUSIC_VIDEO_TYPE_ATV',
+                                                    },
+                                                  },
+                                                },
+                                              },
+                                            },
+                                          ],
+                                        },
+                                      },
+                                    },
+                                    {
+                                      'musicResponsiveListItemFlexColumnRenderer': {
+                                        'text': {
+                                          'runs': [
+                                            {'text': 'Song'},
+                                            {'text': ' • '},
+                                            {'text': 'The Weeknd'},
+                                          ],
+                                        },
+                                      },
+                                    },
+                                    {
+                                      'musicResponsiveListItemFlexColumnRenderer': {
+                                        'text': {
+                                          'runs': [
+                                            {'text': '2.2B plays'},
+                                          ],
+                                        },
+                                      },
+                                    },
+                                  ],
+                                },
+                              },
+                            ],
+                          },
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      };
+
+      final parsed = SearchParser.parse(fixture, query: 'starboy video');
+      expect(parsed.topResult, isNotNull);
+      expect(parsed.topResult!.item, isA<SearchVideoItem>());
+      expect(parsed.items.whereType<SearchVideoItem>().length, equals(1));
+
+      final subSong = parsed.items.whereType<SearchSongItem>().firstWhere(
+        (s) => s.title == 'Die For You',
+      );
+      expect(subSong.playCount, equals(2200000000));
+      expect(subSong.subtitle, equals('The Weeknd'));
+    });
+
+    test('prefix query "star" ranks famous Starboy above obscure literal matches & blocks tiny 178-sub artist hijack', () {
+      final obscureLiteralSong = SearchSongItem(
+        id: 'song-born-star',
+        title: 'Star',
+        subtitle: 'Unknown Indie Band',
+        thumbnailUrl: 'https://example.com/1.jpg',
+        thumbnailUrlHiRes: 'https://example.com/1h.jpg',
+        artists: [const ArtistRef(id: 'unk', name: 'Unknown Indie Band')],
+        providerRank: 7,
+        sourceStream: 'general',
+        musicVideoType: 'ATV',
+        playCount: 1200,
+        playCountText: '1.2K plays',
+      );
+
+      final tinyArtist = SearchArtistItem(
+        id: 'artist-tiny-star',
+        title: 'STAR',
+        subtitle: 'Artist • 178 monthly audience',
+        thumbnailUrl: 'https://example.com/t.jpg',
+        thumbnailUrlHiRes: 'https://example.com/th.jpg',
+        browseId: 'UC_tiny_star',
+        subscriberCount: 178,
+        subscriberText: '178 monthly audience',
+        providerRank: 6,
+      );
+
+      final famousHit = SearchSongItem(
+        id: 'song-starboy-real',
+        title: 'Starboy (feat. Daft Punk)',
+        subtitle: 'The Weeknd, Daft Punk',
+        thumbnailUrl: 'https://example.com/sb.jpg',
+        thumbnailUrlHiRes: 'https://example.com/sbh.jpg',
+        artists: [
+          const ArtistRef(id: 'weeknd', name: 'The Weeknd'),
+          const ArtistRef(id: 'daft', name: 'Daft Punk'),
+        ],
+        providerRank: 0,
+        sourceStream: 'suggestion',
+        musicVideoType: 'ATV',
+        playCount: 4100000000,
+        playCountText: '4.1B plays',
+      );
+
+      final suggestions = ['starboy', 'stargirl interlude'];
+      final candidates = [obscureLiteralSong, tinyArtist, famousHit];
+      final intent = SearchIntentDetector.detectIntent(
+        'star',
+        candidates,
+        querySuggestions: suggestions,
+      );
+
+      // Tiny 178-sub "STAR" artist must NOT hijack into exactArtist mode
+      expect(intent.layoutMode, isNot(equals(SearchLayoutMode.exactArtist)));
+
+      final result = SearchRanker.rank(
+        items: candidates,
+        intent: intent,
+        countryCode: 'US',
+        querySuggestions: suggestions,
+      );
+
+      expect(result.songs.first.id, equals('song-starboy-real'));
+      expect(result.topResult?.item.id, equals('song-starboy-real'));
+    });
+
+    test('preserves legitimate short 50s official theme songs while still rejecting ultra-short <25s clips', () {
+      final theme50s = SearchSongItem(
+        id: 'song-theme-50s',
+        title: 'Vikram Title Theme',
+        subtitle: 'Anirudh Ravichander',
+        thumbnailUrl: 'https://example.com/v.jpg',
+        thumbnailUrlHiRes: 'https://example.com/vh.jpg',
+        artists: [const ArtistRef(id: 'ani', name: 'Anirudh Ravichander')],
+        durationSeconds: 50,
+        durationText: '0:50',
+        musicVideoType: 'ATV',
+      );
+
+      final short15s = SearchSongItem(
+        id: 'song-clip-15s',
+        title: 'Vikram Title Ringtone',
+        subtitle: 'Random Upload',
+        thumbnailUrl: 'https://example.com/r.jpg',
+        thumbnailUrlHiRes: 'https://example.com/rh.jpg',
+        artists: [const ArtistRef(id: 'rand', name: 'Random Upload')],
+        durationSeconds: 15,
+        durationText: '0:15',
+      );
+
+      final intent = SearchIntentDetector.detectIntent('vikram title theme', [theme50s, short15s]);
+      final result = SearchRanker.rank(
+        items: [theme50s, short15s],
+        intent: intent,
+        countryCode: 'IN',
+      );
+
+      expect(result.songs.any((s) => s.id == 'song-theme-50s'), isTrue);
+      expect(result.songs.any((s) => s.id == 'song-clip-15s'), isFalse);
+    });
+  });
 }

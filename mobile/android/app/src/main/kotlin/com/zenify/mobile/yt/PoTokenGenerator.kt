@@ -22,7 +22,7 @@ import kotlin.coroutines.resume
 class PoTokenGenerator(private val context: Context) : TokenProvider {
     companion object {
         private const val TAG = "PoTokenGenerator"
-        private const val TIMEOUT_MS = 12_000L
+        private const val TIMEOUT_MS = 4_500L
     }
 
     override val capabilities: TokenProviderCapabilities =

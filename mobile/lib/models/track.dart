@@ -38,12 +38,15 @@ class Track {
             ? language.toLowerCase().trim()
             : (detectLanguage(title, artist, album) ?? '')),
         isVideo = isVideo || detectIsVideo(title, album, coverUrl: coverUrl),
-        title = MediaNormalizer.cleanTitle(title),
+        title = (isVideo || detectIsVideo(title, album, coverUrl: coverUrl))
+            ? MediaNormalizer.cleanVideoTitle(title, knownArtists: artist)
+            : MediaNormalizer.cleanTitle(title),
         artist = MediaNormalizer.cleanArtistName(artist),
-        album = (isVideo || detectIsVideo(title, album, coverUrl: coverUrl)) &&
-                (album.isEmpty || album.toLowerCase() == 'single')
-            ? 'Music Video'
-            : MediaNormalizer.cleanAlbumTitle(album);
+        album = MediaNormalizer.resolveTrackAlbum(
+          album,
+          rawTitle: title,
+          isVideo: isVideo || detectIsVideo(title, album, coverUrl: coverUrl),
+        );
 
   static bool detectIsVideo(
     String rawTitle,

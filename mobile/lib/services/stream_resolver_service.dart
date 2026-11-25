@@ -357,7 +357,7 @@ class StreamResolverService {
 
     final qPref = quality ?? SettingsState.instance.videoQuality;
     final targetMaxHeight = videoQualityToMaxHeight(qPref);
-    final cacheKey = '${videoId}_$targetMaxHeight';
+    final cacheKey = '${videoId}_${targetMaxHeight}_${preferMuxed ? "m" : "a"}';
 
     final cached = _videoStreamsCache[cacheKey];
     if (cached != null) return cached;
@@ -388,7 +388,7 @@ class StreamResolverService {
                 ytClients: clientSet.isEmpty ? null : clientSet,
                 requireWatchPage: false,
               )
-              .timeout(const Duration(milliseconds: 1800));
+              .timeout(const Duration(milliseconds: 4500));
           if (manifest.videoOnly.isNotEmpty || manifest.muxed.isNotEmpty) {
             if (clientSet.isNotEmpty) {
               if (clientSet.first == YoutubeApiClient.ios) {

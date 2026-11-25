@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show File;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -284,6 +285,20 @@ class CoverImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final trimmed = url.trim();
+    if (trimmed.startsWith('file://') ||
+        trimmed.startsWith('/') ||
+        RegExp(r'^[A-Za-z]:[\\/]').hasMatch(trimmed)) {
+      final path = trimmed.startsWith('file://')
+          ? Uri.parse(trimmed).toFilePath()
+          : trimmed;
+      return Image.file(
+        File(path),
+        key: ValueKey(path),
+        fit: fit,
+        errorBuilder: (_, _, _) => _empty(34),
+      );
+    }
     final cleanUrl = upgradeArtworkUrl(url);
     if (cleanUrl.isEmpty) return _empty(34);
     return CachedNetworkImage(
@@ -744,6 +759,7 @@ class MarqueeScroll extends StatefulWidget {
     super.key,
     required this.child,
     this.resetKey,
+    this.animate = true,
     this.interval = const Duration(seconds: 7),
     this.firstDelay = const Duration(milliseconds: 2500),
     this.speed = 42, // px / second
@@ -751,6 +767,7 @@ class MarqueeScroll extends StatefulWidget {
   });
   final Widget child;
   final Object? resetKey; // change → restart from the beginning
+  final bool animate;
   final Duration interval;
   final Duration firstDelay;
   final double speed;
@@ -767,21 +784,22 @@ class _MarqueeScrollState extends State<MarqueeScroll> {
   bool _loop = false; // second copy is mounted only while looping
   bool _overflow = false;
 
-  bool _alive(int id) => mounted && id == _run;
+  bool _alive(int id) => mounted && id == _run && widget.animate;
 
   @override
   void initState() {
     super.initState();
-    _start();
+    if (widget.animate) _start();
   }
 
   @override
   void didUpdateWidget(covariant MarqueeScroll old) {
     super.didUpdateWidget(old);
-    if (old.resetKey != widget.resetKey) {
+    if (old.resetKey != widget.resetKey || old.animate != widget.animate) {
+      _run++;
       _loop = false;
       if (_ctrl.hasClients) _ctrl.jumpTo(0);
-      _start();
+      if (widget.animate) _start();
     }
   }
 

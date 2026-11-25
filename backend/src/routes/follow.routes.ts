@@ -35,25 +35,6 @@ export async function followRoutes(server: FastifyInstance) {
     FollowController.getReleasesTimeline
   );
 
-  // Web Push Subscriptions
-  server.post(
-    '/push-subscriptions',
-    { preHandler: [server.authenticate], config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
-    FollowController.registerPushSubscription
-  );
-
-  server.delete(
-    '/push-subscriptions',
-    { preHandler: [server.authenticate], config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
-    FollowController.deletePushSubscription
-  );
-
-  server.get(
-    '/push-subscriptions/key',
-    { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
-    FollowController.getVapidPublicKey
-  );
-
   // Notification Preferences
   server.get(
     '/notification-preferences',

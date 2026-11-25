@@ -120,13 +120,13 @@ data class SearchSummaryPage(
                                 .find { it.buttonRenderer.icon?.iconType == "MUSIC_SHUFFLE" }
                                 ?.buttonRenderer
                                 ?.command
-                                ?.watchPlaylistEndpoint ?: return null,
+                                ?.watchPlaylistEndpoint,
                         radioEndpoint =
                             renderer.buttons
                                 .find { it.buttonRenderer.icon?.iconType == "MIX" }
                                 ?.buttonRenderer
                                 ?.command
-                                ?.watchPlaylistEndpoint ?: return null,
+                                ?.watchPlaylistEndpoint,
                     )
                 }
 
@@ -139,7 +139,7 @@ data class SearchSummaryPage(
                                 ?.buttonRenderer
                                 ?.command
                                 ?.anyWatchEndpoint
-                                ?.playlistId ?: return null,
+                                ?.playlistId ?: "",
                         title =
                             renderer.title.runs
                                 ?.firstOrNull()
@@ -151,6 +151,7 @@ data class SearchSummaryPage(
                             renderer.subtitleBadges?.find {
                                 it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
                             } != null,
+                        albumType = PageHelper.extractReleaseType(renderer.subtitle.runs),
                     )
                 }
 
@@ -160,8 +161,9 @@ data class SearchSummaryPage(
                             renderer.onTap.browseEndpoint.browseId
                                 .removePrefix("VL"),
                         title =
-                            renderer.header?.musicCardShelfHeaderBasicRenderer?.title?.runs
-                                ?.joinToString(separator = "") { it.text }
+                            (renderer.title.runs?.joinToString(separator = "") { it.text }?.takeIf { it.isNotBlank() }
+                                ?: renderer.header?.musicCardShelfHeaderBasicRenderer?.title?.runs
+                                    ?.joinToString(separator = "") { it.text })
                                 ?: return null,
                         author = PlaylistPage.ownerFromByline(renderer.subtitle.runs),
                         songCountText = null,
@@ -171,15 +173,13 @@ data class SearchSummaryPage(
                                 .find { it.buttonRenderer.icon?.iconType == "PLAY_ARROW" }
                                 ?.buttonRenderer
                                 ?.command
-                                ?.watchPlaylistEndpoint
-                                ?: return null,
+                                ?.watchPlaylistEndpoint,
                         shuffleEndpoint =
                             renderer.buttons
                                 .find { it.buttonRenderer.icon?.iconType == "MUSIC_SHUFFLE" }
                                 ?.buttonRenderer
                                 ?.command
-                                ?.watchPlaylistEndpoint
-                                ?: return null,
+                                ?.watchPlaylistEndpoint,
                         radioEndpoint = null,
                     )
                 }

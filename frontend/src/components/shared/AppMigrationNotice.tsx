@@ -22,7 +22,7 @@ export function AppMigrationNotice({
   const [dismissed, setDismissed] = useState(false);
 
   const directApkUrl =
-    "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.21/zenify-v1.1.21.apk";
+    "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.22/zenify-v1.1.22.apk";
   const githubRepoUrl = "https://github.com/hackerstudent29/Zenify";
 
   if (dismissed) return null;
@@ -96,7 +96,7 @@ export function AppMigrationNotice({
               className="h-10 px-5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Download className="h-4 w-4 text-brand" />
-              <span>Download v1.1.21 APK</span>
+              <span>Download v1.1.22 APK</span>
             </a>
 
             <a

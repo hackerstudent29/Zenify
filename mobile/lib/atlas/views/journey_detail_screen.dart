@@ -162,7 +162,9 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
               },
             ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 140)),
+          SliverToBoxAdapter(
+            child: SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom),
+          ),
         ],
       ),
     );

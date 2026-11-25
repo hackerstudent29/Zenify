@@ -66,28 +66,19 @@ export class DeepgramLyricsService {
      * Get active API key (from env config, process.env, or comma-separated pool).
      */
     static getApiKey(): string {
-        const raw = (
-            process.env.DEEPGRAM_KEYS ||
-            config.DEEPGRAM_API_KEY ||
-            process.env.DEEPGRAM_API_KEY ||
-            'b97ceb65c0ee4552c3fd29b9827a15065c168699'
-        );
-        const keys = raw.split(',').map((k: string) => k.trim()).filter(Boolean);
-        if (keys.length === 0) return 'b97ceb65c0ee4552c3fd29b9827a15065c168699';
-        return keys[this.keyIndex % keys.length];
+        void config;
+        return '';
     }
 
     static rotateKey(): void {
         this.keyIndex++;
-        console.warn(`[Deepgram] Rotated to next key in pool (index=${this.keyIndex})`);
     }
 
     /**
-     * Check if Deepgram is configured and available.
+     * Deepgram AI speech-to-text / alignment is disabled.
      */
     static isAvailable(): boolean {
-        const key = this.getApiKey();
-        return !!key && key.trim().length > 0;
+        return false;
     }
 
     /**
@@ -944,6 +935,7 @@ export class DeepgramLyricsService {
             duration?: number;
         } = {}
     ): Promise<DeepgramLyricsResult | null> {
+        if (!this.isAvailable()) return null;
         try {
             console.log(`[Deepgram] Generating full lyrics from song audio (lang=${options.songLang || 'auto'})...`);
             const transcription = await this.transcribeAudio(audioSource, {
@@ -993,6 +985,7 @@ export class DeepgramLyricsService {
             minMatchScore?: number;
         } = {}
     ): Promise<DeepgramLyricsResult | null> {
+        if (!this.isAvailable()) return null;
         try {
             if (!plainLyrics || !plainLyrics.trim()) {
                 console.warn(`[Deepgram] Plain lyrics text is empty. Falling back to direct transcription.`);
@@ -1231,6 +1224,7 @@ export class DeepgramLyricsService {
         trackId: string,
         options: { force?: boolean; tryVocals?: boolean; plainLyrics?: string; language?: string } = {}
     ): Promise<DeepgramLyricsResult | null> {
+        if (!this.isAvailable()) return null;
         const track = await prisma.track.findUnique({
             where: { id: trackId },
             select: {
