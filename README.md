@@ -538,9 +538,9 @@ Engineered directly in native Kotlin (`XfFxProcessor.kt`) and synchronized via F
     </tr>
     <tr>
       <td><b>📦 All GitHub Releases</b></td>
-      <td>Release history, changelogs, and SHA-256 integrity checksums</td>
+      <td>Release history, changelogs, and SHA-256 integrity checksums &nbsp;•&nbsp; <i>25 releases total — paginated, click Next on GitHub to see all</i></td>
       <td align="center"><code>Build 2036</code></td>
-      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases"><b>View Releases</b></a></td>
+      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases"><b>View all 25 Releases →</b></a></td>
     </tr>
   </tbody>
 </table>
