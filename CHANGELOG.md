@@ -5,33 +5,31 @@ All notable user updates and improvements to Zenify are documented here.
 ## [1.1.22] - 2026-11-25
 
 ### What's New
-- **New Zendrum Instrument Identity**:
-  - Updated all Android adaptive/legacy launcher icons (`mdpi`–`xxxhdpi`, foreground/background/monochrome, round icons, `#FFFFFF` background) to the white background + rose Zendrum emblem.
-  - Replaced website, mobile-web, and repo favicons plus `"Z"`-only marks (`z_logo.png`, `z_logo_black.png`, `favicon_transparent.png`, `favicon_z_512.png`, `logo-square-dark.png`) with the transparent rose Zendrum logo while keeping full `"ZENIFY"` wordmarks untouched.
-- **Smart Single, Album, Video Routing & Offline Video Downloads**:
-  - Clicking a song in Singles opens its Single view with an interactive **Artist & Album Redirection Sheet** (`MediaNavigationSheet`) + `AlbumResolver` / `MediaRouter` verification instead of misrouting to an unrelated album or unplugged version; soundtrack singles extract movie albums accurately (`(From "Movie")`).
-  - Dedicated Video Single playback view with recommended video songs & artist links, video download support (`DownloadService`), release-type metadata badges (`YouTube.kt` / `PageHelper.kt`), clean `Title + Year` on Artist Video Songs, and `Title + Artist` on Home shelves.
-- **Full Song Credits & Plain Static View Lyrics**:
-  - Dedicated `SongCreditsScreen` & `SongCreditsService` showing performing artists, movie cast, composers & lyricists, production roles, soundtrack details, and gated `View Lyrics` access.
-  - Plain static `FullLyricsScreen` with LRC/word-tag stripping, Arabic RTL & BiDi directionality preservation, stationary `DynamicIslandHeader`, overlapping line tail-glow timing, and zero scroll-to-dock movement.
-- **Rigid 90° Portrait ↔ Landscape Player Morph & Landscape Video Controls**:
-  - iOS-style rigid 90° rotation morph across `PlayerShell`, `player_kit.dart`, and `BleedArtwork` with neutral white `ScrubberSlider` time labels.
-  - Landscape video mode adds ±10s skip controls, double-tap seek accumulation, centered Lyrics/Queue controls, background tap shielding, and a fit/fill zoom toggle.
-- **Transparent Liquid Glass Top Picks & Hero**:
-  - Refined Top Picks and hero surfaces to use a clean transparent liquid-glass backdrop without heavy frosted borders.
+- **New Zendrum Brand Identity**:
+  - Updated the Android app icon to the new white and rose Zendrum emblem and refreshed brand marks across the app.
+- **Smarter Single, Album, Video Browsing & Offline Video Downloads**:
+  - Opening a song from Singles now opens its Single view with a quick option to jump to the artist or full album instead of misrouting to an unrelated release, and soundtrack singles show their movie album accurately.
+  - Dedicated Video Single view with recommended video songs, artist links, offline video downloads, cleaner titles and artist names, release year details, and better organization across Home.
+- **Full Song Credits & Static Lyrics View**:
+  - Added a dedicated Song Credits page showing performing artists, movie cast, composers, lyricists, production roles, soundtrack details, and quick access to View Lyrics.
+  - Added a clean, static full-screen Lyrics view with clear formatting, proper right-to-left language support, and zero distraction while reading.
+- **Smooth 90° Portrait ↔ Landscape Player & Landscape Video Controls**:
+  - Crisp 90° rotation transition when switching between portrait and landscape player modes.
+  - Landscape video mode adds ±10s skip controls, double-tap seeking, centered Lyrics and Queue buttons, and a fit/fill zoom toggle.
+- **Transparent Liquid Glass Look**:
+  - Refined Top Picks and hero banners with a cleaner transparent liquid-glass style.
 
 ### Fixes & Improvements
-- **Media3 `1.9.2` Playback & `LoadControl` Fix**:
-  - Aligned `:app` Media3 compile dependencies to `1.9.2` and forwarded every `LoadControl` interface method (including `getBackBufferDurationUs(PlayerId)`, `retainBackBufferFromKeyframe(PlayerId)`, and `shouldContinuePreloading(...)`) in `ZenAudioPlugin.kt`, resolving `PlatformException(zen_audio, getBackBufferDurationUs not implemented)` during audio and video initialization.
-- **Native Audio Focus, Buffering Throttle & System Volume Sync**:
-  - Added `AudioFocusRequest` + `AudioPlaybackCallback` interruption/resume handling, paused network buffering cap, Android `STREAM_MUSIC` volume sync (`getSystemVolume` / `setSystemVolume`), accurate `getPosition` snapshotting, and hardened `PoTokenGenerator` / `YtDataSource` caching.
+- **Audio & Video Playback Reliability**:
+  - Fixed playback initialization issues for smoother, faster audio and video startup.
+- **Smarter Audio Focus, Pause Optimization & Volume Sync**:
+  - Automatically pauses and resumes when other apps interrupt playback, pauses background buffering to save mobile data while paused, and syncs cleanly with device media volume.
 - **Persistent Dock & MiniPlayer Across All Detail Pages**:
-  - Routed `View Credits`, `View Lyrics`, `Artist`, `Album/Release`, and `Category` navigation from `PlayerShell`, `QueuePanel`, `ZenDropdown`, `showArtistPopup`, `MediaNavigationSheet`, and Home modal sheets through `ShellNavigationScope.openPage` so the bottom Dock and MiniPlayer stay visible.
-- **Unified Bottom Scroll Clearance**:
-  - Added `180 + safeBottom` clearance across Artist, Album, Library, Song Credits, Full Lyrics, and Sound Atlas screens so bottom text never hides behind the Dock or MiniPlayer.
-- **Website Disconnection, Leaner Backend & Automated Release Pipeline**:
-  - Disconnected legacy website `.env` connections, CORS origins, redirects, and web-only routes while removing AI and Cloudflare R2 keys from the backend (moving Room cover uploads to Cloudinary and preserving Auth, Postgres sync, Room Together, RapidAPI, and Apple Music for Android).
-  - Updated `.github/workflows/release.yml` to publish `docs/releases/RELEASE_NOTES_vX.Y.Z.md` directly to GitHub Releases and expanded automated widget/unit test suites across audio focus, lyrics, credits, album resolution, bleed artwork, and video downloads.
+  - Moving between Credits, View Lyrics, Artist, Album, and Category pages now keeps the bottom Dock and MiniPlayer visible and accessible.
+- **Unified Bottom Scroll Spacing**:
+  - Improved bottom scroll padding across detail pages so content never hides behind the Dock or MiniPlayer.
+- **General Performance & Cleanup**:
+  - Streamlined background services for faster startup and cleaner app behavior.
 
 ## [1.1.21] - 2026-11-24 (Stable Version 1)
 

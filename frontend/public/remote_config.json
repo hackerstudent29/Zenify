@@ -8,22 +8,22 @@
   "releaseTime": "08:20 PM IST",
   "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.22/zenify-v1.1.22.apk",
   "features": [
-    "New Zendrum Brand Identity: Fresh white + rose Zendrum instrument launcher icon and transparent rose logo marks",
-    "Song Credits & Stationary Plain Lyrics: Full SongCreditsScreen breakdown (cast, composers, lyricists) and stationary plain-text FullLyricsScreen with RTL preservation",
-    "Smart Singles, Albums, Videos & Offline Downloads: Soundtrack album resolution, MediaNavigationSheet, offline video downloads, and clean Title + Year / Artist metadata",
-    "Rigid 90° Rotation Morph, Landscape Video Controls & Liquid Glass UI: Portrait-to-landscape morph with landscape ±10s skip, fit/fill toggle, and transparent liquid-glass Top Picks"
+    "New Zendrum Brand Identity: Fresh white and rose Zendrum app icon and updated brand marks",
+    "Song Credits & Static View Lyrics: Full song credits breakdown (cast, composers, lyricists) and a clean, distraction-free static Lyrics page",
+    "Smart Singles, Albums, Videos & Offline Downloads: Accurate album matching, quick Artist & Album jump sheet, offline video downloads, and cleaner song metadata",
+    "Smooth 90° Rotation & Landscape Video Controls: Crisp portrait-to-landscape transition with ±10s skip controls, double-tap seeking, fit/fill zoom toggle, and transparent liquid-glass Top Picks"
   ],
   "fixes": [
-    "Media3 1.9.2 LoadControl & Audio Focus Fix: Eliminated getBackBufferDurationUs not implemented crashes across audio, fallback stream, and video playback plus system volume sync",
-    "Persistent Bottom Dock & MiniPlayer across View Credits, View Lyrics, Artist, Album, and Category screens opened from Player, Queue, or modal sheets",
-    "Generous 180px + safe-area bottom scroll clearance across Artist, Album, Library, Credits, Lyrics, and Sound Atlas screens",
-    "Fixed wrong album redirects, unplugged track hijacks, and View Lyrics scroll layout shifting"
+    "Improved Audio & Video Playback: Resolved playback startup errors across audio, fallback streams, and video playback, with smoother system volume and focus handling",
+    "Persistent Dock & MiniPlayer when navigating to Credits, View Lyrics, Artist, Album, and Category pages",
+    "Improved bottom scroll spacing across detail pages so content never hides behind the Dock or MiniPlayer",
+    "Fixed wrong album redirects, unplugged version mismatches, and View Lyrics scroll layout shifting"
   ],
   "improvements": [
-    "Automated GitHub Releases notes synced directly from docs/releases/RELEASE_NOTES_v1.1.22.md",
-    "Standalone Android-focused backend with website CORS/routes, AI gateways, and Cloudflare R2 disabled",
-    "Expanded widget and unit test suites across audio focus, credits, full lyrics, navigation, album resolution, bleed artwork, and video downloads"
+    "Broader, user-friendly release notes and in-app update details",
+    "Streamlined background services for faster startup and cleaner performance",
+    "Improved stability across audio focus, credits, lyrics, artwork effects, and video downloads"
   ],
-  "releaseNotes": "• New white + rose Zendrum app icon & Media3 1.9.2 LoadControl playback fix\n• Persistent Dock & MiniPlayer on Credits, View Lyrics, Album & Artist pages (180px clearance)\n• Dedicated Song Credits & stationary plain View Lyrics + offline video downloads\n• Rigid 90° portrait/landscape rotation morph & landscape video ±10s + fit/fill controls\n• Smart Single/Album/Video routing with soundtrack extraction & transparent liquid-glass UI",
-  "message": "Update to v1.1.22 for the new Zendrum app icon, Media3 1.9.2 playback fix, persistent Dock/MiniPlayer on Credits & Lyrics, 90° landscape controls, and offline video downloads"
+  "releaseNotes": "• New white + rose Zendrum app icon & smoother audio/video playback\n• Persistent Dock & MiniPlayer on Credits, View Lyrics, Album & Artist pages\n• Dedicated Song Credits, clean static View Lyrics & offline video downloads\n• Smooth 90° portrait/landscape rotation & landscape video ±10s + fit/fill controls\n• Smarter Single/Album/Video browsing & transparent liquid-glass Top Picks",
+  "message": "Update to v1.1.22 for the new Zendrum app icon, smoother playback, persistent Dock & MiniPlayer on Credits & Lyrics, 90° landscape controls, and offline video downloads"
 }
