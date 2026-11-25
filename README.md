@@ -56,7 +56,7 @@
   <br />
 
   <p align="center">
-    <img src="assets/screenshots/hero_showcase.png" alt="Zenify Android Showcase — Now Playing, Album View, 16:9 Video Player, and Syllable-Synced Lyrics" width="100%" />
+    <img src="assets/screenshots/hero_showcase.png" alt="Zenify Android Showcase — Now Playing, Album View, 16:9 Video Player, and Syllable-Synced Lyrics" width="540" />
   </p>
   <p align="center">
     <sub><b>Now Playing (Hi-Res)</b> &nbsp;•&nbsp; <b>Album &amp; Floating Dock</b> &nbsp;•&nbsp; <b>16:9 Video Player</b> &nbsp;•&nbsp; <b>Karaoke Lyrics</b></sub>
