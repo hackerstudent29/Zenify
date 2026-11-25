@@ -1,10 +1,8 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { Vibrant } = require('node-vibrant/node');
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { prisma } from '../utils/prisma';
-import { Prisma } from '@prisma/client';
+import { Vibrant } from '../utils/vibrant-sharp';
 
 export interface RawColor {
     r: number;
@@ -12,27 +10,9 @@ export interface RawColor {
     b: number;
 }
 
-/** Parse "#RRGGBB" or "#RGB" hex string into {r,g,b} */
-function hexToRgb(hex: string): RawColor {
-    const h = hex.replace('#', '');
-    if (h.length === 3) {
-        const r = parseInt(h[0] + h[0], 16);
-        const g = parseInt(h[1] + h[1], 16);
-        const b = parseInt(h[2] + h[2], 16);
-        return { r, g, b };
-    }
-    return {
-        r: parseInt(h.slice(0, 2), 16),
-        g: parseInt(h.slice(2, 4), 16),
-        b: parseInt(h.slice(4, 6), 16),
-    };
-}
-
-import getColors from 'get-image-colors';
-
 /**
  * PaletteService
- * ─ Extracts 4 dominant colors from cover art using get-image-colors.
+ * ─ Extracts up to 3 dominant colors from cover art using Sharp + Vibrant MMCQ.
  * ─ Saves result to the `palette` Json field on Track / Album.
  * ─ Provides a backfill job for existing songs.
  */
@@ -43,9 +23,6 @@ export class PaletteService {
         if (!imageUrl) return null;
         try {
             let buffer: Buffer;
-            let mimeType = 'image/jpeg';
-            if (imageUrl.toLowerCase().endsWith('.png')) mimeType = 'image/png';
-            if (imageUrl.toLowerCase().endsWith('.webp')) mimeType = 'image/webp';
 
             if (!imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
                 // Local relative path (e.g. /public/... or uploads/...)
@@ -60,22 +37,28 @@ export class PaletteService {
                         || 'https://zenify-78e257420386.herokuapp.com/api';
                     const baseOrigin = API_BASE.replace(/\/api$/, '');
                     const fullUrl = `${baseOrigin}/${cleanPath}`;
-                    const res = await axios.get(fullUrl, { responseType: 'arraybuffer', timeout: 10000 });
+                    const res = await axios.get(fullUrl, { responseType: 'arraybuffer', timeout: 10000, maxContentLength: 15 * 1024 * 1024 });
                     buffer = Buffer.from(res.data);
-                    const ct = res.headers['content-type'];
-                    if (typeof ct === 'string') mimeType = ct;
                 }
-            } else {
+            } else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
                 // Absolute HTTP URL
-                const res = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 10000 });
+                const res = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 10000, maxContentLength: 15 * 1024 * 1024 });
                 buffer = Buffer.from(res.data);
-                const ct = res.headers['content-type'];
-                if (typeof ct === 'string') mimeType = ct;
+            } else {
+                return null;
             }
 
-            // Use get-image-colors to get a list of dominant chroma colors
-            const chromaColors = await getColors(buffer, mimeType);
-            if (!chromaColors || chromaColors.length === 0) return null;
+            // Quantize dominant colors using Vibrant MMCQ backed by Sharp
+            const vibrant = new Vibrant(buffer, { quality: 1, colorCount: 64 });
+            const palette = await vibrant.getPalette();
+            const quantized = vibrant.result?.colors ?? [];
+            const paletteSwatches = Object.values(palette).filter(
+                (swatch): swatch is NonNullable<typeof swatch> => Boolean(swatch)
+            );
+            const candidates = (quantized.length > 0 ? [...quantized] : paletteSwatches)
+                .sort((a, b) => b.population - a.population);
+
+            if (candidates.length === 0) return null;
 
             const result: RawColor[] = [];
             const MIN_COLOR_DISTANCE = 60;
@@ -87,10 +70,10 @@ export class PaletteService {
                 return Math.sqrt(dr * dr + dg * dg + db * db);
             };
 
-            for (const chromaColor of chromaColors) {
+            for (const swatch of candidates) {
                 if (result.length >= 3) break;
 
-                const [r, g, b] = chromaColor.rgb();
+                const [r, g, b] = swatch.rgb;
 
                 // Skip very dark or very bright colors to ensure vibrancy
                 const brightness = (r + g + b) / 3;
@@ -108,9 +91,9 @@ export class PaletteService {
 
             // Fallback if filtering removed everything
             if (result.length === 0) {
-                for (const chromaColor of chromaColors) {
+                for (const swatch of candidates) {
                     if (result.length >= 3) break;
-                    const [r, g, b] = chromaColor.rgb();
+                    const [r, g, b] = swatch.rgb;
                     result.push({ r: Math.round(r), g: Math.round(g), b: Math.round(b) });
                 }
             }

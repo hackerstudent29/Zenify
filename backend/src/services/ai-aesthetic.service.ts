@@ -1,5 +1,5 @@
 import { prisma } from '../utils/prisma';
-import { Vibrant } from 'node-vibrant/node';
+import { Vibrant } from '../utils/vibrant-sharp';
 
 export class AIAestheticService {
     /**
