@@ -626,17 +626,13 @@ class DownloadService extends ChangeNotifier {
 
       if (isVideo) {
         // --- Video Song Download ---
-        // Build ordered progressive video candidates:
+        // Try each progressive video source lazily so a working native stream
+        // starts downloading immediately without stalling on fallback lookups:
         // 1) Native YtEngine with allowHls=false (uses PoToken + EJS cipher solver)
-        // 2) On-device StreamResolver adaptive/quality-matched streams
+        // 2) On-device StreamResolver quality-matched adaptive streams
         // 3) On-device StreamResolver muxed fallback stream
-        final targetMaxH = StreamResolverService.videoQualityToMaxHeight(dlVideoQuality);
-        final candidates = <({
-          String audioUrl,
-          String videoUrl,
-          Map<String, String> headers,
-          int? audioLen,
-        })>[];
+        final targetMaxH =
+            StreamResolverService.videoQualityToMaxHeight(dlVideoQuality);
 
         bool isProgressiveVideo(String? u, {bool isHls = false}) =>
             u != null &&
@@ -645,108 +641,129 @@ class DownloadService extends ChangeNotifier {
             !u.contains('.m3u8') &&
             !u.contains('/manifest/hls');
 
-        final nativeRes = await InnerTubeService.instance.getStreamUrl(
-          cleanVideoId,
-          quality: dlAudioQuality,
-          wantVideo: true,
-          maxVideoHeight: targetMaxH,
-          allowHls: false,
-        );
-        if (nativeRes != null &&
-            isProgressiveVideo(nativeRes.videoUrl, isHls: nativeRes.isHls) &&
-            nativeRes.url.isNotEmpty) {
-          candidates.add((
-            audioUrl: nativeRes.url,
-            videoUrl: nativeRes.videoUrl!,
-            headers: nativeRes.headers,
-            audioLen: nativeRes.contentLength,
-          ));
-        }
-
-        final adaptiveRes = await StreamResolverService.instance.resolveVideoStreams(
-          cleanVideoId,
-          quality: dlVideoQuality,
-          preferMuxed: false,
-        );
-        if (adaptiveRes != null &&
-            isProgressiveVideo(adaptiveRes.videoUrl) &&
-            adaptiveRes.audioUrl.isNotEmpty) {
-          candidates.add((
-            audioUrl: adaptiveRes.audioUrl,
-            videoUrl: adaptiveRes.videoUrl!,
-            headers: adaptiveRes.headers,
-            audioLen: null,
-          ));
-        }
-
-        final muxedRes = await StreamResolverService.instance.resolveVideoStreams(
-          cleanVideoId,
-          quality: dlVideoQuality,
-          preferMuxed: true,
-        );
-        if (muxedRes != null &&
-            isProgressiveVideo(muxedRes.videoUrl) &&
-            muxedRes.audioUrl.isNotEmpty) {
-          candidates.add((
-            audioUrl: muxedRes.audioUrl,
-            videoUrl: muxedRes.videoUrl!,
-            headers: muxedRes.headers,
-            audioLen: null,
-          ));
-        }
-
-        if (candidates.isEmpty) {
-          throw Exception('Unable to resolve progressive video stream for $cleanVideoId');
+        Future<({String audioPath, String videoPath})> tryVideoCandidate({
+          required String videoUrl,
+          required String audioUrl,
+          required Map<String, String> headers,
+          int? audioLen,
+        }) async {
+          if (videoUrl == audioUrl) {
+            _downloadingProgress[track.id] = 0.15;
+            notifyListeners();
+            await _streamToFile(
+              client: httpClient!,
+              url: videoUrl,
+              headers: headers,
+              targetFile: videoFile,
+              estimatedDurationSeconds: track.durationSeconds,
+              startProgress: 0.15,
+              endProgress: 0.88,
+              trackId: track.id,
+            );
+            return (audioPath: videoFile.path, videoPath: videoFile.path);
+          } else {
+            _downloadingProgress[track.id] = 0.15;
+            notifyListeners();
+            await _streamToFile(
+              client: httpClient!,
+              url: videoUrl,
+              headers: headers,
+              targetFile: videoFile,
+              estimatedDurationSeconds: track.durationSeconds,
+              startProgress: 0.15,
+              endProgress: 0.65,
+              trackId: track.id,
+            );
+            await _streamToFile(
+              client: httpClient!,
+              url: audioUrl,
+              headers: headers,
+              targetFile: audioFile,
+              estimatedDurationSeconds: track.durationSeconds,
+              startProgress: 0.65,
+              endProgress: 0.88,
+              trackId: track.id,
+              knownContentLength: audioLen,
+            );
+            return (audioPath: audioFile.path, videoPath: videoFile.path);
+          }
         }
 
         Object? lastVideoErr;
         var videoDownloaded = false;
-        for (final cand in candidates) {
+
+        final resolvers = <Future<({
+          String audioUrl,
+          String? videoUrl,
+          Map<String, String> headers,
+          int? audioLen,
+          bool isHls,
+        })?> Function()>[
+          () async {
+            final n = await InnerTubeService.instance.getStreamUrl(
+              cleanVideoId,
+              quality: dlAudioQuality,
+              wantVideo: true,
+              maxVideoHeight: targetMaxH,
+              allowHls: false,
+            );
+            if (n == null) return null;
+            return (
+              audioUrl: n.url,
+              videoUrl: n.videoUrl,
+              headers: n.headers,
+              audioLen: n.contentLength,
+              isHls: n.isHls,
+            );
+          },
+          () async {
+            final r = await StreamResolverService.instance.resolveVideoStreams(
+              cleanVideoId,
+              quality: dlVideoQuality,
+              preferMuxed: false,
+            );
+            if (r == null) return null;
+            return (
+              audioUrl: r.audioUrl,
+              videoUrl: r.videoUrl,
+              headers: r.headers,
+              audioLen: null,
+              isHls: false,
+            );
+          },
+          () async {
+            final r = await StreamResolverService.instance.resolveVideoStreams(
+              cleanVideoId,
+              quality: dlVideoQuality,
+              preferMuxed: true,
+            );
+            if (r == null) return null;
+            return (
+              audioUrl: r.audioUrl,
+              videoUrl: r.videoUrl,
+              headers: r.headers,
+              audioLen: null,
+              isHls: false,
+            );
+          },
+        ];
+
+        for (final resolveCand in resolvers) {
           try {
-            if (cand.videoUrl == cand.audioUrl) {
-              // Muxed MP4 (single combined stream)
-              _downloadingProgress[track.id] = 0.15;
-              notifyListeners();
-              await _streamToFile(
-                client: httpClient,
-                url: cand.videoUrl,
-                headers: cand.headers,
-                targetFile: videoFile,
-                estimatedDurationSeconds: track.durationSeconds,
-                startProgress: 0.15,
-                endProgress: 0.88,
-                trackId: track.id,
-              );
-              audioPath = videoFile.path;
-              videoPath = videoFile.path;
-            } else {
-              // Adaptive: separate video (.mp4) and audio (.m4a)
-              _downloadingProgress[track.id] = 0.15;
-              notifyListeners();
-              await _streamToFile(
-                client: httpClient,
-                url: cand.videoUrl,
-                headers: cand.headers,
-                targetFile: videoFile,
-                estimatedDurationSeconds: track.durationSeconds,
-                startProgress: 0.15,
-                endProgress: 0.65,
-                trackId: track.id,
-              );
-              await _streamToFile(
-                client: httpClient,
-                url: cand.audioUrl,
-                headers: cand.headers,
-                targetFile: audioFile,
-                estimatedDurationSeconds: track.durationSeconds,
-                startProgress: 0.65,
-                endProgress: 0.88,
-                trackId: track.id,
-                knownContentLength: cand.audioLen,
-              );
-              audioPath = audioFile.path;
-              videoPath = videoFile.path;
+            final cand = await resolveCand();
+            if (cand == null ||
+                !isProgressiveVideo(cand.videoUrl, isHls: cand.isHls) ||
+                cand.audioUrl.isEmpty) {
+              continue;
             }
+            final paths = await tryVideoCandidate(
+              videoUrl: cand.videoUrl!,
+              audioUrl: cand.audioUrl,
+              headers: cand.headers,
+              audioLen: cand.audioLen,
+            );
+            audioPath = paths.audioPath;
+            videoPath = paths.videoPath;
             videoDownloaded = true;
             break;
           } catch (e) {
@@ -754,12 +771,17 @@ class DownloadService extends ChangeNotifier {
             if (await videoFile.exists()) await videoFile.delete();
             if (await audioFile.exists()) await audioFile.delete();
             if (kDebugMode) {
-              debugPrint('[DownloadService] video candidate failed for $cleanVideoId: $e');
+              debugPrint(
+                '[DownloadService] video candidate failed for $cleanVideoId: $e',
+              );
             }
           }
         }
         if (!videoDownloaded) {
-          throw lastVideoErr ?? Exception('All video stream downloads failed for $cleanVideoId');
+          throw lastVideoErr ??
+              Exception(
+                'Unable to resolve progressive video stream for $cleanVideoId',
+              );
         }
       } else {
         // --- Audio Song Download ---

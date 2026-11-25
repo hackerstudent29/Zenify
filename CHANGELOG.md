@@ -5,29 +5,33 @@ All notable user updates and improvements to Zenify are documented here.
 ## [1.1.22] - 2026-11-25
 
 ### What's New
-- **Smart Single, Album & Video Song Routing**:
-  - Clicking a song in Singles opens its Single view with an interactive **Artist & Album Redirection Sheet** (`MediaNavigationSheet`) instead of misrouting to an unrelated album or unplugged version.
-  - Dedicated Video Single playback view with recommended video songs & artist links, clean title normalization, accurate artist extraction, `Title + Year` on Artist Video Songs, and `Title + Artist` on Home shelves.
+- **New Zendrum Instrument Identity**:
+  - Updated all Android adaptive/legacy launcher icons (`mdpi`–`xxxhdpi`, foreground/background/monochrome, round icons, `#FFFFFF` background) to the white background + rose Zendrum emblem.
+  - Replaced website, mobile-web, and repo favicons plus `"Z"`-only marks (`z_logo.png`, `z_logo_black.png`, `favicon_transparent.png`, `favicon_z_512.png`, `logo-square-dark.png`) with the transparent rose Zendrum logo while keeping full `"ZENIFY"` wordmarks untouched.
+- **Smart Single, Album, Video Routing & Offline Video Downloads**:
+  - Clicking a song in Singles opens its Single view with an interactive **Artist & Album Redirection Sheet** (`MediaNavigationSheet`) + `AlbumResolver` / `MediaRouter` verification instead of misrouting to an unrelated album or unplugged version; soundtrack singles extract movie albums accurately (`(From "Movie")`).
+  - Dedicated Video Single playback view with recommended video songs & artist links, video download support (`DownloadService`), release-type metadata badges (`YouTube.kt` / `PageHelper.kt`), clean `Title + Year` on Artist Video Songs, and `Title + Artist` on Home shelves.
 - **Full Song Credits & Plain Static View Lyrics**:
-  - Dedicated `SongCreditsScreen` showing performing artists, movie cast, composers & lyricists, production/engineering, release details, and gated `View Lyrics` access.
-  - Plain static `FullLyricsScreen` with LRC/word-tag stripping, RTL preservation, stationary `DynamicIslandHeader`, and zero scroll-to-dock movement.
+  - Dedicated `SongCreditsScreen` & `SongCreditsService` showing performing artists, movie cast, composers & lyricists, production roles, soundtrack details, and gated `View Lyrics` access.
+  - Plain static `FullLyricsScreen` with LRC/word-tag stripping, Arabic RTL & BiDi directionality preservation, stationary `DynamicIslandHeader`, overlapping line tail-glow timing, and zero scroll-to-dock movement.
 - **Rigid 90° Portrait ↔ Landscape Player Morph & Landscape Video Controls**:
-  - iOS-style rigid 90° rotation morph across `PlayerShell` components with neutral white `ScrubberSlider` time labels.
-  - Landscape video mode adds ±10s skip controls, double-tap seek accumulation, and a fit/fill zoom toggle.
+  - iOS-style rigid 90° rotation morph across `PlayerShell`, `player_kit.dart`, and `BleedArtwork` with neutral white `ScrubberSlider` time labels.
+  - Landscape video mode adds ±10s skip controls, double-tap seek accumulation, centered Lyrics/Queue controls, background tap shielding, and a fit/fill zoom toggle.
 - **Transparent Liquid Glass Top Picks & Hero**:
   - Refined Top Picks and hero surfaces to use a clean transparent liquid-glass backdrop without heavy frosted borders.
-- **New Zendrum Instrument Identity**:
-  - Updated Android adaptive/legacy launcher icons to white background with rose Zendrum emblem and switched website/repo favicons and `"Z"`-only marks to the transparent rose Zendrum logo while keeping full `"ZENIFY"` wordmarks intact.
 
 ### Fixes & Improvements
-- **Media3 1.9.2 Playback & `LoadControl` Fix**:
-  - Aligned `:app` Media3 compile dependencies to `1.9.2` and forwarded every `LoadControl` interface method (including `getBackBufferDurationUs(PlayerId)`) in `ZenAudioPlugin.kt`, resolving `PlatformException(zen_audio, getBackBufferDurationUs not implemented)` during audio and video initialization.
+- **Media3 `1.9.2` Playback & `LoadControl` Fix**:
+  - Aligned `:app` Media3 compile dependencies to `1.9.2` and forwarded every `LoadControl` interface method (including `getBackBufferDurationUs(PlayerId)`, `retainBackBufferFromKeyframe(PlayerId)`, and `shouldContinuePreloading(...)`) in `ZenAudioPlugin.kt`, resolving `PlatformException(zen_audio, getBackBufferDurationUs not implemented)` during audio and video initialization.
+- **Native Audio Focus, Buffering Throttle & System Volume Sync**:
+  - Added `AudioFocusRequest` + `AudioPlaybackCallback` interruption/resume handling, paused network buffering cap, Android `STREAM_MUSIC` volume sync (`getSystemVolume` / `setSystemVolume`), accurate `getPosition` snapshotting, and hardened `PoTokenGenerator` / `YtDataSource` caching.
 - **Persistent Dock & MiniPlayer Across All Detail Pages**:
-  - Routed `View Credits`, `View Lyrics`, `Artist`, and `Album/Release` navigation from `PlayerShell`, `QueuePanel`, `ZenDropdown`, `showArtistPopup`, `MediaNavigationSheet`, and Home modal sheets through `ShellNavigationScope.openPage` so the bottom Dock and MiniPlayer stay visible.
+  - Routed `View Credits`, `View Lyrics`, `Artist`, `Album/Release`, and `Category` navigation from `PlayerShell`, `QueuePanel`, `ZenDropdown`, `showArtistPopup`, `MediaNavigationSheet`, and Home modal sheets through `ShellNavigationScope.openPage` so the bottom Dock and MiniPlayer stay visible.
 - **Unified Bottom Scroll Clearance**:
   - Added `180 + safeBottom` clearance across Artist, Album, Library, Song Credits, Full Lyrics, and Sound Atlas screens so bottom text never hides behind the Dock or MiniPlayer.
-- **Website Disconnection & Leaner Backend**:
-  - Disconnected legacy website `.env` connections, CORS origins, redirects, and web-only routes while removing AI and Cloudflare R2 keys from the backend (preserving Auth, Postgres sync, Room Together, Cloudinary, RapidAPI, and Apple Music for Android).
+- **Website Disconnection, Leaner Backend & Automated Release Pipeline**:
+  - Disconnected legacy website `.env` connections, CORS origins, redirects, and web-only routes while removing AI and Cloudflare R2 keys from the backend (moving Room cover uploads to Cloudinary and preserving Auth, Postgres sync, Room Together, RapidAPI, and Apple Music for Android).
+  - Updated `.github/workflows/release.yml` to publish `docs/releases/RELEASE_NOTES_vX.Y.Z.md` directly to GitHub Releases and expanded automated widget/unit test suites across audio focus, lyrics, credits, album resolution, bleed artwork, and video downloads.
 
 ## [1.1.21] - 2026-11-24 (Stable Version 1)
 

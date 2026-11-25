@@ -282,7 +282,7 @@ export default function DownloadPage() {
                     <h3 className="text-base font-semibold text-white mt-1">Notification or Files</h3>
                   </div>
                   <p className="text-[14px] leading-relaxed text-zinc-400">
-                    Once the 13.7 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone's <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
+                    Once the 16.2 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone&apos;s <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
                   </p>
                 </div>
 
@@ -464,7 +464,7 @@ export default function DownloadPage() {
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Release Version</span>
-                <span className="text-white">v1.0.12 (Build 16) — November 15, 2026</span>
+                <span className="text-white">v1.1.22 (Build 2036) — November 25, 2026</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Package Format</span>
@@ -472,15 +472,15 @@ export default function DownloadPage() {
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">File Size</span>
-                <span className="text-white">15.2 MB (ARM64) • 34.7 MB (Universal)</span>
+                <span className="text-white">16.2 MB (ARM64) • 36.8 MB (Universal)</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
-                <span className="text-zinc-500 font-medium">ARM64 SHA-256</span>
-                <span className="text-white font-mono text-[11px] break-all">Release Build 16 Verified</span>
+                <span className="text-zinc-500 font-medium">ARM64 Package</span>
+                <span className="text-white font-mono text-[11px] break-all">zenify-v1.1.22.apk (17,008,287 bytes)</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
-                <span className="text-zinc-500 font-medium">Universal SHA-256</span>
-                <span className="text-white font-mono text-[11px] break-all">Release Build 16 Verified</span>
+                <span className="text-zinc-500 font-medium">Universal Package</span>
+                <span className="text-white font-mono text-[11px] break-all">zenify-v1.1.22-universal.apk (38,635,649 bytes)</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Minimum Operating System</span>
@@ -488,12 +488,12 @@ export default function DownloadPage() {
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Engine & Architecture</span>
-                <span className="text-white">Flutter 3.44.2 • Dart 3.12.2 • Kotlin • Android Media3 ExoPlayer</span>
+                <span className="text-white">Flutter 3.44.2 • Dart 3.12.2 • Kotlin • AndroidX Media3 ExoPlayer 1.9.2</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
-                <span className="text-zinc-500 font-medium">What&apos;s Included in v1.0.12</span>
+                <span className="text-zinc-500 font-medium">What&apos;s Included in v1.1.22</span>
                 <span className="text-zinc-300 leading-relaxed">
-                  Scroll-linked Dynamic Island header that opens smoothly when scrolling past hero, expansive artist portrait hero section with balanced layout, edge-to-edge fullview player with zero display gaps, high-precision lyric matching, and clean audience metrics.
+                  New white + rose Zendrum app icon &amp; transparent rose favicons, Media3 1.9.2 LoadControl &amp; native Audio Focus playback fix, persistent Dock &amp; MiniPlayer across View Credits, View Lyrics, Artist, and Album pages with 180px bottom scroll clearance, stationary plain-text FullLyricsScreen, dedicated SongCreditsScreen, smart Single/Album/Video routing &amp; soundtrack resolution, offline video downloads, rigid 90° portrait/landscape PlayerShell morph with ±10s landscape skip &amp; fit/fill toggle, and transparent liquid-glass Top Picks UI.
                 </span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
@@ -521,7 +521,7 @@ export default function DownloadPage() {
                 className="h-11 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
                 <Download size={16} className="text-brand" />
-                <span>Download Zenify APK (v1.0.12 • 15.2 MB)</span>
+                <span>Download Zenify APK (v1.1.22 • 16.2 MB)</span>
               </a>
             </div>
           </motion.div>
