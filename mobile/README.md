@@ -16,15 +16,19 @@
 
 ## ✨ Features
 
-- **Pristine 320kbps Akamai CDN Audio**: Direct, low-latency stream resolution with instantaneous seeking and byte-range caching.
-- **Syllable-Synced Karaoke Lyrics**: Smooth, word-level synchronized lyric highlighting with automated instrumental pause indicators (`• • •`).
+- **Sound Atlas (177 Countries, 76 Cities, 11 Feeds)**: Interactive vector world map exploration, curated regional cities, and 11 live global country chart feeds (`IN`, `US`, `GB`, `DE`, `CA`, `AU`, `JP`, `FR`, `BR`, `KR`, `AE`).
+- **Pristine 320kbps Akamai CDN Audio**: Direct, low-latency full-track stream resolution (strictly zero 30s previews) with instantaneous seeking and byte-range caching.
+- **16:9 4K Video Theater & Offline `.mp4` Downloads**: Widescreen 4K music videos, rigid portrait/landscape morphing, background audio playback, and concurrent offline song & video downloads.
+- **20 DJ Crossfade Styles & Gapless Playback**: Powered by AndroidX Media3 `1.9.2` with 20 DJ transition styles (`1s–12s` configurable).
+- **Syllable-Synced & Plain Lyrics (50+ Languages)**: Word-level karaoke timing, stationary plain full lyrics with persistent Dock & MiniPlayer, script romanization, `• • •` gap indicators, and complete Song Credits.
 - **Hardware-Accelerated Studio FX**:
   - 3-Band Parametric Equalizer (Bass, Mid, Treble with ±12dB range)
   - 8D Spatial Audio rotation with customizable orbit speed
   - Dynamic Bass Boost & Stereo Reverb
   - Speed (0.5x – 2.0x) and Pitch Warper (-12 to +12 semitones)
-- **Room Together (Phase 1 & 2)**: Persistent synchronized multi-device rooms (`/api/v1/together`, `/ws/together` resume replay) with LiveKit voice chat, synced karaoke lyrics + translation/romanization, floating reactions, pinned moments, song requests, RBAC DJ controls, custom themes, QR/WhatsApp deep links, achievements, insights & shareable PNG recaps.
-- **Bundled SF Pro & Dynamic Island**: Offline bundled `SF Pro` / `SF Pro Display` typography (zero Google Fonts runtime fallback), Dynamic Island in-app marquee notifications, redesigned Search, Email OTP & Onboarding, and tactile spring physics.
+- **Replay & Insights + Story Sharing**: 27 telemetry metrics powering monthly & all-time recaps plus 16 exportable Story Share card templates.
+- **Room Together**: Persistent synchronized multi-device rooms (`/api/v1/together`, `/ws/together`) for up to 100 listeners with LiveKit voice chat, synced karaoke lyrics + romanization, floating reactions, pinned moments, song requests, RBAC DJ controls, custom themes, QR/App Links, and PNG recaps.
+- **Pure OLED `#000000`, SF Pro & Dynamic Island**: Solid Pure Black OLED mode, offline bundled `SF Pro` typography, and Dynamic Island marquee notifications.
 - **Offline Library & Local Music**: Seamlessly cache online tracks or play personal local audio files directly from device storage.
 - **Background & Lock-Screen Playback**: Full native MediaSession notification with cover artwork, track scrubber, skip, and like controls.
 
@@ -97,5 +101,5 @@ mobile/
 | **Universal APK** | `36.8 MB` (`38,635,649` bytes) |
 | **Min SDK** | `Android 8.0 (API 26)` |
 | **Target SDK** | `Android 15 (API 35)` |
-| **Engine** | `Flutter / Dart (SDK ^3.12)` |
+| **Engine** | `Flutter 3.44.2 / Dart ^3.12.2 / Media3 1.9.2` |
 | **License** | `MIT` |

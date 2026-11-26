@@ -58,9 +58,49 @@ export default function AboutPage() {
         style={{ fontFamily: '"Zalando Sans SemiExpanded", sans-serif' }}
       >
         <SEO
-          title="Creator & Developer – Zenify Music"
-          description="Meet the creator behind Zenify, an open-source audio streaming platform featuring real-time DSP, lyrics synchronization, and modern web tech."
+          title="Ram Prasath (hackerstudent29) – Creator & Producer of Zenify"
+          description="Meet Ram Prasath (@ramzendrum), music producer and open-source software engineer from Chennai building Zenify v1.1.22 for ad-free global audio."
+          keywords={[
+            "ram prasath",
+            "ramzendrum",
+            "hackerstudent29",
+            "zenify creator",
+            "music producer chennai",
+            "open source music developer",
+          ]}
+          type="profile"
           path="/about"
+          jsonLd={{
+            "@context": "https://schema.org",
+            "@graph": [
+              {
+                "@type": "ProfilePage",
+                "@id": "https://listenzenify.vercel.app/about#profile",
+                url: "https://listenzenify.vercel.app/about",
+                name: "Ram Prasath – Creator & Developer of Zenify",
+                mainEntity: {
+                  "@type": "Person",
+                  name: "Ram Prasath",
+                  alternateName: ["Ram", "Ramanathan S", "ramzendrum", "hackerstudent29"],
+                  jobTitle: "Music Producer & Full-Stack Software Engineer",
+                  homeLocation: { "@type": "Place", name: "Chennai, India" },
+                  sameAs: [
+                    "https://github.com/hackerstudent29",
+                    "https://github.com/hackerstudent29/Zenify",
+                    "https://www.instagram.com/ramzendrum?igsh=MXBkYXE4YnZmdHN0A==",
+                    "https://open.spotify.com/artist/3imsDaYqTYfQZ8ZhSjMD4T?si=PcXvQrghS5O7Y65u5eIc6A",
+                  ],
+                },
+              },
+              {
+                "@type": "BreadcrumbList",
+                itemListElement: [
+                  { "@type": "ListItem", position: 1, name: "Home", item: "https://listenzenify.vercel.app/" },
+                  { "@type": "ListItem", position: 2, name: "About Creator", item: "https://listenzenify.vercel.app/about" },
+                ],
+              },
+            ],
+          }}
         />
 
         <PageHeader title="Ram" />
@@ -206,7 +246,7 @@ export default function AboutPage() {
           </Section>
 
           <motion.p variants={rise} className="mt-12 text-xs text-white/30">
-            Version 1.0.9
+            Version 1.1.22
           </motion.p>
         </motion.main>
       </div>

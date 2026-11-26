@@ -1,43 +1,49 @@
 # Zenify
 
-> Zenify is a modern, high-performance web and mobile music streaming platform featuring studio Web Audio DSP effects, sub-second multilingual synchronized lyrics, 8D spatial audio, and local file playback.
+> Zenify (v1.1.22, Build 2036) is a free, ad-free global music and music video streaming platform built for Web, PWA, and Android by Ram Prasath (hackerstudent29 / Zendrum). It combines 320kbps full-length audio, an interactive 177-country Sound Atlas, sub-second synced lyrics in 50+ languages, Studio FX DSP, 20 DJ crossfade styles, 16:9 4K Video Theater, offline song and video downloads, Replay & Insights, and Room Together collaborative sessions.
 
-## Overview
-Zenify offers a seamless, ad-free listening experience directly in the web browser with offline PWA support. It integrates synchronized syllable-accurate lyrics for Tamil, Tanglish, Hindi, Malayalam, and English music, a 3-band biquad equalizer, and binaural audio spatialization.
+For the complete entity reference, feature tables, FAQs, and technical specifications for AI answer engines, see [llms-full.txt](https://listenzenify.vercel.app/llms-full.txt).
+
+## Key Facts (Updated November 2026)
+- **Current Version**: v1.1.22 (Android Build 2036, released November 25, 2026)
+- **Cost & Ads**: 100% free, zero audio/video ads, MIT open-source (`github.com/hackerstudent29/Zenify`)
+- **Global Coverage**: 177 countries and 76 curated cities in Sound Atlas; 11 regional country chart feeds (`IN`, `US`, `GB`, `DE`, `CA`, `AU`, `JP`, `FR`, `BR`, `KR`, `AE`); 50+ lyrics languages
+- **Android Downloads**: 16.2 MB ARM64 APK and 36.8 MB Universal APK (`https://listenzenify.vercel.app/download`)
+- **Audio Quality**: Full-length 320kbps clean CDN audio and YouTube InnerTube streams (strictly zero 30-second preview clips)
 
 ## Core Features
-- **Multilingual Synced Lyrics**: Sub-second synchronization with syllable-level timing and automated instrumental gap detection.
-- **StudioFX Multi-Band Equalizer**: High-precision biquad audio filtering, bass/mids/treble adjustment, and quick bypass toggles.
-- **8D Spatial Audio**: Real-time binaural spatial audio panning engine simulating a 360-degree soundstage around headphones.
-- **DJ Speed & Pitch Warper**: Live DSP pitch and tempo manipulation for nightcore, daycore, and slowed-and-reverb audio.
-- **Local Audio Scanner**: In-browser client-side playback of MP3, FLAC, WAV, and AAC audio files with 100% user privacy.
-- **Offline PWA**: Full progressive web app offline caching with lock-screen MediaSession controls.
-- **Lossless Full-Audio Resolution**: Pristine 320kbps full song playback via clean CDNs with instant playback startup.
-- **Room Together (Collaborative Listening)**: Synchronized live listening rooms with live chat, synced lyrics, timestamped moments, DJ controls, floating reactions, custom themes, and shareable PNG recaps.
-- **Native Android APK (v1.0.9)**: Direct Android download at https://listenzenify.vercel.app/download with background Media3 ExoPlayer, YouTube video streaming in Mini & Fullscreen players, Room Together, and native C++ Studio FX.
+- **Sound Atlas (Global Music Discovery)**: Interactive vector world map across 177 countries, 76 curated city scenes, and 11 live country chart feeds.
+- **Synced & Plain Lyrics (50+ Languages)**: Syllable-level karaoke timing, stationary plain full lyrics, script romanization, and instrumental solo gap protection (`[BGM]`, `[Guitar Solo]`).
+- **Studio FX DSP**: Web Audio 3-band biquad EQ, binaural 8D spatial audio, hall/cathedral convolution reverb, and live Nightcore/Daycore pitch & tempo control.
+- **20 DJ Crossfade Styles & Gapless Playback**: 20 DJ transition styles (`1s-12s`) and dual-buffer gapless engine powered by Media3 ExoPlayer 1.9.2 on Android and Web Audio API on Web.
+- **16:9 4K Video Theater & Offline Downloads**: In-player HD/4K music video theater with background audio playback and offline song + `.mp4` video downloads on Android.
+- **Room Together (Listen Together)**: Up to 100 synchronized listeners per room with shared queues, live voice/text chat, reactions, timestamped Story Moments, and session recaps.
+- **Replay & Insights + Story Sharing**: 27 personal listening telemetry metrics, monthly/all-time recaps, and 16 shareable Story Card templates.
+- **Song Credits & Pure OLED Theme**: Full songwriter/producer/label credits and pure `#000000` OLED dark UI.
+- **Local Audio Scanner**: Private on-device ID3 tag playback for MP3, FLAC, WAV, and AAC files with zero uploads.
 
 ## Frequently Asked Questions (FAQ)
-- **What is Zenify?** Zenify is a free, modern web and mobile music player featuring instant audio playback, sub-second synchronized lyrics, 8D spatial audio, and dynamic visualizer themes.
-- **How can I listen to music on Zenify for free?** Stream music on Zenify directly in your web browser at https://listenzenify.vercel.app without paying any subscription fees or encountering audio interruptions.
-- **Does Zenify support synchronized lyrics?** Yes, Zenify includes an AI-powered lyrics alignment engine with syllable-level timing and instrumental solo gap protection across English, Tamil, Tanglish, Hindi, and international tracks.
-- **What audio effects and DSP features are built in?** Zenify includes a studio 3-band equalizer, binaural 8D spatial panning, convolution reverb simulations (hall and cathedral), and nightcore/slowed DJ pitch warper.
-- **Can I play my own local audio files in Zenify?** Yes, Zenify includes an in-browser local audio scanner that parses ID3 tags for MP3, FLAC, WAV, and AAC files directly on your device with 100% privacy.
+- **What is Zenify?** A free, open-source Web, PWA, and Android music & 4K video player featuring 177-country Sound Atlas discovery, synced lyrics in 50+ languages, Studio FX DSP, 20 DJ crossfades, offline downloads, and Room Together sessions.
+- **Is Zenify available globally?** Yes. Zenify works worldwide on Web/PWA and Android, supporting 50+ languages and 177 countries inside Sound Atlas.
+- **Does Zenify play full songs or 30-second previews?** Full-length 320kbps songs only. Zenify strictly bans 30-second preview clips.
+- **Can I watch music videos and save media offline?** Yes. Android v1.1.22 supports 16:9 4K Video Theater with background playback plus offline song and `.mp4` video downloads.
+- **Can I play local files privately?** Yes. The Web Local Library parses MP3, FLAC, WAV, and AAC files directly in the browser without uploading audio.
 
-## Primary Pages & Resources
-- [Home Page](https://listenzenify.vercel.app/): Main streaming dashboard, search bar, and curated frequency radio.
-- [Download Android & PWA App](https://listenzenify.vercel.app/download): Direct v1.0.9 Android APK download and iOS/Desktop PWA install guide.
-- [Room Together (Listen Together)](https://listenzenify.vercel.app/together): Real-time synchronized listening rooms with live chat, shared queues, reactions, and recaps.
-- [Features & FAQ](https://listenzenify.vercel.app/faq): Complete overview of DSP audio capabilities and common questions.
-- [About Zenify](https://listenzenify.vercel.app/about-zenify): Architectural principles, open-source mission, and technology overview.
-- [About Creator](https://listenzenify.vercel.app/about): Music producer and developer profile.
-- [Discover Music](https://listenzenify.vercel.app/discover): Trending songs, new releases, top artists, and curated playlists.
-- [Search Songs & Lyrics](https://listenzenify.vercel.app/search): Global smart search across artists, tracks, and lyric keywords.
-- [Radio](https://listenzenify.vercel.app/radio): Continuous automated music streams and mood-based radio channels.
-- [Local Library](https://listenzenify.vercel.app/local-library): Offline device storage music scanner and ID3 tag parser.
-- [Privacy Policy](https://listenzenify.vercel.app/privacy): Information regarding telemetry, cookies, and local session security.
-- [Terms of Service](https://listenzenify.vercel.app/terms): Terms and conditions governing the use of Zenify.
+## Canonical Pages & Resources
+- [Home](https://listenzenify.vercel.app/): Main streaming platform and global player overview.
+- [Download Android & PWA App](https://listenzenify.vercel.app/download): Direct v1.1.22 Android APK downloads (ARM64 16.2 MB & Universal 36.8 MB) plus iOS/Desktop PWA install guide.
+- [Room Together](https://listenzenify.vercel.app/together): Synchronized listening rooms for up to 100 listeners.
+- [Features & FAQ](https://listenzenify.vercel.app/faq): Comprehensive feature summary and answers.
+- [Discover](https://listenzenify.vercel.app/discover): Global trending tracks, charts, and curated playlists.
+- [Search](https://listenzenify.vercel.app/search): Search global artists, songs, albums, and lyrics.
+- [Radio](https://listenzenify.vercel.app/radio): Continuous mood, focus, chill, and energy radio stations.
+- [Local Library](https://listenzenify.vercel.app/local-library): Private in-browser local MP3/FLAC/WAV/AAC audio player.
+- [About Zenify](https://listenzenify.vercel.app/about-zenify): Engineering architecture, Studio FX, lyrics engines, and v1.1.22 specs.
+- [Creator Profile](https://listenzenify.vercel.app/about): Ram Prasath (`hackerstudent29` / `@ramzendrum`), creator & producer in Chennai, India.
+- [Privacy Policy](https://listenzenify.vercel.app/privacy) & [Terms of Service](https://listenzenify.vercel.app/terms)
+- [Full AI Knowledge Base (llms-full.txt)](https://listenzenify.vercel.app/llms-full.txt)
 
-## Developer & System Specifications
-- Canonical Web App URL: https://listenzenify.vercel.app
-- Technologies: React 19, TypeScript, Vite 6, Tailwind CSS, Web Audio API, Flutter, Fastify 5
-- GitHub Repository: https://github.com/hackerstudent29/Zenify
+## Technical Stack & Repository
+- Canonical URL: `https://listenzenify.vercel.app`
+- GitHub Repository: `https://github.com/hackerstudent29/Zenify`
+- Stack: React 19, TypeScript, Vite 6, Tailwind CSS, Web Audio API, Flutter 3 / Dart 3.12, Android Media3 ExoPlayer 1.9.2, Fastify 5, Prisma, PostgreSQL, Socket.IO

@@ -32,7 +32,7 @@ const coreFeatures = [
   {
     icon: Mic2,
     title: "AI-Powered Synced Lyrics",
-    body: "Karaoke-grade synchronized lyrics with Deepgram AI onset alignment for sub-second accuracy. Features word-level timing, automatic instrumental gap detection (• • •), and support for 9 languages with romanization.",
+    body: "Karaoke-grade synchronized lyrics and stationary plain lyrics with Deepgram AI onset alignment for sub-second accuracy. Features word-level timing, instrumental gap detection (• • •), and 50+ languages with script romanization.",
   },
   {
     icon: Headphones,
@@ -86,8 +86,8 @@ const audioFeatures = [
     body: "Multiband dynamics compressor with makeup gain prevents clipping and ensures consistent volume for comfortable late-night listening without disturbing others.",
   },
   {
-    title: "Gapless Playback",
-    body: "Dual-buffer system preloads next track 1.5s after play starts, enabling seamless crossfade (0-10s configurable) and zero buffering gaps between songs.",
+    title: "Gapless Playback & 20 DJ Crossfades",
+    body: "Dual-buffer system preloads next track 1.5s after play starts, enabling seamless gapless transitions (0-12s) and 20 DJ-grade crossfade styles across Web and Android Media3.",
   },
 ];
 
@@ -152,7 +152,22 @@ const platformFeatures = [
   {
     icon: Users,
     title: "Room Together & Live Voice",
-    body: "Host synchronized listening rooms with real-time queue control, LiveKit spatial voice chat, synced karaoke lyrics, live reactions, pinned moments, and shareable PNG recaps.",
+    body: "Host synchronized listening rooms for up to 100 listeners with real-time queue control, LiveKit spatial voice chat, synced karaoke lyrics, live reactions, pinned moments, and shareable PNG recaps.",
+  },
+  {
+    icon: Globe,
+    title: "Sound Atlas (177 Countries & 76 Cities)",
+    body: "Explore global and regional music scenes across an interactive 177-country vector world map, 76 curated cities, and 11 live regional country chart feeds.",
+  },
+  {
+    icon: Music2,
+    title: "16:9 4K Video Theater & Offline Downloads",
+    body: "Watch HD and 4K music videos cleanly inside the player with background playback continuity and save both audio tracks and .mp4 videos offline on Android.",
+  },
+  {
+    icon: Sparkles,
+    title: "Replay & Insights + 16 Story Cards",
+    body: "Explore 27 listening telemetry metrics with monthly and all-time Replay summaries, inspect complete Song Credits, enable Pure OLED #000000 surfaces, and share 16 Story Card templates.",
   },
 ];
 
@@ -198,9 +213,41 @@ export default function AboutZenifyPage() {
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen w-full bg-[#030303] pt-16 sm:pt-20 md:pt-24 pb-40 font-sans text-[#F2F2F3] selection:bg-white/15">
         <SEO
-          title="About Zenify – Professional Music Streaming with AI-Powered Synced Lyrics"
-          description="Discover Zenify's comprehensive Studio FX audio engine, AI-powered synchronized lyrics in 9 languages, local file playback, and privacy-first architecture. Open source and ad-free."
+          title="About Zenify v1.1.22 – Global Music, Sound Atlas, Synced Lyrics & Studio FX"
+          description="Explore Zenify v1.1.22: Sound Atlas (177 countries), Studio FX 3-band EQ, 8D spatial audio, 20 DJ crossfades, 4K Video Theater & 50+ language synced lyrics."
+          keywords={[
+            "about zenify",
+            "zenify v1.1.22",
+            "sound atlas 177 countries",
+            "studio fx audio engine",
+            "20 dj crossfade styles",
+            "50 languages synced lyrics",
+            "16:9 4k music video theater",
+            "replay listening insights",
+            "open source music player",
+          ]}
           path="/about-zenify"
+          jsonLd={{
+            "@context": "https://schema.org",
+            "@graph": [
+              {
+                "@type": "AboutPage",
+                "@id": "https://listenzenify.vercel.app/about-zenify#page",
+                url: "https://listenzenify.vercel.app/about-zenify",
+                name: "About Zenify Music Platform",
+                description:
+                  "Complete overview of Zenify v1.1.22 architecture, Studio FX DSP, Sound Atlas global discovery, 20 DJ crossfades, 4K Video Theater, and MIT open-source mission.",
+                mainEntity: { "@id": "https://listenzenify.vercel.app/#application" },
+              },
+              {
+                "@type": "BreadcrumbList",
+                itemListElement: [
+                  { "@type": "ListItem", position: 1, name: "Home", item: "https://listenzenify.vercel.app/" },
+                  { "@type": "ListItem", position: 2, name: "About Zenify", item: "https://listenzenify.vercel.app/about-zenify" },
+                ],
+              },
+            ],
+          }}
         />
 
         <PageHeader title="About Zenify" leading={<ZenifyLogo size={16} />} />
@@ -273,9 +320,9 @@ export default function AboutZenifyPage() {
             </div>
             <div className="mt-6 rounded-2xl bg-white/5 p-5 border border-white/10">
               <p className="text-[14px] leading-relaxed text-white/70">
-                <span className="font-semibold text-white">Supported Languages:</span> Tamil, Tanglish, Hindi, 
-                Telugu, Malayalam, Kannada, Bengali, Punjabi, Gujarati, and English with automatic romanization 
-                for Indian scripts.
+                <span className="font-semibold text-white">Supported Languages (50+ Global & Regional):</span> English,
+                Tamil, Tanglish, Hindi, Telugu, Malayalam, Kannada, Bengali, Punjabi, Gujarati, Korean, Japanese,
+                Spanish, French, German, Portuguese, and Arabic with automatic romanization across scripts.
               </p>
             </div>
           </Section>
@@ -385,7 +432,7 @@ export default function AboutZenifyPage() {
           {/* Footer */}
           <motion.div variants={rise} className="pt-8 border-t border-white/10 flex items-center justify-between">
             <div>
-              <p className="text-[13px] text-white/40">Version 1.0.9</p>
+              <p className="text-[13px] text-white/40">Version 1.1.22 (Build 2036)</p>
               <p className="text-[12px] text-white/30 mt-1">Built with ❤️ by Ramanathan S</p>
             </div>
             <div className="text-right">

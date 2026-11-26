@@ -56,7 +56,7 @@ Unlike conventional wrappers, Zenify interfaces directly with low-level audio re
 | **Target OS** | Android 15 (API level 35) |
 | **Minimum OS** | Android 8.0 (API level 26 - Oreo) |
 | **Native Compilation** | Kotlin 2.0.21 / JVM 17 |
-| **Cross-Platform Engine** | Flutter 3.44.2 / Dart 3.12.0 |
+| **Cross-Platform Engine** | Flutter 3.44.2 / Dart 3.12.2 |
 | **Universal APK Size** | `36.8 MB` (`38,635,649` bytes) |
 | **ARM64 Optimized Split**| `16.2 MB` (`17,008,287` bytes) |
 | **Audio Bitrates** | 320 kbps (Lossless/HQ), 160 kbps (Opus), 128 kbps (AAC), 70 kbps (Data Saver) |
@@ -112,7 +112,7 @@ Unlike conventional wrappers, Zenify interfaces directly with low-level audio re
 ## 🛠 Technology Stacks & Architecture
 
 ### 1. Frontend & UI Framework
-* **Flutter SDK (`v3.44.2`) & Dart (`v3.12.0`)**: High-framerate UI rendering supporting native 60Hz and 120Hz ProMotion display panels.
+* **Flutter SDK (`v3.44.2`) & Dart (`v3.12.2`)**: High-framerate UI rendering supporting native 60Hz and 120Hz ProMotion display panels.
 * **Design System & Aesthetics**:
   * **Typography**: Bundled offline Apple `SF Pro Display` & `SF Pro Text` typography (zero runtime Google Fonts requests).
   * **Surfaces**: Custom `AppleGlass` frosted backdrop filters, dynamic specular rim lighting, and fluid glass shaders.
@@ -123,7 +123,7 @@ Unlike conventional wrappers, Zenify interfaces directly with low-level audio re
   * Isolated 120fps scrubbers via `positionNotifier` to eliminate unnecessary widget re-renders during playback.
 
 ### 2. Native Android & Audio Engine
-* **AndroidX Media3 ExoPlayer (`1.5.1`)**: Industry-standard media streaming core providing robust buffer management and low-latency chunk parsing.
+* **AndroidX Media3 ExoPlayer (`1.9.2`)**: Industry-standard media streaming core providing robust `LoadControl` buffer management, native audio focus handling, and low-latency chunk parsing.
 * **Kotlin Native Plugins (`ZenAudioPlugin.kt`)**: Bidirectional platform channels (`MethodChannel` & `EventChannel`) bridging Flutter and native Android audio threads.
 * **Native Audio Processing (`ZenFxProcessor.kt`)**: Custom `BaseAudioProcessor` operating directly on 16-bit PCM audio buffers:
   * **3-Band Parametric Equalizer**: Low Shelf, Peaking Mid, and High Shelf biquad IIR filters with ±12 dB gain adjustment.
@@ -177,10 +177,9 @@ Built into `ZenFxProcessor.kt`, the DSP engine operates at 44.1kHz / 48kHz:
 * **8D Spatial Audio**: Simulates an orbital listener head-related impulse response, sweeping sound across the stereo soundstage at customizable RPM speeds.
 * **Vocal Isolator & Clarity**: Inverts and scales center-panned vocal frequencies to enhance instrumentals or elevate vocal definition.
 
-### 4. Crossfade & Gapless Transition Engine
+### 4. 20 DJ Crossfade Styles & Gapless Transition Engine
 * Dual ExoPlayer design (`player` and `fadePlayer`) coordinated by an Android `ValueAnimator`.
-* When transitioning between songs with crossfade enabled (1s to 12s), the incoming player starts silently while the outgoing player gently fades out via linear gain interpolation.
-* Defaults to `0s` (Off) for standard gapless playback.
+* Choose from **20 DJ-grade transition styles** with customizable **1s to 12s** fade curves alongside standard `0s` gapless playback.
 
 ### 5. Real-Time Volume Normalization (-14 LUFS)
 * Intercepts YouTube loudness metadata (`loudnessDb`).
@@ -208,13 +207,15 @@ Built into `ZenFxProcessor.kt`, the DSP engine operates at 44.1kHz / 48kHz:
   * `NetworkCapabilities.TRANSPORT_ETHERNET`
 * When "Download on Wi-Fi Only" is toggled in Settings, cellular downloads are blocked automatically to protect user mobile data limits.
 
-### 10. Word-by-Word Syllable-Synced Karaoke Lyrics
-* Parses synced LRC and InnerTube JSON lyrics into word-level timestamps.
-* Features automatic 3-dot instrumental countdown indicators (`• • •`), interactive lyric line scrub jumping, and auto-scroll tracking.
+### 10. Word-by-Word Karaoke, Stationary Plain Lyrics & Song Credits
+* Parses synced LRC and InnerTube JSON lyrics into word-level timestamps, plus a dedicated stationary plain-text full lyrics view with persistent Dock & MiniPlayer navigation and full `SongCreditsScreen` metadata.
+* Covers **50+ global and regional languages** with script romanization, `• • •` instrumental countdown indicators, and interactive lyric seek jumping.
 
-### 11. Room Together Multi-Device Spatial Sync
-* Collaborative listening rooms supporting up to 50 concurrent participants.
-* Features role-based access control (Host, Co-Host, DJ, Guest), synchronized song queues, chat reactions, and LiveKit voice chat.
+### 11. Room Together, Sound Atlas (177 Countries) & Replay Insights
+* **Room Together**: Collaborative listening rooms supporting up to 100 concurrent participants with role-based access control (Host, Co-Host, DJ, Guest), synchronized song queues, reactions, Story Moments, and LiveKit voice chat.
+* **Sound Atlas Global Discovery**: Interactive 177-country vector world map, 76 curated cities, and 11 live country chart feeds (`IN`, `US`, `GB`, `DE`, `CA`, `AU`, `JP`, `FR`, `BR`, `KR`, `AE`).
+* **Replay & Insights + Story Sharing**: 27 listening telemetry metrics with monthly/all-time Replay recaps and 16 share card export templates.
+* **16:9 4K Video Theater & Offline `.mp4` Downloads**: Dual landscape/portrait 4K video toggle, background playback continuity, and concurrent offline audio + `.mp4` video downloads.
 
 ---
 

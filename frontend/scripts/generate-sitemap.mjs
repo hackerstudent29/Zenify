@@ -12,6 +12,7 @@ const STATIC_ROUTES = [
   '/download',
   '/together',
   '/discover',
+  '/search',
   '/radio',
   '/faq',
   '/about-zenify',

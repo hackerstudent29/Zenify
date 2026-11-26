@@ -983,7 +983,7 @@ export async function togetherPublicRoutes(server: FastifyInstance) {
         relation: ['delegate_permission/common.handle_all_urls'],
         target: {
           namespace: 'android_app',
-          package_name: process.env.ANDROID_PACKAGE_NAME || 'com.example.zenify_mobile',
+          package_name: process.env.ANDROID_PACKAGE_NAME || 'com.zenify.mobile',
           sha256_cert_fingerprints:
             fingerprints.length > 0
               ? fingerprints
@@ -1000,15 +1000,38 @@ export async function togetherPublicRoutes(server: FastifyInstance) {
     const room = await prisma.togetherRoom
       .findUnique({ where: { code: cleanCode }, select: { name: true, description: true, coverUrl: true } })
       .catch(() => null);
+    const escHtml = (value: string) =>
+      value.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] || ch));
     const deepLink = `zenify://room/${cleanCode}${invite ? `?invite=${encodeURIComponent(invite)}` : ''}`;
-    const title = (room?.name || `Join Room ${cleanCode}`).replace(/</g, '&lt;');
+    const webRoomUrl = `https://listenzenify.vercel.app/together?code=${encodeURIComponent(cleanCode)}`;
+    const title = escHtml(room?.name || `Join Room ${cleanCode}`);
+    const description = escHtml(
+      room?.description || 'Open in Zenify Room Together to listen in millisecond real-time sync with shared queues, voice chat, and synced lyrics.'
+    );
+    const ogImage = escHtml(
+      room?.coverUrl && /^https?:\/\//i.test(room.coverUrl)
+        ? room.coverUrl
+        : 'https://listenzenify.vercel.app/og-image.png'
+    );
 
     return reply.type('text/html').send(`<!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} — Zenify Room Together</title>
+<meta name="description" content="${description}">
+<meta name="robots" content="noindex, follow">
+<meta name="theme-color" content="#121214">
+<meta property="og:site_name" content="Zenify">
+<meta property="og:type" content="website">
+<meta property="og:title" content="${title} — Zenify Room Together">
+<meta property="og:description" content="${description}">
+<meta property="og:image" content="${ogImage}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title} — Zenify Room Together">
+<meta name="twitter:description" content="${description}">
+<meta name="twitter:image" content="${ogImage}">
 <style>body{font-family:-apple-system,system-ui,sans-serif;background:#121214;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;padding:24px}
-.box{max-width:400px;text-align:center}.btn{display:inline-block;margin-top:20px;padding:14px 28px;border-radius:999px;background:#fa2d48;color:#fff;text-decoration:none;font-weight:700}</style>
-</head><body><div class="box"><h1>${title}</h1><p>Open in Zenify to listen together in real time.</p>
-<a class="btn" href="${deepLink}">Open in Zenify</a></div></body></html>`);
+.box{max-width:420px;text-align:center}.actions{display:flex;flex-direction:column;gap:12px;margin-top:24px}.btn{display:inline-block;padding:14px 28px;border-radius:12px;background:#fa2d48;color:#fff;text-decoration:none;font-weight:700}.btn-secondary{background:#18181b;border:1px solid rgba(255,255,255,0.12);color:#fff}</style>
+</head><body><div class="box"><h1>${title}</h1><p>${description}</p>
+<div class="actions"><a class="btn" href="${deepLink}">Open in Zenify App</a><a class="btn btn-secondary" href="${webRoomUrl}">Join in Web Player</a></div></div></body></html>`);
   });
 }

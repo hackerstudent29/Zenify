@@ -1,7 +1,7 @@
 {
   "name": "backend",
   "version": "1.1.22",
-  "description": "Zenify Backend API — Fastify 5, TypeScript, Prisma, Redis, 320kbps audio resolver, multilingual lyrics orchestrator, and real-time Room Together WebSocket engine.",
+  "description": "Zenify Backend API (v1.1.22) — Fastify 5, TypeScript, Prisma, Redis, 320kbps full-track audio resolver, 50+ language lyrics orchestrator, and real-time Room Together WebSocket engine.",
   "homepage": "https://listenzenify.vercel.app",
   "repository": {
     "type": "git",
@@ -26,6 +26,8 @@
     "music-app",
     "music-player",
     "online-music-player",
+    "global-music-discovery",
+    "sound-atlas",
     "free-music",
     "spotify-alternative",
     "ad-free",
@@ -33,7 +35,10 @@
     "open-source",
     "audio-streaming",
     "synced-lyrics",
+    "multilingual-lyrics",
     "lyrics",
+    "room-together",
+    "4k-music-videos",
     "apple-music-ui",
     "playlist",
     "equalizer",

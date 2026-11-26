@@ -750,9 +750,58 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
         className="min-h-screen bg-[#1c1c1e] text-white relative antialiased selection:bg-brand selection:text-white pt-[calc(64px+env(safe-area-inset-top,0px))] md:pt-[calc(72px+env(safe-area-inset-top,0px))] pb-[calc(80px+64px+env(safe-area-inset-bottom,0px))] md:pb-[calc(110px+env(safe-area-inset-bottom,0px))]"
       >
         <SEO
-          title={isSearchRoute ? "Search Songs, Artists & Multilingual Lyrics – Zenify" : "Discover Trending Music, New Releases & Top Charts – Zenify"}
-          description={isSearchRoute ? "Search millions of tracks, albums, and artists with instant playback and synchronized lyrics in Tamil, Hindi, and English on Zenify." : "Explore trending tracks, newly released albums, and curated multilingual playlists with real-time synchronized lyrics on Zenify."}
+          title={
+            isSearchRoute
+              ? "Search Global Songs, Artists & 50+ Language Lyrics – Zenify"
+              : "Discover Global Charts, New Releases & Sound Atlas – Zenify"
+          }
+          description={
+            isSearchRoute
+              ? "Search millions of global songs, albums, artists, and 4K music videos with instant 320kbps playback and synced lyrics in 50+ languages."
+              : "Explore global trending charts across 11 country feeds and 177 Sound Atlas regions, newly released albums, 4K videos, and playlists on Zenify."
+          }
+          keywords={
+            isSearchRoute
+              ? [
+                  "search music free",
+                  "search synced lyrics",
+                  "global song search",
+                  "hindi tamil english kpop jpop search",
+                  "zenify search",
+                ]
+              : [
+                  "discover global music",
+                  "sound atlas charts",
+                  "top music charts worldwide",
+                  "trending albums playlists",
+                  "international music player",
+                  "zenify discover",
+                ]
+          }
           path={isSearchRoute ? "/search" : "/discover"}
+          jsonLd={{
+            "@context": "https://schema.org",
+            "@graph": [
+              {
+                "@type": isSearchRoute ? "SearchResultsPage" : "CollectionPage",
+                "@id": `https://listenzenify.vercel.app${isSearchRoute ? "/search" : "/discover"}#page`,
+                url: `https://listenzenify.vercel.app${isSearchRoute ? "/search" : "/discover"}`,
+                name: isSearchRoute ? "Search Music & Lyrics – Zenify" : "Discover Global Music – Zenify",
+              },
+              {
+                "@type": "BreadcrumbList",
+                itemListElement: [
+                  { "@type": "ListItem", position: 1, name: "Home", item: "https://listenzenify.vercel.app/" },
+                  {
+                    "@type": "ListItem",
+                    position: 2,
+                    name: isSearchRoute ? "Search" : "Discover",
+                    item: `https://listenzenify.vercel.app${isSearchRoute ? "/search" : "/discover"}`,
+                  },
+                ],
+              },
+            ],
+          }}
         />
 
         {/* Ambient tint, like the artwork wash behind Apple Music's sidebar */}

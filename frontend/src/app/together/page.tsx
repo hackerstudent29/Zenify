@@ -209,9 +209,37 @@ export default function TogetherHubPage() {
       className="mx-auto min-h-screen max-w-4xl select-none px-4 pb-32 pt-20 text-white antialiased sm:px-6 sm:pt-24"
     >
       <SEO
-        title="Listen Together – Zenify"
-        description="Listen in sync with up to 100 friends. Shared queue, live chat and reactions."
+        title="Room Together – Listen to Music in Live Global Sync | Zenify"
+        description="Host or join live Room Together listening parties for up to 100 friends. Synced queues, voice chat, reactions, Story Moments & session recaps."
+        keywords={[
+          "room together",
+          "listen together music",
+          "synced music party",
+          "listen with friends online free",
+          "shared playlist room",
+          "zenify room together",
+        ]}
         path="/together"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "WebPage",
+              "@id": "https://listenzenify.vercel.app/together#page",
+              url: "https://listenzenify.vercel.app/together",
+              name: "Room Together – Synchronized Listening Rooms | Zenify",
+              description:
+                "Create or join real-time synced listening rooms for up to 100 listeners with shared queues, voice chat, live reactions, Story Moments, and recaps.",
+            },
+            {
+              "@type": "BreadcrumbList",
+              itemListElement: [
+                { "@type": "ListItem", position: 1, name: "Home", item: "https://listenzenify.vercel.app/" },
+                { "@type": "ListItem", position: 2, name: "Room Together", item: "https://listenzenify.vercel.app/together" },
+              ],
+            },
+          ],
+        }}
       />
 
       <header className="mb-6">

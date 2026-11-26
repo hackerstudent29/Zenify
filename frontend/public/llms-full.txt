@@ -1,0 +1,87 @@
+# Zenify — Complete Global Platform & AI Knowledge Reference
+
+> TL;DR: Zenify (v1.1.22, Android Build 2036, updated November 25, 2026) is an ad-free, MIT open-source global music and 4K video streaming platform built by Ram Prasath (hackerstudent29 / Zendrum) for Web, installable PWA (Windows, macOS, Linux, iOS), and native Android (8.0+). It pairs full-length 320kbps audio and 16:9 4K music videos with an interactive 177-country / 76-city Sound Atlas, 11 live country chart feeds, sub-second synced lyrics in 50+ languages with script romanization, Studio FX DSP, 20 DJ crossfade transition styles, offline audio & .mp4 video downloads, Replay & Insights (27 metrics), 16 Story Share templates, Song Credits, Pure OLED (#000000) dark mode, local FLAC/MP3 playback, and Room Together collaborative listening for up to 100 people.
+
+- **Official Website**: https://listenzenify.vercel.app/
+- **Direct App Downloads**: https://listenzenify.vercel.app/download
+- **Source Repository**: https://github.com/hackerstudent29/Zenify
+- **Creator**: Ram Prasath (`hackerstudent29` / `ramzendrum`), Chennai, India
+- **License**: MIT Open Source
+- **Current Release**: v1.1.22 (Build 2036, November 25, 2026)
+
+---
+
+## Platform Capabilities Matrix
+
+| Capability | Web & Installable PWA | Native Android App (v1.1.22) |
+|---|---|---|
+| Full-Length 320kbps Audio (Zero 30s Previews) | Yes | Yes (Akamai CDN + InnerTube) |
+| 16:9 4K Video Theater & Background Play | Yes (Video Overlay) | Yes (ExoPlayer Media3 1.9.2 + In-Player Toggle) |
+| Offline Audio & `.mp4` Video Downloads | IndexedDB / Cache PWA | Yes (Concurrent Download Manager + Smart Tracked Cache) |
+| Synced & Plain Lyrics (50+ Languages + Romanization) | Yes (Syllable + LRC + Studio) | Yes (Word-by-Word + Stationary Plain Lyrics) |
+| Sound Atlas World Map (177 Countries, 76 Cities) | Global Charts & Discover | Interactive Vector Atlas, 177 Countries, 76 Cities, 11 Feeds |
+| Studio FX & Equalizer | Web Audio 3-Band EQ, 8D, Reverb, Nightcore | Native Studio FX EQ, Bass Boost, Pitch/Speed & Visualizer |
+| Crossfade & Gapless Engine | Dual-Buffer Gapless Web Audio | 20 DJ Crossfade Styles (1s-12s Configurable) |
+| Room Together (Up to 100 Listeners) | Yes (Sync, Chat, Moments, Recaps) | Yes (Deep Links, Queue Voting, Voice/Text Chat, Reactions) |
+| Replay & Insights + Story Cards | Listening History & Stats | 27 Telemetry Metrics, Monthly/All-Time Recaps, 16 Story Cards |
+| Song Credits & Pure OLED Theme | Liquid Glass UI & Credits | Full Credits Sheet & `#000000` Pure OLED Surfaces |
+| Private Local File Playback | MP3, FLAC, WAV, AAC (In-Browser ID3) | Device Media Integration |
+| Package Size & OS Requirements | Any Modern Browser / iOS Safari PWA | Android 8.0+ (16.2 MB ARM64 APK / 36.8 MB Universal APK) |
+
+---
+
+## Global Discovery & Language Coverage
+
+### Sound Atlas (177 Countries, 76 Cities, 11 Live Country Feeds)
+Zenify is engineered for worldwide discovery rather than a single region:
+- **Interactive Vector World Map**: Covers 177 countries with tap-to-explore regional musical identities and moods.
+- **76 Curated Music Cities**: Localized scene exploration across major global cultural capitals.
+- **11 Live Country Chart Feeds**: Dedicated real-time regional charts for **India (`IN`), United States (`US`), United Kingdom (`GB`), Germany (`DE`), Canada (`CA`), Australia (`AU`), Japan (`JP`), France (`FR`), Brazil (`BR`), South Korea (`KR`), and the United Arab Emirates (`AE`)**.
+
+### Multilingual Lyrics & Script Support (50+ Languages)
+- Powered by community open databases (`LRCLIB`, `lrc.red` / Unison) and speech-alignment tooling (`Deepgram Nova-3 / Nova-2`).
+- Supports **word-by-word karaoke timing**, **line-by-line LRC timing**, and **Stationary Plain Full Lyrics** for uninterrupted reading.
+- Covers **50+ global and regional languages**, including **English, Tamil, Tanglish, Hindi, Malayalam, Telugu, Kannada, Punjabi, Korean, Japanese, Spanish, French, German, Portuguese, and Arabic**.
+- Includes **automatic romanization/transliteration** so international listeners can sing along across scripts, plus **smart instrumental gap detection** (`[BGM]`, `[Guitar Solo]`).
+
+---
+
+## Audio Engine, Video Theater & Social Architecture
+
+1. **Full-Song Streaming Priority (No 30s Snippets)**:
+   - Zenify strictly avoids 30-second preview clips. It prioritizes pristine 320kbps full tracks and real-time InnerTube full audio extraction with HTTP Range (`206 Partial Content`) seeking.
+2. **20 DJ Crossfade Transition Styles**:
+   - Powered by `androidx.media3:media3-exoplayer:1.9.2` on Android with 20 named DJ transition curves and adjustable `1s-12s` crossfade durations.
+3. **16:9 4K Video Theater & Offline Video**:
+   - Switch any compatible music video directly between clean audio mode and full 16:9 HD/4K playback, continue listening in background/lock-screen mode, and download offline `.mp4` videos on Android.
+4. **Room Together Live Sync**:
+   - Supports up to 100 synchronized participants per room (`zenify://room/<code>`, `/room/<code>`) with drift correction, collaborative queuing, live chat, emoji reactions, voice rooms, Story Moments, custom room themes, and shareable session recaps.
+5. **Replay & Insights + Story Sharing**:
+   - Records 27 granular listening telemetry metrics locally/synced to power Monthly & All-Time Replay summaries and 16 animated/static Story Card export templates.
+
+---
+
+## Canonical URL Directory
+
+- `/` — Main Web Streaming Player & Radio Dashboard
+- `/discover` — Trending Songs, Global Charts, Albums & Curated Playlists
+- `/search` — Smart Search Across Songs, Artists, Albums & Lyrics
+- `/download` — Zenify v1.1.22 Android APK (ARM64 16.2 MB & Universal 36.8 MB) + iOS/Desktop PWA Install Guide
+- `/together` — Room Together Synchronized Live Listening Hub
+- `/radio` — Continuous Curated Mood, Focus, Chill & Energy Channels
+- `/local-library` — Private Client-Side MP3, FLAC, WAV & AAC Player
+- `/faq` — Platform Capabilities & Frequently Asked Questions
+- `/about-zenify` — Full Technical Overview, DSP Suite, Attribution & Specs
+- `/about` — Creator & Music Producer Bio (Ram Prasath / `@ramzendrum`)
+- `/privacy` — Privacy Policy (Zero Third-Party Ad Tracking)
+- `/terms` — Terms of Service
+- `/llms.txt` — Concise AI Assistant Summary
+- `/llms-full.txt` — Complete AI Reference (this document)
+
+---
+
+## Technical Stack
+
+- **Web Frontend**: React 19, TypeScript, Vite 6, Tailwind CSS v4, Web Audio API DSP, Canvas 2D FFT Visualizer, IndexedDB
+- **Mobile App**: Flutter 3, Dart 3.12, Media3 ExoPlayer 1.9.2, Native Android Equalizer & Deep Links (`com.zenify.mobile`)
+- **Backend & Real-Time Engine**: Fastify 5, Node.js, TypeScript, Prisma ORM, PostgreSQL, Socket.IO, Cloudflare R2, yt-dlp HTTP 206 Proxy

@@ -32,38 +32,32 @@
 
 ## 🎛️ Audio & Features
 
-### Q: What audio effects does Zenify have?
+### Q: What audio effects, DJ crossfades, and video features does Zenify have?
 **A**: 
-- 3-band equalizer (Bass, Mid, Treble)
-- 8D spatial audio
-- Vocal isolation/extraction
-- Effects: Chorus, Echo, Reverb, Drive, Stereo Width
-- Speed control (0.5x-2x)
-- Pitch shifting (-12 to +12 semitones)
-- 10+ audio presets
-- Night mode compression
+- **Studio FX DSP**: 3-band equalizer (Bass, Mid, Treble), 8D spatial audio, vocal isolation/extraction, Chorus, Echo, Reverb, Drive, Stereo Width, speed control (`0.5x–2.0x`), pitch shifting (`-12` to `+12` semitones), and Night mode compression
+- **20 DJ Crossfade Styles (Android v1.1.22)**: 20 smooth DJ transition curves customizable between `1s–12s`, alongside standard gapless playback
+- **16:9 4K Video Theater**: In-player music video toggle with seamless background audio continuity and offline `.mp4` video downloads on Android
+- **Sound Atlas (Global Music Map)**: Interactive 177-country world map, 76 curated global music cities, and 11 live country chart feeds (`IN`, `US`, `GB`, `DE`, `CA`, `AU`, `JP`, `FR`, `BR`, `KR`, `AE`)
+- **Replay & Insights + Story Sharing**: 27 listening telemetry metrics, monthly/all-time recaps, 16 share card templates, Song Credits, and Pure OLED `#000000` dark mode
 
-### Q: Can I use Zenify for karaoke?
-**A**: Yes! Zenify has vocal isolation + word-level lyrics highlighting perfect for karaoke.
-
-### Q: Does Zenify have video/music creation tools?
-**A**: No, Zenify is a player only. For production, use DAWs like FL Studio, Ableton, etc.
+### Q: Can I use Zenify for karaoke and reading lyrics?
+**A**: Yes! Zenify includes vocal isolation + word-level karaoke highlighting, plus stationary plain full lyrics and automatic romanization.
 
 ---
 
 ## 🔤 Lyrics & Languages
 
 ### Q: What languages have synced lyrics?
-**A**: Tamil, Hindi, Malayalam (fully synced). 50+ languages supported (auto-translated).
+**A**: Full word-by-word/line synced lyrics and stationary plain lyrics across **50+ global and regional languages**, including English, Tamil, Tanglish, Hindi, Malayalam, Telugu, Kannada, Punjabi, Korean, Japanese, Spanish, French, German, Portuguese, and Arabic—with script romanization.
 
 ### Q: How accurate is lyrics sync?
-**A**: Sub-second accuracy. Word-level highlighting supported. Synced offline.
+**A**: Sub-second accuracy. Word-level highlighting and stationary plain lyrics are supported, with offline cached lyric support.
 
-### Q: Can I add custom lyrics?
-**A**: Not yet, but planned for future versions.
+### Q: Can I add custom or community-contributed lyrics?
+**A**: Admins and contributors can align and export LRC timing in the Web Lyric Studio, alongside automated multi-source enrichment (`LRCLIB`, `lrc.red`, Deepgram alignment).
 
-### Q: Why doesn't my language have synced lyrics?
-**A**: Regional language support is expanding. We're adding more languages each release.
+### Q: Why doesn't my language have synced lyrics yet for a specific song?
+**A**: Regional and international language coverage expands continuously with each release; when word-sync is unavailable, Zenify falls back cleanly to plain lyrics.
 
 ---
 
@@ -71,30 +65,29 @@
 
 ### Q: How do I install Zenify?
 **A**: 
-- **Web**: Just visit https://listenzenify.vercel.app (no install needed)
-- **PWA**: Click "Install" in browser
+- **Web**: Visit [listenzenify.vercel.app](https://listenzenify.vercel.app) (no install needed)
+- **PWA**: Click "Install" in Chrome/Edge or "Add to Home Screen" in iOS/macOS Safari
+- **Android (v1.1.22, Build 2036)**: Download the `16.2 MB` ARM64 APK or `36.8 MB` Universal APK from [listenzenify.vercel.app/download](https://listenzenify.vercel.app/download) or [GitHub Releases](https://github.com/hackerstudent29/Zenify/releases/tag/v1.1.22)
 - **Docker**: `docker-compose up`
-- **Android**: Download APK from releases
 
 ### Q: Do I need Node.js installed?
-**A**: Only for manual setup. Docker or PWA requires nothing.
+**A**: Only for manual self-hosted setup. Using the Web app, PWA, Docker, or Android APK requires no developer tools.
 
 ### Q: How long does setup take?
 **A**: 
 - Web: Instant
-- PWA: 1 minute
+- PWA / Android APK: Under 1 minute
 - Docker: 2 minutes
-- Manual: 5-10 minutes
+- Manual source build: 5–10 minutes
 
-### Q: What's the minimum browser requirement?
-**A**: Chrome, Firefox, Safari, Edge (latest versions). Web Audio API required.
+### Q: What's the minimum requirement?
+**A**: Android 8.0+ (API 26+) for the native APK, or latest Chrome, Firefox, Safari, or Edge with Web Audio API for Web/PWA.
 
-### Q: Does Zenify work on mobile?
+### Q: Does Zenify work on mobile and globally?
 **A**: 
-- **Web**: Yes (responsive design)
-- **PWA**: Yes (install as app)
-- **Android**: Yes (Flutter app)
-- **iOS**: Not yet (licensing constraints)
+- **Android**: Native Flutter + Media3 ExoPlayer `1.9.2` APK (`com.zenify.mobile`)
+- **Web / PWA**: Responsive worldwide web player & installable PWA
+- **iOS / iPadOS**: Works via Safari PWA (`Share -> Add to Home Screen`)
 
 ---
 
@@ -102,21 +95,22 @@
 
 ### Q: Where does music come from?
 **A**: 
-- YouTube (primary source)
-- iTunes CDN (official streams)
-- Local files (your MP3s)
+- Pristine **320kbps Clean CDN** full-length streams (global and regional releases)
+- **YouTube InnerTube** full-length audio & 16:9 4K music video streams with HTTP 206 seeking
+- **Private Local Files** (your personal MP3, FLAC, WAV, M4A, AAC files)
+> Zenify enforces a strict ban on 30-second preview snippets so every track plays in full length.
 
 ### Q: Can I use Zenify offline?
-**A**: Yes! Works with:
-- Cached music (previously played)
+**A**: Yes! Works offline with:
+- Downloaded full-length songs (`.m4a`) and offline music videos (`.mp4`) on Android
 - Local files (MP3, FLAC, WAV, M4A, AAC)
-- Offline lyrics
+- Offline synced & plain lyrics and artwork
 
-### Q: Can Zenify directly stream from Spotify?
-**A**: No. Due to licensing, Zenify uses YouTube/iTunes instead.
+### Q: Can I listen together with friends across the world?
+**A**: Yes! **Room Together** supports up to 100 synchronized participants with shared queues, LiveKit voice chat, reactions, timestamped Story Moments, and session recaps.
 
-### Q: Is Zenify legal?
-**A**: Yes. Music from official sources (YouTube, iTunes) via legal APIs.
+### Q: Is Zenify open source and privacy-friendly?
+**A**: Yes. Music streams are resolved seamlessly and open-source code is inspectable on GitHub.
 
 ---
 
@@ -192,13 +186,12 @@
 
 ## 🚀 Roadmap & Future
 
-### Q: What features are coming?
-**A**: See [ROADMAP.md](ROADMAP.md) for v2.6-v3.0 plans:
-- More languages (Telugu, Kannada, Bengali, etc.)
-- Artist dashboard
-- Playlist collaboration
-- iOS app support
-- Podcast support
+### Q: What features are coming next?
+**A**: See [CHANGELOG.md](../CHANGELOG.md) for latest `v1.1.22` releases (Sound Atlas across 177 countries & 76 cities, 20 DJ crossfade styles, 16:9 4K Video Theater & offline `.mp4` downloads, Replay & Insights with 27 metrics, and 16 Story Share templates) and upcoming cross-platform enhancements:
+- Expanded Sound Atlas city scenes & additional regional feeds
+- Collaborative playlists & artist analytics
+- Native Apple silicon / iOS Swift exploration alongside PWA
+- Podcast & long-form audio chapters
 
 ### Q: When is the next release?
 **A**: Monthly releases. Check [CHANGELOG.md](../CHANGELOG.md) for dates.
@@ -217,6 +210,6 @@
 
 ---
 
-**Last updated**: October 2026  
+**Last updated**: November 2026 (`v1.1.22`)  
 **Suggest a question?** Open an issue or discussion!
 

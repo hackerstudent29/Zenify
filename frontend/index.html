@@ -16,42 +16,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     
     <!-- Primary Fallback Meta Tags -->
-    <title>Zenify – Free Music Player with Synced Lyrics & 8D Audio</title>
-    <meta name="title" content="Zenify – Free Music Player with Synced Lyrics & 8D Audio" />
-    <meta name="description" content="Stream millions of songs with sub-second synchronized lyrics in 50+ languages, studio 3-band EQ, 8D spatial audio, Listen Together rooms, and local file playback. Free & ad-free." />
-    <meta name="keywords" content="zenify, free music player, ad-free music streaming, synced lyrics, 8d spatial audio, studio equalizer, listen together, room together, android music apk, spotify alternative, local flac mp3 player" />
+    <title>Zenify – Global Ad-Free Music Player, Synced Lyrics, Sound Atlas & 8D Audio</title>
+    <meta name="title" content="Zenify – Global Ad-Free Music Player, Synced Lyrics, Sound Atlas & 8D Audio" />
+    <meta name="description" content="Stream 320kbps music & 4K videos worldwide free. Explore 177-country Sound Atlas, lyrics in 50+ languages, 20 DJ crossfades, 8D audio & Room Together." />
+    <meta name="keywords" content="zenify, listenzenify, free music player, ad-free music streaming, sound atlas, world music map, 177 countries music discovery, synced lyrics 50 languages, 20 dj crossfade styles, 8d spatial audio, studio 3-band equalizer, 4k music video theater, room together live listening, offline music video download, pure oled android music apk, replay listening insights, spotify alternative, local flac mp3 player" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="author" content="Ram Prasath (hackerstudent29)" />
     <meta name="application-name" content="Zenify" />
     <meta name="apple-mobile-web-app-title" content="Zenify" />
+    <link rel="alternate" hreflang="en" href="https://listenzenify.vercel.app/" />
+    <link rel="alternate" hreflang="en-US" href="https://listenzenify.vercel.app/" />
+    <link rel="alternate" hreflang="en-IN" href="https://listenzenify.vercel.app/" />
+    <link rel="alternate" hreflang="en-GB" href="https://listenzenify.vercel.app/" />
+    <link rel="alternate" hreflang="x-default" href="https://listenzenify.vercel.app/" />
+    <link rel="alternate" type="text/plain" title="llms.txt" href="https://listenzenify.vercel.app/llms.txt" />
+    <link rel="alternate" type="text/plain" title="llms-full.txt" href="https://listenzenify.vercel.app/llms-full.txt" />
     <meta property="og:site_name" content="Zenify" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://listenzenify.vercel.app/" />
-    <meta property="og:title" content="Zenify – Free Music Player with Synced Lyrics & 8D Audio" />
-    <meta property="og:description" content="Stream millions of songs with sub-second synchronized lyrics in 50+ languages, studio 3-band EQ, 8D spatial audio, Listen Together rooms, and local file playback." />
+    <meta property="og:title" content="Zenify – Global Ad-Free Music Player, Synced Lyrics, Sound Atlas & 8D Audio" />
+    <meta property="og:description" content="Stream 320kbps music & 4K videos worldwide free. Explore 177-country Sound Atlas, synced lyrics in 50+ languages, 20 DJ crossfades, 8D audio & Room Together." />
     <meta property="og:image" content="https://listenzenify.vercel.app/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="en_IN" />
+    <meta property="og:locale:alternate" content="en_GB" />
+    <meta property="og:locale:alternate" content="en_CA" />
+    <meta property="og:locale:alternate" content="en_AU" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@zenifymusic" />
-    <meta name="twitter:title" content="Zenify – Free Music Player with Synced Lyrics & 8D Audio" />
-    <meta name="twitter:description" content="Stream millions of songs with sub-second synchronized lyrics, 8D spatial audio, studio 3-band EQ, and synced Room Together sessions. Free & ad-free." />
+    <meta name="twitter:title" content="Zenify – Global Ad-Free Music Player, Synced Lyrics, Sound Atlas & 8D Audio" />
+    <meta name="twitter:description" content="Stream 320kbps music & 4K videos worldwide free. Sound Atlas (177 countries), synced lyrics in 50+ languages, 20 DJ crossfades, 8D audio & Room Together." />
     <meta name="twitter:image" content="https://listenzenify.vercel.app/og-image.png" />
 
-    <!-- Google Site Name & Application Structured Data -->
+    <!-- Google Site Name, Organization & Application Structured Data -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "Zenify",
-      "alternateName": ["Zenify Music", "ListenZenify", "Zenify Web Player"],
-      "url": "https://listenzenify.vercel.app/",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://listenzenify.vercel.app/discover?q={search_term_string}",
-        "query-input": "required name=search_term_string"
-      }
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://listenzenify.vercel.app/#website",
+          "name": "Zenify",
+          "alternateName": ["Zenify Music", "ListenZenify", "Zenify Web Player"],
+          "url": "https://listenzenify.vercel.app/",
+          "inLanguage": "en",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://listenzenify.vercel.app/discover?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://listenzenify.vercel.app/#organization",
+          "name": "Zenify",
+          "alternateName": ["Zendrum", "ListenZenify"],
+          "url": "https://listenzenify.vercel.app/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://listenzenify.vercel.app/favicon_z_512.png",
+            "width": 512,
+            "height": 512
+          },
+          "founder": {
+            "@type": "Person",
+            "name": "Ram Prasath",
+            "alternateName": ["Ramanathan S", "hackerstudent29", "ramzendrum"],
+            "url": "https://github.com/hackerstudent29"
+          },
+          "areaServed": "Worldwide",
+          "sameAs": [
+            "https://github.com/hackerstudent29/Zenify",
+            "https://github.com/hackerstudent29"
+          ]
+        }
+      ]
     }
     </script>
     <meta name="google-site-verification" content="google66ee582c33341a73" />

@@ -364,7 +364,22 @@ server.get('/api/config', async () => {
 });
 
 server.get('/', async () => {
-    return { message: 'Zenify API is running 🎵', documentation: '/documentation' };
+    return {
+        name: 'Zenify API',
+        version: '1.1.22',
+        status: 'ok',
+        message: 'Zenify API is running 🎵',
+        website: 'https://listenzenify.vercel.app',
+        llms: 'https://listenzenify.vercel.app/llms.txt',
+        sitemap: 'https://listenzenify.vercel.app/sitemap.xml',
+        documentation: '/documentation',
+    };
+});
+
+server.get('/robots.txt', async (_req, reply) => {
+    return reply
+        .type('text/plain; charset=utf-8')
+        .send('User-agent: *\nAllow: /.well-known/\nAllow: /room/\nDisallow: /api/\n');
 });
 
 import { CronService } from './services/cron.service';

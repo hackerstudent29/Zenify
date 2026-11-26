@@ -12,11 +12,17 @@ class RoomLink {
 }
 
 /// Parses `zenify://room/7K9ABC`, `zenify://room/7K9ABC?t=TOKEN`,
-/// `https://zenify.app/room/7K9ABC?t=TOKEN` (Android App Link). Returns null if not a room link.
-/// Hosts are configurable so staging/prod can differ.
+/// `https://listenzenify.vercel.app/room/7K9ABC?t=TOKEN`, and `/together?code=...` (Android App Link).
+/// Returns null if not a room link. Hosts are configurable so staging/prod can differ.
 RoomLink? parseRoomLink(
   Uri uri, {
-  Set<String> httpsHosts = const {'zenify.app', 'www.zenify.app', 'listenzenify.com', 'www.listenzenify.com'},
+  Set<String> httpsHosts = const {
+    'zenify.app',
+    'www.zenify.app',
+    'listenzenify.com',
+    'www.listenzenify.com',
+    'listenzenify.vercel.app',
+  },
 }) {
   final isCustom = uri.scheme == 'zenify' && uri.host == 'room';
   final isHttps = uri.scheme == 'https' && httpsHosts.contains(uri.host);
@@ -24,7 +30,11 @@ RoomLink? parseRoomLink(
   final segs = uri.pathSegments.where((s) => s.isNotEmpty).toList();
   String? code;
   if (isCustom && segs.isNotEmpty) code = segs.first;
-  if (isHttps && segs.length >= 2 && segs.first == 'room') code = segs[1];
+  if (isHttps && segs.length >= 2 && (segs.first == 'room' || segs.first == 'together' || segs.first == 'j')) {
+    code = segs[1];
+  } else if (isHttps && segs.isNotEmpty && segs.first == 'together') {
+    code = uri.queryParameters['code'];
+  }
   if (code == null) return null;
   code = code.toUpperCase();
   if (!RegExp(r'^[0-9A-HJKMNP-TV-Z]{6}$').hasMatch(code)) return null; // Crockford Base32, 6 chars (no I L O U)

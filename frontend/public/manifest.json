@@ -1,14 +1,16 @@
 {
   "id": "/",
-  "name": "Zenify – Free Music Player with Synced Lyrics & 8D Audio",
+  "name": "Zenify – Global Music Player, Synced Lyrics, Sound Atlas & 8D Audio",
   "short_name": "Zenify",
-  "description": "Stream millions of songs with sub-second synchronized lyrics in 50+ languages, studio 3-band EQ, 8D spatial audio, Listen Together rooms, and local file playback. Free & ad-free.",
+  "lang": "en",
+  "dir": "ltr",
+  "description": "Stream 320kbps music & 16:9 4K videos worldwide free. Explore Sound Atlas (177 countries, 76 cities), synced lyrics in 50+ languages, 20 DJ crossfades, Studio FX 8D audio, Room Together, and private local playback.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#030303",
   "theme_color": "#030303",
-  "categories": ["music", "entertainment"],
+  "categories": ["music", "entertainment", "multimedia"],
   "icons": [
     {
       "src": "/favicon-32x32.png",

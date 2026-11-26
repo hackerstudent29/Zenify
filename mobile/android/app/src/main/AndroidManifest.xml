@@ -33,6 +33,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:enableOnBackInvokedCallback="true"
         android:allowBackup="true"
+        android:supportsRtl="true"
         android:hasFragileUserData="true"
         android:usesCleartextTraffic="true">
         <!-- Disable experimental Impeller on Android to prevent CanAcceptOpacity validation breaks and pipeline stalls -->
@@ -60,20 +61,39 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Room Together custom scheme deep links -->
+            <!-- Zenify custom scheme deep links (Room Together, Sound Atlas, Replay, Media & Notifications) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="zenify" android:host="room"/>
+                <data android:scheme="zenify" android:host="atlas"/>
+                <data android:scheme="zenify" android:host="replay"/>
+                <data android:scheme="zenify" android:host="update"/>
+                <data android:scheme="zenify" android:host="downloads"/>
+                <data android:scheme="zenify" android:host="track"/>
+                <data android:scheme="zenify" android:host="album"/>
+                <data android:scheme="zenify" android:host="artist"/>
+                <data android:scheme="zenify" android:host="playlist"/>
             </intent-filter>
-            <!-- Room Together Universal App Links -->
+            <!-- Room Together & Web Catalog Universal App Links -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="zenify.app" android:pathPrefix="/room"/>
+                <data android:scheme="https" android:host="zenify.app" android:pathPrefix="/together"/>
+                <data android:scheme="https" android:host="zenify.app" android:pathPrefix="/j"/>
+                <data android:scheme="https" android:host="www.zenify.app" android:pathPrefix="/room"/>
                 <data android:scheme="https" android:host="listenzenify.com" android:pathPrefix="/room"/>
+                <data android:scheme="https" android:host="www.listenzenify.com" android:pathPrefix="/room"/>
+                <data android:scheme="https" android:host="listenzenify.vercel.app" android:pathPrefix="/room"/>
+                <data android:scheme="https" android:host="listenzenify.vercel.app" android:pathPrefix="/together"/>
+                <data android:scheme="https" android:host="listenzenify.vercel.app" android:pathPrefix="/j"/>
+                <data android:scheme="https" android:host="listenzenify.vercel.app" android:pathPrefix="/track"/>
+                <data android:scheme="https" android:host="listenzenify.vercel.app" android:pathPrefix="/album"/>
+                <data android:scheme="https" android:host="listenzenify.vercel.app" android:pathPrefix="/artist"/>
+                <data android:scheme="https" android:host="listenzenify.vercel.app" android:pathPrefix="/playlist"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

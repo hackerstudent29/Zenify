@@ -5,9 +5,39 @@
   "cleanUrls": false,
   "rewrites": [
     { "source": "/google66ee582c33341a73.html", "destination": "/google66ee582c33341a73.html" },
-    { "source": "/((?!assets/|favicon|manifest|logo|zenify_logo|og-image|sitemap|robots|google|llms|fonts/|.*\\..*).*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|\\.well-known/|favicon|manifest|logo|zenify_logo|og-image|sitemap|robots|google|llms|fonts/|.*\\..*).*)", "destination": "/index.html" }
   ],
   "headers": [
+    {
+      "source": "/(llms\\.txt|llms-full\\.txt|robots\\.txt)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/plain; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, s-maxage=3600"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "all"
+        }
+      ]
+    },
+    {
+      "source": "/sitemap\\.xml",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/xml; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, s-maxage=3600"
+        }
+      ]
+    },
     {
       "source": "/",
       "headers": [

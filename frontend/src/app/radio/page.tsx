@@ -11,9 +11,34 @@ export default function RadioPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-6 text-center">
       <SEO
-        title="Zenify Radio – Endless Curated Music Stations & Moods"
-        description="Tune in to non-stop streaming radio channels, chill beats, workout energy, and ambient focus stations on Zenify Radio."
+        title="Zenify Radio – Non-Stop Global Stations, Moods & Focus Streams"
+        description="Tune in to ad-free 24/7 radio channels for deep focus, midnight chill, workout energy, and global moods on Zenify Radio."
+        keywords={[
+          "zenify radio",
+          "free online music radio",
+          "deep focus music stream",
+          "lofi chill workout radio",
+          "ad-free curated radio",
+        ]}
         path="/radio"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "WebPage",
+              "@id": "https://listenzenify.vercel.app/radio#page",
+              url: "https://listenzenify.vercel.app/radio",
+              name: "Zenify Radio – Continuous Global Mood & Focus Stations",
+            },
+            {
+              "@type": "BreadcrumbList",
+              itemListElement: [
+                { "@type": "ListItem", position: 1, name: "Home", item: "https://listenzenify.vercel.app/" },
+                { "@type": "ListItem", position: 2, name: "Radio", item: "https://listenzenify.vercel.app/radio" },
+              ],
+            },
+          ],
+        }}
       />
       <div className="w-16 h-16 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center">
         <Radio className="text-brand w-8 h-8 animate-pulse" />

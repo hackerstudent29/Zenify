@@ -54,28 +54,74 @@ export default function DownloadPage() {
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen w-full bg-[#030303] pt-24 sm:pt-28 md:pt-32 pb-40 font-sans text-[#F2F2F3] selection:bg-white/15">
         <SEO
-          title="Download Zenify APK (v1.1.22) – Ad-Free Music for Android, iOS & Desktop"
-          description="Download the Zenify v1.1.22 Android APK package directly to your phone. 100% ad-free, 320kbps lossless streaming, YouTube video streaming, Room Together, synchronized lyrics, and Studio FX."
+          title="Download Zenify APK (v1.1.22) & PWA – Global Music & 4K Video App"
+          description="Download Zenify v1.1.22 Android APK (16.2 MB ARM64 / 36.8 MB Universal) or install the global PWA. 320kbps audio, Sound Atlas, 4K Video & synced lyrics."
           keywords={[
             "download zenify apk",
+            "zenify v1.1.22 apk",
             "zenify android app",
             "free ad-free music app apk",
+            "sound atlas music discovery app",
             "music player with synced lyrics apk",
-            "zenify pwa download"
+            "offline music video downloader android",
+            "20 dj crossfade player",
+            "zenify pwa ios windows mac",
           ]}
           path="/download"
           jsonLd={{
             "@context": "https://schema.org",
-            "@type": "MobileApplication",
-            name: "Zenify Music Player",
-            operatingSystem: "Android 8.0+",
-            softwareVersion: "1.1.22",
-            applicationCategory: "MultimediaApplication",
-            applicationSubCategory: "Music & Audio",
-            downloadUrl: "https://listenzenify.vercel.app/downloads/zenify.apk",
-            offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-            description:
-              "Free ad-free Android music player with 320kbps streaming, Room Together live synced listening rooms, native Studio FX DSP, and syllable-synced lyrics.",
+            "@graph": [
+              {
+                "@type": "MobileApplication",
+                "@id": "https://listenzenify.vercel.app/download#mobile-app",
+                name: "Zenify Music Player",
+                operatingSystem: "Android 8.0+ (API 26+)",
+                softwareVersion: "1.1.22",
+                datePublished: "2026-11-25",
+                fileSize: "16.2 MB",
+                applicationCategory: "MultimediaApplication",
+                applicationSubCategory: "Music & Audio",
+                inLanguage: ["en", "ta", "hi", "ml", "te", "ko", "ja", "es", "fr", "de", "pt", "ar"],
+                downloadUrl: "https://listenzenify.vercel.app/downloads/zenify.apk",
+                installUrl: "https://listenzenify.vercel.app/download",
+                screenshot: "https://listenzenify.vercel.app/og-image.png",
+                offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+                publisher: { "@id": "https://listenzenify.vercel.app/#organization" },
+                releaseNotes:
+                  "v1.1.22 Build 2036: Media3 ExoPlayer 1.9.2 audio focus & LoadControl upgrade, 20 DJ crossfade styles, Sound Atlas (177 countries & 76 cities), offline .mp4 video downloads, stationary plain lyrics, Song Credits, Replay & Insights (27 metrics), and 16 Story Share cards.",
+                featureList: [
+                  "Pristine 320kbps Clean CDN Audio",
+                  "Sound Atlas Interactive Map (177 Countries, 76 Cities, 11 Live Country Charts)",
+                  "16:9 4K Music Video Theater with Background Play & Offline .mp4 Downloads",
+                  "20 DJ Crossfade Styles (1s-12s Configurable)",
+                  "Word-by-Word Synced & Stationary Plain Lyrics in 50+ Languages",
+                  "Native Studio FX 3-Band EQ & 8D Spatial Audio",
+                  "Room Together Live Synced Listening (Up to 100 Listeners)",
+                  "Replay & Insights (27 Metrics), 16 Story Templates, Song Credits & Pure OLED Mode",
+                ],
+                description:
+                  "Free ad-free Android music and 4K video player (v1.1.22, Build 2036) with 320kbps streaming, Sound Atlas (177 countries), 20 DJ crossfades, Room Together, native Studio FX DSP, and synced lyrics.",
+              },
+              {
+                "@type": "HowTo",
+                "@id": "https://listenzenify.vercel.app/download#install-android",
+                name: "How to Install Zenify v1.1.22 on Android",
+                totalTime: "PT2M",
+                step: [
+                  { "@type": "HowToStep", position: 1, name: "Download the Zenify APK", text: "Download zenify-v1.1.22.apk (16.2 MB ARM64) or the 36.8 MB Universal APK from listenzenify.vercel.app/download." },
+                  { "@type": "HowToStep", position: 2, name: "Open APK in Chrome or Files", text: "Tap the completed APK file in your Android notification shade or Downloads folder." },
+                  { "@type": "HowToStep", position: 3, name: "Allow Unknown Apps for Installer", text: "Grant Allow from this source if Android prompts during your first sideload installation." },
+                  { "@type": "HowToStep", position: 4, name: "Install and Launch Zenify", text: "Tap Install and open Zenify (com.zenify.mobile) to stream ad-free music globally." },
+                ],
+              },
+              {
+                "@type": "BreadcrumbList",
+                itemListElement: [
+                  { "@type": "ListItem", position: 1, name: "Home", item: "https://listenzenify.vercel.app/" },
+                  { "@type": "ListItem", position: 2, name: "Download", item: "https://listenzenify.vercel.app/download" },
+                ],
+              },
+            ],
           }}
         />
 

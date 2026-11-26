@@ -570,9 +570,40 @@ export default function LocalLibraryPage() {
       }}
     >
       <SEO
-        title="Local Audio Player – Play MP3, FLAC & WAV in Browser – Zenify"
-        description="Play your local music files directly in browser with ID3 metadata parsing, 8D audio effects, equalizer, and private playback."
+        title="Local Audio Player – Play MP3, FLAC & WAV Privately | Zenify"
+        description="Play local MP3, FLAC, WAV, and AAC audio files offline in your browser with ID3 tag parsing, 3-band EQ, 8D spatial audio, and 100% on-device privacy."
+        keywords={[
+          "browser flac player",
+          "online local mp3 player",
+          "play local audio files with eq",
+          "id3 tag reader browser player",
+          "8d audio local music player",
+          "private offline audio player",
+        ]}
         path="/local-library"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "WebApplication",
+              "@id": "https://listenzenify.vercel.app/local-library#app",
+              url: "https://listenzenify.vercel.app/local-library",
+              name: "Zenify Local Audio Player",
+              applicationCategory: "MultimediaApplication",
+              operatingSystem: "Web Browser",
+              offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+              description:
+                "Private client-side browser player for local MP3, FLAC, WAV, and AAC files with ID3 metadata extraction and Web Audio Studio FX DSP.",
+            },
+            {
+              "@type": "BreadcrumbList",
+              itemListElement: [
+                { "@type": "ListItem", position: 1, name: "Home", item: "https://listenzenify.vercel.app/" },
+                { "@type": "ListItem", position: 2, name: "Local Library", item: "https://listenzenify.vercel.app/local-library" },
+              ],
+            },
+          ],
+        }}
       />
       {/* Hidden File & Folder Inputs */}
       <input

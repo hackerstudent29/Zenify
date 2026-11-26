@@ -56,7 +56,20 @@ export function SEO({
       <title>{fullTitle}</title>
       <meta name="description" content={cleanDescription} />
       {keywordContent && <meta name="keywords" content={keywordContent} />}
+      <meta name="application-name" content="Zenify" />
+      <meta name="author" content="Ram Prasath (hackerstudent29)" />
       <link rel="canonical" href={canonicalUrl} />
+      {!noindex && (
+        <>
+          <link rel="alternate" hrefLang="en" href={canonicalUrl} />
+          <link rel="alternate" hrefLang="en-US" href={canonicalUrl} />
+          <link rel="alternate" hrefLang="en-IN" href={canonicalUrl} />
+          <link rel="alternate" hrefLang="en-GB" href={canonicalUrl} />
+          <link rel="alternate" hrefLang="x-default" href={canonicalUrl} />
+        </>
+      )}
+      <link rel="alternate" type="text/plain" title="llms.txt" href="https://listenzenify.vercel.app/llms.txt" />
+      <link rel="alternate" type="text/plain" title="llms-full.txt" href="https://listenzenify.vercel.app/llms-full.txt" />
 
       {/* Robots */}
       {noindex ? (
@@ -76,6 +89,10 @@ export function SEO({
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
       <meta property="og:locale" content="en_US" />
+      <meta property="og:locale:alternate" content="en_IN" />
+      <meta property="og:locale:alternate" content="en_GB" />
+      <meta property="og:locale:alternate" content="en_CA" />
+      <meta property="og:locale:alternate" content="en_AU" />
 
       {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />

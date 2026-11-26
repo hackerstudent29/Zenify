@@ -351,11 +351,11 @@
   <tr>
     <td width="50%" valign="top">
       <h3>📥 Smart offline downloads</h3>
-      Chunked parallel downloader grabs audio (<code>.m4a</code>), HD artwork and synced lyrics (<code>.lrc</code>) in one go. <b>Wi-Fi Only Guardian</b> keeps your mobile data safe.
+      Chunked parallel downloader grabs audio (<code>.m4a</code>), offline music videos (<code>.mp4</code>), HD artwork, and synced/plain lyrics in one go. <b>Wi-Fi Only Guardian</b> keeps your mobile data safe.
     </td>
     <td width="50%" valign="top">
-      <h3>💎 Liquid Glass &amp; Pure OLED</h3>
-      Apple-style glass with real-time blur and rim lighting. Switch on Pure OLED <code>#000000</code> Blackout Mode to turn off AMOLED pixels and save battery.
+      <h3>💎 Liquid Glass, Song Credits &amp; Pure OLED</h3>
+      Apple-style glass with real-time blur, rim lighting, dedicated <b>Song Credits</b>, and stationary plain full lyrics. Switch on Pure OLED <code>#000000</code> Blackout Mode to turn off AMOLED pixels and save battery.
     </td>
   </tr>
   <tr>
@@ -364,8 +364,18 @@
       Full YouTube Music catalog parity: songs, videos, artists, albums and playlists. Live autocomplete, filter chips, and paste any YouTube / YouTube Music link to play or import instantly.
     </td>
     <td width="50%" valign="top">
-      <h3>📊 Insights, Replay &amp; sharing</h3>
-      Weekly listening stats, top artists, heatmaps, achievements (Night Owl, Genre Explorer, Century Club), Private Listening Mode, Apple-style story cards and song dedications.
+      <h3>🗺️ Sound Atlas (177 Countries &amp; 76 Cities)</h3>
+      Explore an interactive 177-country vector world map, 76 curated global music cities, and 11 live country chart feeds spanning 50+ languages across the globe.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>📊 Insights, Replay &amp; 16 Story Templates</h3>
+      Track 27 Replay listening telemetry metrics, monthly/all-time recaps, top artists, heatmaps, achievements, and shareable Story Cards plus song dedications.
+    </td>
+    <td width="50%" valign="top">
+      <h3>🌐 Open-source &amp; global PWA</h3>
+      100% MIT open-source with zero trackers, on-device encrypted storage, Android App Links, and an instant installable PWA at <a href="https://listenzenify.vercel.app">listenzenify.vercel.app</a>.
     </td>
   </tr>
 </table>
@@ -668,7 +678,13 @@ Test transitions on real song pairs in *Settings → Crossfade* before you liste
 <details>
   <summary><b>Is there an iPhone or web version?</b></summary>
   <br />
-  Zenify is built for Android. The web player is in legacy status (see below) and all active development goes into the Android app.
+  Zenify's primary focus is the native Android app, while the global Web Player &amp; installable PWA (<a href="https://listenzenify.vercel.app">listenzenify.vercel.app</a>) runs on Chrome, Edge, Windows, macOS, and iOS/iPadOS Safari via <i>Add to Home Screen</i>.
+</details>
+
+<details>
+  <summary><b>Does Zenify work worldwide across languages and countries?</b></summary>
+  <br />
+  Yes. <b>Sound Atlas</b> covers 177 countries, 76 curated cities, and 11 live country chart feeds (India, US, UK, Germany, Canada, Australia, Japan, France, Brazil, South Korea, and UAE), paired with synced/plain lyrics and script romanization in 50+ languages.
 </details>
 
 <details>
@@ -681,7 +697,7 @@ Test transitions on real song pairs in *Settings → Crossfade* before you liste
 
 ## 💻 For Developers
 
-You'll need: [Flutter SDK](https://docs.flutter.dev/) 3.44.2 • [Dart SDK](https://dart.dev/) 3.12.0 • Android Studio or VS Code with the Flutter extension • Android SDK (API 26+)
+You'll need: [Flutter SDK](https://docs.flutter.dev/) 3.44.2 • [Dart SDK](https://dart.dev/) 3.12.2 • Android Studio or VS Code with the Flutter extension • Android SDK (API 26+)
 
 ```bash
 # 1. Clone the repository
@@ -720,7 +736,7 @@ Output files:
 ## 🌐 About the Web Player
 
 > [!NOTE]
-> The browser player at [listenzenify.vercel.app](https://listenzenify.vercel.app/) is in sunset / legacy status because of browser audio limits, mobile background-playback restrictions and ISP/CORS stream blocks. All active work — hardware DSP, 16:9 video and new features — goes into the **Zenify Android app**.
+> The browser player &amp; download portal at [listenzenify.vercel.app](https://listenzenify.vercel.app/) ([Download Hub](https://listenzenify.vercel.app/download) • [FAQ](https://listenzenify.vercel.app/faq)) offers PWA streaming worldwide, while primary hardware DSP, 16:9 4K Video Theater, offline `.mp4`/`.m4a` downloads, and Sound Atlas development targets the **Zenify Android app**.
 
 ---
 

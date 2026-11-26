@@ -51,13 +51,30 @@ for (const { route, file } of testRoutes) {
   const h1Count = h1Matches.length;
   const h1Text = h1Matches.length > 0 ? h1Matches[0].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim() : 'NONE';
 
-  // Extract JSON-LD scripts
-  const jsonLdCount = (content.match(/<script\s+type="application\/ld\+json"[^>]*>/gi) || []).length;
+  // Extract JSON-LD scripts & validate JSON syntax
+  const jsonLdBlocks = [...content.matchAll(/<script\s+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)];
+  const jsonLdCount = jsonLdBlocks.length;
+  for (const block of jsonLdBlocks) {
+    try {
+      JSON.parse(block[1]);
+    } catch (err) {
+      console.error(`  [FAIL] Invalid JSON-LD on ${route}: ${err?.message || err}`);
+      allPrerenderOk = false;
+    }
+  }
+
+  // Extract x-default hreflang
+  const hreflangMatch = content.match(/<link\s+rel="alternate"\s+hreflang="x-default"\s+href="([^"]*)"/i);
+  const hreflangDefault = hreflangMatch ? hreflangMatch[1] : 'NONE';
+
+  // Ensure no stale release versions leak into prerendered SEO HTML
+  const hasStaleVersion = /\bv1\.0\.[89]\b|Version 1\.0\.[89]/i.test(content);
 
   console.log(`Route: ${route}`);
   console.log(`  File: ${file}`);
   console.log(`  Title: "${title}" (length: ${title.length})`);
   console.log(`  Canonical: ${canonical}`);
+  console.log(`  Hreflang x-default: ${hreflangDefault}`);
   console.log(`  Description: "${desc.slice(0, 70)}..." (length: ${desc.length})`);
   console.log(`  H1 Count: ${h1Count} -> "${h1Text.slice(0, 60)}"`);
   console.log(`  JSON-LD scripts: ${jsonLdCount}`);
@@ -68,6 +85,14 @@ for (const { route, file } of testRoutes) {
   }
   if (canonical === 'NONE') {
     console.warn(`  [WARN] Missing canonical on ${route}`);
+    allPrerenderOk = false;
+  }
+  if (hreflangDefault !== canonical) {
+    console.warn(`  [WARN] hreflang x-default (${hreflangDefault}) does not match canonical (${canonical}) on ${route}`);
+    allPrerenderOk = false;
+  }
+  if (hasStaleVersion) {
+    console.warn(`  [WARN] Found stale v1.0.8/v1.0.9 reference in ${route}`);
     allPrerenderOk = false;
   }
 }
@@ -162,8 +187,24 @@ if (fs.existsSync(robotsPath)) {
   });
 }
 
-// 5. Check og-image.png
-console.log('\n--- 5. Checking og-image.png ---');
+// 5. Check AIEO / AI Knowledge Base files (llms.txt & llms-full.txt)
+console.log('\n--- 5. Checking AI Engine Optimization (llms.txt / llms-full.txt / robots.txt) ---');
+const llmsPath = path.resolve('public/llms.txt');
+const llmsFullPath = path.resolve('public/llms-full.txt');
+const llmsOk =
+  fs.existsSync(llmsPath) &&
+  fs.existsSync(llmsFullPath) &&
+  fs.readFileSync(llmsPath, 'utf8').includes('v1.1.22') &&
+  !/\bv1\.0\.[89]\b/.test(fs.readFileSync(llmsPath, 'utf8'));
+const robotsAiOk =
+  fs.existsSync(robotsPath) &&
+  fs.readFileSync(robotsPath, 'utf8').includes('OAI-SearchBot') &&
+  fs.readFileSync(robotsPath, 'utf8').includes('llms-full.txt');
+console.log(`  llms.txt & llms-full.txt (v1.1.22): ${llmsOk ? '[PASS]' : '[FAIL]'}`);
+console.log(`  robots.txt AI crawlers & llms-full.txt: ${robotsAiOk ? '[PASS]' : '[FAIL]'}`);
+
+// 6. Check og-image.png
+console.log('\n--- 6. Checking og-image.png ---');
 const ogPath = path.resolve('public/og-image.png');
 const ogOk = fs.existsSync(ogPath);
 if (ogOk) {
@@ -177,7 +218,7 @@ console.log('\n==================================================');
 console.log('              AUDIT COMPLETED                     ');
 console.log('==================================================');
 
-if (!allPrerenderOk || missingNoIndex > 0 || !ogOk) {
-  console.error(`\n[FAILED] SEO audit found issues (prerenderOk=${allPrerenderOk}, missingNoIndex=${missingNoIndex}, ogOk=${ogOk}).`);
+if (!allPrerenderOk || missingNoIndex > 0 || !ogOk || !llmsOk || !robotsAiOk) {
+  console.error(`\n[FAILED] SEO audit found issues (prerenderOk=${allPrerenderOk}, missingNoIndex=${missingNoIndex}, ogOk=${ogOk}, llmsOk=${llmsOk}, robotsAiOk=${robotsAiOk}).`);
   process.exit(1);
 }
