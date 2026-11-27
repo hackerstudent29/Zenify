@@ -221,6 +221,9 @@ function AuthPageContent() {
       showToast(msg, "error");
       setIsGoogleLoading(false);
     },
+    onNonOAuthError: () => {
+      setIsGoogleLoading(false);
+    },
   });
 
   const handleForgotPasswordRequest = async (e: React.FormEvent) => {
@@ -851,7 +854,11 @@ function AuthPageContent() {
 }
 
 export default function AuthPage() {
-  const clientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '') as string;
+  const clientId = (
+    import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+    import.meta.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+    '362498893988-fnrqfrbcb6nbs2j2gvnev10qabc4c2en.apps.googleusercontent.com'
+  ) as string;
   return (
     <GoogleOAuthProvider clientId={clientId}>
       <AuthPageContent />

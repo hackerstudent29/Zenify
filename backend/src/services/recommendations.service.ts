@@ -828,12 +828,20 @@ export class RecommendationsService {
     let resolvedLang = meta?.language;
     let resolvedCountry = meta?.country;
     let userFavoriteArtists: string[] = [];
+    const suppressedKeys = new Set<string>();
+    const suppressedSigs = new Set<string>();
+
+    const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 
     if (userId) {
       try {
-        const [prefs, u] = await Promise.all([
+        const [prefs, u, supRows] = await Promise.all([
           prisma.userPreferences.findUnique({ where: { userId } }),
-          prisma.user.findUnique({ where: { id: userId }, select: { country: true } })
+          prisma.user.findUnique({ where: { id: userId }, select: { country: true } }),
+          prisma.userTrackSuppression.findMany({
+            where: { ownerKey: `user:${userId}` },
+            select: { trackKey: true, signature: true, title: true }
+          }).catch(() => [])
         ]);
         if (prefs) {
           resolvedLang = prefs.selectedLanguageName || prefs.languages?.[0] || resolvedLang;
@@ -841,6 +849,14 @@ export class RecommendationsService {
           if (Array.isArray(prefs.favoriteArtists)) {
             userFavoriteArtists = (prefs.favoriteArtists as any[]).map(a => typeof a === 'string' ? a : a?.name).filter(Boolean);
           }
+        }
+        for (const s of supRows) {
+          if (s.trackKey) {
+            suppressedKeys.add(s.trackKey);
+            suppressedKeys.add(`yt-${s.trackKey}`);
+          }
+          if (s.signature) suppressedSigs.add(s.signature);
+          if (s.title) suppressedSigs.add(norm(s.title));
         }
       } catch {}
     }
@@ -856,7 +872,6 @@ export class RecommendationsService {
     const seenTitles = new Set<string>();
     const finalQueue: any[] = [];
 
-    const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
     const seedTitleNorm = meta?.title ? norm(meta.title) : '';
 
     // Prioritize favorite artists if present
@@ -874,7 +889,9 @@ export class RecommendationsService {
     for (const t of vibeTracks) {
       if (!t || !t.id) continue;
       if (meta?.excludeIds && meta.excludeIds.has(t.id)) continue;
+      if (suppressedKeys.has(t.id) || (t.providerId && suppressedKeys.has(t.providerId))) continue;
       const tNorm = norm(t.title || '');
+      if (tNorm && suppressedSigs.has(tNorm)) continue;
       if (seedTitleNorm && tNorm === seedTitleNorm) continue;
       if (seenTitles.has(tNorm)) continue;
 

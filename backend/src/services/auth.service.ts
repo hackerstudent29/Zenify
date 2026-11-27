@@ -813,6 +813,44 @@ export class AuthService {
             data: { userId: targetUserId }
         }).catch(() => {});
 
+        // Migrate song reports and Suggest Less suppressions from guest session
+        await prisma.songReport.updateMany({
+            where: { userId: guestId },
+            data: { userId: targetUserId }
+        }).catch(() => {});
+
+        const guestSuppressions = await prisma.userTrackSuppression.findMany({
+            where: {
+                OR: [{ userId: guestId }, { ownerKey: `guest:${guestId}` }]
+            }
+        }).catch(() => []);
+        for (const sup of guestSuppressions) {
+            await prisma.userTrackSuppression.upsert({
+                where: {
+                    ownerKey_trackKey: {
+                        ownerKey: `user:${targetUserId}`,
+                        trackKey: sup.trackKey,
+                    }
+                },
+                create: {
+                    ownerKey: `user:${targetUserId}`,
+                    userId: targetUserId,
+                    deviceKey: null,
+                    trackKey: sup.trackKey,
+                    signature: sup.signature,
+                    title: sup.title,
+                    artist: sup.artist,
+                    album: sup.album,
+                    coverUrl: sup.coverUrl,
+                    isVideo: sup.isVideo,
+                    suppressionLevel: sup.suppressionLevel,
+                    reason: sup.reason,
+                },
+                update: {},
+            }).catch(() => {});
+            await prisma.userTrackSuppression.delete({ where: { id: sup.id } }).catch(() => {});
+        }
+
         // Delete guest user
         await prisma.user.delete({ where: { id: guestId } }).catch(() => {});
 
@@ -852,7 +890,9 @@ export class AuthService {
                 likes: { include: { track: true } },
                 followedArtists: true,
                 listeningEvents: { take: 500, orderBy: { startedAt: 'desc' } },
-                stats: true
+                stats: true,
+                suppressedTracks: true,
+                songReports: { include: { screenshots: true } }
             }
         });
 
@@ -879,6 +919,8 @@ export class AuthService {
             await prisma.playlist.deleteMany({ where: { userId } });
             await prisma.like.deleteMany({ where: { userId } });
             await prisma.artistFollow.deleteMany({ where: { userId } });
+            await prisma.userTrackSuppression.deleteMany({ where: { userId } });
+            await prisma.songReport.updateMany({ where: { userId }, data: { userId: null } });
             await prisma.track.updateMany({ where: { userId }, data: { userId: null } });
 
             await prisma.user.delete({ where: { id: userId } });

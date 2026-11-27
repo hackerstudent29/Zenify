@@ -61,6 +61,8 @@ model User {
   userHourlyStats UserHourlyStat[]
   userAchievements UserAchievement[]
   savedAlbums     SavedAlbum[]
+  songReports     SongReport[]
+  suppressedTracks UserTrackSuppression[]
 }
 
 model Subscription {
@@ -1263,5 +1265,82 @@ model TogetherRoomRecap {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("room_recaps")
+}
+
+model SongReport {
+  id                 String                 @id @default(uuid())
+  ticketCode         String                 @unique @map("ticket_code") @db.VarChar(24)
+  userId             String?                @map("user_id")
+  deviceKey          String?                @map("device_key") @db.VarChar(128)
+  reporterEmail      String?                @map("reporter_email") @db.VarChar(255)
+  reporterName       String?                @map("reporter_name") @db.VarChar(120)
+  trackId            String                 @map("track_id") @db.VarChar(128)
+  trackTitle         String                 @map("track_title") @db.VarChar(256)
+  artistName         String                 @map("artist_name") @db.VarChar(256)
+  albumName          String?                @map("album_name") @db.VarChar(256)
+  coverUrl           String?                @map("cover_url")
+  isVideo            Boolean                @default(false) @map("is_video")
+  category           String                 @db.VarChar(64)
+  subIssues          String[]               @default([]) @map("sub_issues")
+  severity           String                 @default("medium") @db.VarChar(16)
+  description        String?                @db.Text
+  suggestedSolutions String[]               @default([]) @map("suggested_solutions")
+  userSolution       String?                @map("user_solution") @db.Text
+  appVersion         String?                @map("app_version") @db.VarChar(32)
+  platform           String?                @db.VarChar(32)
+  audioQuality       String?                @map("audio_quality") @db.VarChar(32)
+  contextSource      String?                @map("context_source") @db.VarChar(64)
+  status             String                 @default("OPEN") @db.VarChar(24)
+  adminNotes         String?                @map("admin_notes") @db.Text
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+  user               User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  screenshots        SongReportScreenshot[]
+
+  @@index([userId, createdAt])
+  @@index([deviceKey, createdAt])
+  @@index([trackId])
+  @@index([status, createdAt])
+  @@map("song_reports")
+}
+
+model SongReportScreenshot {
+  id        String     @id @default(uuid())
+  reportId  String     @map("report_id")
+  url       String     @db.Text
+  mimeType  String     @map("mime_type") @db.VarChar(64)
+  sizeBytes Int        @default(0) @map("size_bytes")
+  position  Int        @default(0)
+  createdAt DateTime   @default(now()) @map("created_at")
+  report    SongReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId, position])
+  @@map("song_report_screenshots")
+}
+
+model UserTrackSuppression {
+  id               String   @id @default(uuid())
+  ownerKey         String   @map("owner_key") @db.VarChar(160)
+  userId           String?  @map("user_id")
+  deviceKey        String?  @map("device_key") @db.VarChar(128)
+  trackKey         String   @map("track_key") @db.VarChar(128)
+  signature        String   @db.VarChar(256)
+  title            String   @db.VarChar(256)
+  artist           String   @db.VarChar(256)
+  album            String?  @db.VarChar(256)
+  coverUrl         String?  @map("cover_url")
+  isVideo          Boolean  @default(false) @map("is_video")
+  suppressionLevel String   @default("ultra_less") @map("suppression_level") @db.VarChar(24)
+  reason           String?  @db.VarChar(64)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  user             User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerKey, trackKey])
+  @@index([ownerKey])
+  @@index([userId])
+  @@index([deviceKey])
+  @@index([signature])
+  @@map("user_track_suppressions")
 }
 

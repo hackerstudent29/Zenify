@@ -26,12 +26,12 @@ export interface QuickLrcResult {
  * Returns null if API key not set, quota exceeded, or request fails.
  */
 export async function alignWithQuickLrc(_audioUrl: string, _lyrics: string): Promise<string | null> {
-    void QUICKLRC_BASE;
-    void axios;
-    return null;
+  void QUICKLRC_BASE;
+  void axios;
+  return null;
 }
 
 export function isQuickLrcAvailable(): boolean {
-    void config;
-    return false;
+  void config;
+  return false;
 }

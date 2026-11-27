@@ -76,8 +76,31 @@ server.register(rateLimit, {
 function isOriginAllowed(origin: string | undefined): boolean {
     // Native Android app requests have no browser Origin header.
     if (!origin) return true;
-    // Allow local development origins only; website origins are disconnected.
-    return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    // Allow all local development origins (Flutter Chrome :8085, Preview :8080, Vite :5173, etc.)
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return true;
+    }
+    const allowedOrigins = [
+        ...config.FRONTEND_URL.split(','),
+        'https://listenzenify.vercel.app',
+        'https://listenzenify.com',
+        'https://www.listenzenify.com',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:3001',
+        'http://127.0.0.1:3001',
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+    ].map(o => o.trim()).filter(Boolean);
+
+    const isVercel = (
+        origin === 'https://listenzenify.vercel.app' ||
+        origin === 'https://listenzenify.com' ||
+        /^https:\/\/listenzenify[a-z0-9-]*\.vercel\.app$/.test(origin) ||
+        /^https:\/\/zenify[a-z0-9-]*\.vercel\.app$/.test(origin)
+    );
+
+    return allowedOrigins.includes(origin) || isVercel;
 }
 
 server.register(cors, {
@@ -93,7 +116,7 @@ server.register(cors, {
     allowedHeaders: [
         'Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization',
         'Range', 'baggage', 'sentry-trace', 'x-user-language', 'x-user-languages', 'x-user-country', 'x-user-recent-artists', 'x-admin-key',
-        'Idempotency-Key', 'X-Timezone', 'X-Together-Ticket', 'X-Guest-Id', 'X-Guest-Name'
+        'Idempotency-Key', 'X-Timezone', 'X-Together-Ticket', 'X-Guest-Id', 'X-Guest-Name', 'X-Device-Key'
     ],
     exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length', 'Content-Type'],
 });
@@ -229,9 +252,14 @@ import { registerTogetherWebSocket } from './websocket/together-ws';
 import { ScheduledPublishService } from './services/scheduled-publish.service';
 import { followRoutes } from './routes/follow.routes';
 import { replayRoutes } from './routes/replay.routes';
+import { emptySocialState, socialPublicRoutes, socialRoutes, type SocialState } from './routes/social.routes';
+import { emptyProfileState, profileRoutes, type ProfileState } from './routes/profile.routes';
+import type { Authenticator } from './auth/auth';
+import { JsonStore } from './store/jsonStore';
 import { meRoutes } from './routes/me.routes';
 import { libraryRoutes } from './routes/library.routes';
 import { lyricsPipelineRoutes } from './routes/lyrics-pipeline.routes';
+import { feedbackRoutes } from './routes/feedback.routes';
 
 server.register(authMiddleware);
 
@@ -252,9 +280,40 @@ server.register(togetherV1Routes, { prefix: '/api/v1/together' });
 server.register(togetherPublicRoutes);
 server.register(registerTogetherWebSocket);
 server.register(followRoutes, { prefix: '/api/me' });
-server.register(replayRoutes, { prefix: '/api/replay' });
+server.register(async (replayApp) => {
+    const replayDataDir = process.env.REPLAY_DATA_DIR || path.join(process.cwd(), 'data', 'replay');
+    const [socialStore, profileStore] = await Promise.all([
+        new JsonStore<SocialState>(path.join(replayDataDir, 'social.json'), emptySocialState).init(),
+        new JsonStore<ProfileState>(path.join(replayDataDir, 'profiles.json'), emptyProfileState).init(),
+    ]);
+
+    const extractJwtUser: Authenticator = async (req) => {
+        try {
+            if (req.headers.authorization) {
+                await req.jwtVerify();
+            } else if ((req as any).cookies?.accessToken) {
+                (req as any).user = await server.jwt.verify((req as any).cookies.accessToken);
+            } else {
+                return null;
+            }
+            const u = (req as any).user;
+            const id = u?.id ?? u?.userId ?? u?.sub;
+            return id ? { id: String(id) } : null;
+        } catch {
+            return null;
+        }
+    };
+
+    const publicWebUrl = process.env.PUBLIC_WEB_URL || 'https://listenzenify.vercel.app';
+
+    await replayApp.register(replayRoutes, { prefix: '/api/replay', optionalAuthenticate: server.optionalAuthenticate });
+    await replayApp.register(socialRoutes({ store: socialStore, auth: extractJwtUser, publicBaseUrl: publicWebUrl }), { prefix: '/api/replay' });
+    await replayApp.register(profileRoutes({ store: profileStore, auth: extractJwtUser }), { prefix: '/api/replay' });
+    await replayApp.register(socialPublicRoutes({ store: socialStore, webBaseUrl: publicWebUrl }));
+});
 server.register(meRoutes, { prefix: '/api/me' });
 server.register(libraryRoutes, { prefix: '/api/me/library' });
+server.register(feedbackRoutes, { prefix: '/api/me' });
 server.register(lyricsPipelineRoutes, { prefix: '/api' });
 
 server.get('/health', async () => {

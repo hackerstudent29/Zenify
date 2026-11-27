@@ -751,4 +751,57 @@ export async function databaseAdminRoutes(server: FastifyInstance) {
             });
         }
     });
+
+    /**
+     * 10. GET /api/admin/database/reports
+     * Lists user-submitted song complaints and attached screenshots for admin review.
+     */
+    server.get('/reports', { preHandler: adminGuard }, async (req: FastifyRequest<{ Querystring: { status?: string; limit?: string } }>, reply: FastifyReply) => {
+        try {
+            const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || '50', 10) || 50));
+            const statusFilter = req.query.status?.trim();
+            const reports = await prisma.songReport.findMany({
+                where: statusFilter ? { status: statusFilter } : undefined,
+                include: { screenshots: { orderBy: { position: 'asc' } } },
+                orderBy: { createdAt: 'desc' },
+                take: limit,
+            });
+            return reply.send({ reports });
+        } catch (error: any) {
+            return reply.status(500).send({
+                success: false,
+                error: 'Failed to load song reports',
+                details: error?.message,
+            });
+        }
+    });
+
+    /**
+     * 11. PATCH /api/admin/database/reports/:id
+     * Updates status or internal resolution notes on a song report.
+     */
+    server.patch('/reports/:id', { preHandler: adminGuard }, async (req: FastifyRequest<{ Params: { id: string }; Body: { status?: string; adminNotes?: string } }>, reply: FastifyReply) => {
+        try {
+            const allowedStatuses = new Set(['OPEN', 'IN_REVIEW', 'RESOLVED', 'DISMISSED']);
+            const nextStatus = req.body?.status?.trim().toUpperCase();
+            if (nextStatus && !allowedStatuses.has(nextStatus)) {
+                return reply.status(400).send({ error: 'Invalid status value' });
+            }
+            const updated = await prisma.songReport.update({
+                where: { id: req.params.id },
+                data: {
+                    ...(nextStatus ? { status: nextStatus } : {}),
+                    ...(req.body?.adminNotes !== undefined ? { adminNotes: req.body.adminNotes } : {}),
+                },
+                include: { screenshots: { orderBy: { position: 'asc' } } },
+            });
+            return reply.send({ report: updated });
+        } catch (error: any) {
+            return reply.status(500).send({
+                success: false,
+                error: 'Failed to update song report',
+                details: error?.message,
+            });
+        }
+    });
 }

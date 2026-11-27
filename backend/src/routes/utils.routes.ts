@@ -234,8 +234,8 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
 
     const isLocalBlocked = Date.now() < localYtBlockCooldownUntil;
     if (ytBin && !isLocalBlocked && verifiedUrlToExtract) {
-        // Priority: ios, mweb, web_creator, android, tv_embedded
-        const gClients: (string | null)[] = ['ios', 'mweb', 'web_creator', 'android', 'tv_embedded'];
+        // Prioritize fastest unblocked clients first with tight timeouts before falling back to Infinity Gates
+        const gClients: (string | null)[] = ['ios', 'android'];
         let botBlockCount = 0;
         for (const client of gClients) {
             try {
@@ -253,10 +253,10 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
                     ...(client ? ['--extractor-args', `youtube:player_client=${client}`] : []),
                     '-f', 'ba/18/b/best',
                     '--no-playlist',
-                    '--socket-timeout', '8',
+                    '--socket-timeout', '5',
                     verifiedUrlToExtract
                 ];
-                const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 9500 });
+                const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 5500 });
                 const urls = stdout.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('http'));
                 const directMediaUrl = urls.find(u => u.includes('mime=audio') || u.includes('audio')) || urls[0];
                 if (directMediaUrl && directMediaUrl.startsWith('http')) {
@@ -267,12 +267,15 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
                 server.log.warn(`[stream-youtube] Direct URL lookup -g (${client || 'default-node'}) failed: ${gErr.message}`);
                 if (gErr.message?.includes('Sign in to confirm') || gErr.message?.includes('bot') || gErr.message?.includes('429')) {
                     botBlockCount++;
+                    // Engage circuit breaker immediately if bot/429 challenge hits so subsequent tracks route via Infinity Gates in <1s
+                    localYtBlockCooldownUntil = Date.now() + 120 * 1000;
+                    break;
                 }
             }
         }
         if (botBlockCount === gClients.length) {
-            server.log.warn(`[stream-youtube] YouTube IP block/bot challenge detected across all clients. Engaging 30-second circuit breaker.`);
-            localYtBlockCooldownUntil = Date.now() + 30 * 1000;
+            server.log.warn(`[stream-youtube] YouTube IP block/bot challenge detected. Engaging 120-second circuit breaker.`);
+            localYtBlockCooldownUntil = Date.now() + 120 * 1000;
         }
     } else if (isLocalBlocked) {
         server.log.info(`[stream-youtube] Host IP in active circuit breaker cooldown. Routing directly to Infinity Gates network.`);
@@ -360,7 +363,7 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
         } catch {}
     }
 
-    // Gate 2: Distributed Piped API instances in parallel race
+    // Gate 2 & 3: Distributed Piped + Invidious + Cobalt in simultaneous parallel race (<3.5s)
     if (videoId) {
         const pipedEndpoints = [
             `https://pipedapi.kavin.rocks/streams/${videoId}`,
@@ -369,7 +372,6 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
             `https://pipedapi.drgns.space/streams/${videoId}`,
             `https://pipedapi.leptons.xyz/streams/${videoId}`
         ];
-
         const fetchPiped = async (endpoint: string): Promise<string> => {
             const res = await axios.get(endpoint, { timeout: 3500 });
             const audioStreams = res.data?.audioStreams;
@@ -380,17 +382,6 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
             throw new Error(`No stream at ${endpoint}`);
         };
 
-        try {
-            const directUrl = await Promise.any(pipedEndpoints.map(fetchPiped));
-            if (directUrl) {
-                server.log.info(`[stream-youtube] Infinity Gate 2 (Piped) parallel race successfully resolved stream!`);
-                return directUrl;
-            }
-        } catch {}
-    }
-
-    // Gate 3: Distributed Invidious Instances in parallel race
-    if (videoId) {
         const invidiousEndpoints = [
             `https://inv.nadeko.net/api/v1/videos/${videoId}`,
             `https://invidious.nerdvpn.de/api/v1/videos/${videoId}`,
@@ -399,7 +390,6 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
             `https://invidious.projectsegfau.lt/api/v1/videos/${videoId}`,
             `https://yt.artemislena.eu/api/v1/videos/${videoId}`
         ];
-
         const fetchInvidious = async (endpoint: string): Promise<string> => {
             const res = await axios.get(endpoint, { timeout: 3500 });
             const formats = res.data?.adaptiveFormats;
@@ -411,9 +401,12 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
         };
 
         try {
-            const directUrl = await Promise.any(invidiousEndpoints.map(fetchInvidious));
+            const directUrl = await Promise.any([
+                ...pipedEndpoints.map(fetchPiped),
+                ...invidiousEndpoints.map(fetchInvidious),
+            ]);
             if (directUrl) {
-                server.log.info(`[stream-youtube] Infinity Gate 3 (Invidious) parallel race successfully resolved stream!`);
+                server.log.info(`[stream-youtube] Infinity Gates (Piped/Invidious parallel race) resolved stream!`);
                 return directUrl;
             }
         } catch {}
