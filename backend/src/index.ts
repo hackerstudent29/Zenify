@@ -237,10 +237,15 @@ import { trackRoutes } from './routes/track.routes';
 import { searchRoutes } from './routes/search.routes';
 import { playlistRoutes } from './routes/playlist.routes';
 import { albumRoutes } from './routes/album.routes';
+import { billingRoutes } from './routes/billing.routes';
+import { analyticsRoutes } from './routes/analytics.routes';
 import { metadataRoutes } from './routes/metadata.routes';
+import { homepageRoutes } from './routes/homepage.routes';
 import { utilsRoutes } from './routes/utils.routes';
+import { webhookRoutes } from './routes/webhook.routes';
 import { artistRoutes } from './routes/artist.routes';
 import { notificationRoutes } from './routes/notification.routes';
+import { settingsRoutes } from './routes/settings.routes';
 import { authMiddleware } from './middleware/auth';
 import { preferencesRoutes } from './routes/preferences.routes';
 import { activityRoutes } from './routes/activity.routes';
@@ -250,7 +255,10 @@ import { togetherPublicRoutes, togetherV1Routes } from './routes/together-v1.rou
 import { RoomLifecycleScheduler } from './services/together/room-lifecycle.scheduler';
 import { registerTogetherWebSocket } from './websocket/together-ws';
 import { ScheduledPublishService } from './services/scheduled-publish.service';
+import { shareRoutes } from './routes/share.routes';
 import { followRoutes } from './routes/follow.routes';
+import { dayMixRoutes } from './routes/day-mix.routes';
+import { blendRoutes } from './routes/blend.routes';
 import { replayRoutes } from './routes/replay.routes';
 import { emptySocialState, socialPublicRoutes, socialRoutes, type SocialState } from './routes/social.routes';
 import { emptyProfileState, profileRoutes, type ProfileState } from './routes/profile.routes';
@@ -258,6 +266,8 @@ import type { Authenticator } from './auth/auth';
 import { JsonStore } from './store/jsonStore';
 import { meRoutes } from './routes/me.routes';
 import { libraryRoutes } from './routes/library.routes';
+import { discoveryRoutes } from './routes/discovery.routes';
+import { databaseAdminRoutes } from './routes/database-admin.routes';
 import { lyricsPipelineRoutes } from './routes/lyrics-pipeline.routes';
 import { feedbackRoutes } from './routes/feedback.routes';
 
@@ -268,8 +278,13 @@ server.register(trackRoutes, { prefix: '/api/tracks' });
 server.register(searchRoutes, { prefix: '/api/search' });
 server.register(playlistRoutes, { prefix: '/api/playlists' });
 server.register(albumRoutes, { prefix: '/api/albums' });
+server.register(billingRoutes, { prefix: '/api/billing' });
+server.register(analyticsRoutes, { prefix: '/api/analytics' });
 server.register(metadataRoutes, { prefix: '/api/metadata' });
+server.register(homepageRoutes, { prefix: '/api/homepage' });
+server.register(settingsRoutes, { prefix: '/api/settings' });
 server.register(utilsRoutes, { prefix: '/api/utils' });
+server.register(webhookRoutes, { prefix: '/webhooks' });
 server.register(artistRoutes, { prefix: '/api/artists' });
 server.register(notificationRoutes, { prefix: '/api/notifications' });
 server.register(preferencesRoutes, { prefix: '/api/preferences' });
@@ -279,7 +294,10 @@ server.register(togetherRoutes, { prefix: '/api/together' });
 server.register(togetherV1Routes, { prefix: '/api/v1/together' });
 server.register(togetherPublicRoutes);
 server.register(registerTogetherWebSocket);
+server.register(shareRoutes);
 server.register(followRoutes, { prefix: '/api/me' });
+server.register(dayMixRoutes, { prefix: '/api/me' });
+server.register(blendRoutes, { prefix: '/api/me' });
 server.register(async (replayApp) => {
     const replayDataDir = process.env.REPLAY_DATA_DIR || path.join(process.cwd(), 'data', 'replay');
     const [socialStore, profileStore] = await Promise.all([
@@ -314,6 +332,8 @@ server.register(async (replayApp) => {
 server.register(meRoutes, { prefix: '/api/me' });
 server.register(libraryRoutes, { prefix: '/api/me/library' });
 server.register(feedbackRoutes, { prefix: '/api/me' });
+server.register(discoveryRoutes, { prefix: '/api/discover' });
+server.register(databaseAdminRoutes, { prefix: '/api/admin/database' });
 server.register(lyricsPipelineRoutes, { prefix: '/api' });
 
 server.get('/health', async () => {

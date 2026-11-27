@@ -795,8 +795,8 @@ export default function DatabaseAdminPage() {
 
     let eventSource: EventSource | null = null;
     try {
-      const baseUrl = getApiBaseUrl().replace(/\/+$/, "");
-      const sseUrl = `${baseUrl}/api/admin/database/logs/stream`;
+      const baseOrigin = getApiBaseUrl().replace(/\/api\/?$/, "").replace(/\/+$/, "");
+      const sseUrl = `${baseOrigin}/api/admin/database/logs/stream`;
       eventSource = new EventSource(sseUrl, { withCredentials: true });
 
       eventSource.onopen = () => {
@@ -1006,7 +1006,7 @@ export default function DatabaseAdminPage() {
   const nodePid = systemHealth?.pid || (typeof process !== "undefined" && (process as any).pid) || "—";
 
   const summary: { label: string; count: number; icon: LucideIcon; tone: Tone }[] = [
-    { label: "Users", count: overviewData?.counts?.users ?? 29, icon: Users, tone: "blue" },
+    { label: "Users", count: overviewData?.counts?.users ?? 0, icon: Users, tone: "blue" },
     { label: "Tracks", count: overviewData?.counts?.tracks ?? 0, icon: Music, tone: "brand" },
     { label: "Artists", count: overviewData?.counts?.artists ?? 0, icon: Radio, tone: "orange" },
     { label: "Albums", count: overviewData?.counts?.albums ?? 0, icon: Layers, tone: "purple" },
